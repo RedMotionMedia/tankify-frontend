@@ -1,0 +1,56 @@
+type Props = {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    onSearch: () => void;
+    onPickOnMap: () => void;
+    loading: boolean;
+    pickActive: boolean;
+    searchLabel: string;
+    mapLabel: string;
+};
+
+export default function LocationField({
+                                          label,
+                                          value,
+                                          onChange,
+                                          onSearch,
+                                          onPickOnMap,
+                                          loading,
+                                          pickActive,
+                                          searchLabel,
+                                          mapLabel,
+                                      }: Props) {
+    return (
+        <div>
+            <label className="mb-2 block text-sm font-medium">{label}</label>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") onSearch();
+                    }}
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                />
+                <button
+                    type="button"
+                    onClick={onSearch}
+                    className="rounded-2xl bg-black px-4 py-3 text-white"
+                >
+                    {loading ? "..." : searchLabel}
+                </button>
+                <button
+                    type="button"
+                    onClick={onPickOnMap}
+                    className={`rounded-2xl px-4 py-3 text-white ${
+                        pickActive ? "bg-blue-600" : "bg-gray-700"
+                    }`}
+                >
+                    {mapLabel}
+                </button>
+            </div>
+        </div>
+    );
+}
