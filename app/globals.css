@@ -13,28 +13,68 @@ body {
   box-sizing: border-box;
 }
 
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+button,
+.leaflet-popup-content,
+.leaflet-popup-content * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .leaflet-container {
   height: 100%;
   width: 100%;
 }
 
 .price-badge-marker {
-  background: transparent;
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none;
 }
 
 .price-badge-inner {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
-  height: 22px;
+  min-width: 56px;
+  height: 24px;
   padding: 0 8px;
   border-radius: 9999px;
   background: #2563eb;
   color: white;
   font-size: 11px;
   font-weight: 700;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
   white-space: nowrap;
+}
+
+.map-resizable {
+  resize: vertical;
+  overflow: auto;
+  min-height: 420px;
+  max-height: 85vh;
+}
+
+.mobile-sheet {
+  min-height: 48vh;
+}
+
+.map-resizable {
+  resize: vertical;
+  overflow: auto;
+  height: 460px;
+  min-height: 420px;
+  max-height: 85vh;
 }

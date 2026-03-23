@@ -1,7 +1,7 @@
 "use client";
 
 import L, { type LeafletMouseEvent } from "leaflet";
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     CircleMarker,
     MapContainer,
@@ -57,16 +57,9 @@ const markerIcon = new L.Icon({
 
 async function reverseGeocode(lat: number, lon: number) {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
 
-    const res = await fetch(url, {
-        headers: {
-            Accept: "application/json",
-        },
-    });
-
-    if (!res.ok) {
-        return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-    }
+    if (!res.ok) return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 
     const data = await res.json();
     return data.display_name || `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
@@ -101,9 +94,7 @@ async function fetchStationsForVisibleMap(bounds: {
         try {
             const data = await res.json();
             if (data?.error) message = data.error;
-        } catch {
-            // ignore
-        }
+        } catch {}
         return { stations: [], error: message };
     }
 
@@ -121,11 +112,9 @@ function ClickHandler({
     useMapEvents({
         async click(e: LeafletMouseEvent) {
             if (!pickMode) return;
-
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
             const label = await reverseGeocode(lat, lon);
-
             onMapPick(pickMode, { lat, lon, label });
         },
     });
@@ -167,13 +156,9 @@ function SearchHereControl({
     const map = useMap();
     const [loading, setLoading] = useState(false);
     const [hint, setHint] = useState("Tippe auf „Hier suchen“ für Tankstellen.");
-    const mountedRef = useRef(true);
 
     useEffect(() => {
-        mountedRef.current = true;
-
         function onMoveStart() {
-            if (!mountedRef.current) return;
             setHint("Kartenausschnitt geändert – „Hier suchen“ drücken.");
         }
 
@@ -181,7 +166,6 @@ function SearchHereControl({
         map.on("zoomstart", onMoveStart);
 
         return () => {
-            mountedRef.current = false;
             map.off("movestart", onMoveStart);
             map.off("zoomstart", onMoveStart);
         };
@@ -223,8 +207,7 @@ function SearchHereControl({
                         : "Keine Tankstellen gefunden."
                 );
             }
-        } catch (error) {
-            console.error(error);
+        } catch {
             onStationsLoaded([]);
             setHint("Tankstellen konnten nicht geladen werden.");
         } finally {
@@ -233,12 +216,12 @@ function SearchHereControl({
     }
 
     return (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-1000 -translate-x-1/2">
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-1000 -translate-x-1/2">
             <div className="flex flex-col items-center gap-2">
                 <button
                     type="button"
                     onClick={handleSearchHere}
-                    className="pointer-events-auto rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700"
+                    className="pointer-events-auto rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700"
                 >
                     {loading ? "Lädt ..." : "Hier suchen"}
                 </button>
@@ -259,13 +242,19 @@ function PriceBadge({
     fuelType: FuelType;
 }) {
     const value = fuelType === "diesel" ? station.diesel : station.super95;
-
     if (value === null || value === undefined) return null;
 
     return (
-        <div className="rounded-full bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow">
-            {value.toFixed(3)}
-        </div>
+        <Marker
+            position={[station.lat, station.lon]}
+            interactive={false}
+            icon={L.divIcon({
+                className: "price-badge-marker",
+                html: `<div class="price-badge-inner">${value.toFixed(3)}</div>`,
+                iconSize: [56, 24],
+                iconAnchor: [28, 38],
+            })}
+        />
     );
 }
 
@@ -292,117 +281,107 @@ function StationsLayer({
                     selectedPrice !== null && selectedPrice !== undefined;
 
                 return (
-                    <CircleMarker
-                        key={station.id}
-                        center={[station.lat, station.lon]}
-                        radius={8}
-                        pathOptions={{
-                            color: hasPrice ? "#2563eb" : "#dc2626",
-                            fillColor: hasPrice ? "#60a5fa" : "#ef4444",
-                            fillOpacity: 0.9,
-                            weight: 2,
-                        }}
+                    <React.Fragment key={station.id}>
+                        <CircleMarker
+                            center={[station.lat, station.lon]}
+                            radius={8}
+                            pathOptions={{
+                                color: hasPrice ? "#2563eb" : "#dc2626",
+                                fillColor: hasPrice ? "#60a5fa" : "#ef4444",
+                                fillOpacity: 0.9,
+                                weight: 2,
+                            }}
+                        >
+                            <Popup>
+                                <div className="min-w-60 select-text">
+                                    <div className="text-base font-semibold">{station.name}</div>
+
+                                    {station.address ? (
+                                        <div className="mt-1 text-sm text-gray-700">
+                                            {station.address}
+                                        </div>
+                                    ) : null}
+
+                                    {station.city ? (
+                                        <div className="text-sm text-gray-500">{station.city}</div>
+                                    ) : null}
+
+                                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                                        <div className="rounded-lg bg-gray-50 p-2">
+                                            <div className="text-gray-500">Diesel</div>
+                                            <div className="font-semibold">
+                                                {formatPrice(station.diesel)}
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-lg bg-gray-50 p-2">
+                                            <div className="text-gray-500">Super 95</div>
+                                            <div className="font-semibold">
+                                                {formatPrice(station.super95)}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 flex items-center justify-between text-xs">
+                    <span
+                        className={
+                            station.open === true
+                                ? "font-medium text-green-600"
+                                : station.open === false
+                                    ? "font-medium text-red-600"
+                                    : "text-gray-500"
+                        }
                     >
-                        <Popup>
-                            <div className="min-w-60">
-                                <div className="text-base font-semibold">{station.name}</div>
+                      {station.open === true
+                          ? "Geöffnet"
+                          : station.open === false
+                              ? "Geschlossen"
+                              : "Öffnungsstatus unbekannt"}
+                    </span>
 
-                                {station.address ? (
-                                    <div className="mt-1 text-sm text-gray-700">
-                                        {station.address}
-                                    </div>
-                                ) : null}
-
-                                {station.city ? (
-                                    <div className="text-sm text-gray-500">{station.city}</div>
-                                ) : null}
-
-                                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                                    <div className="rounded-lg bg-gray-50 p-2">
-                                        <div className="text-gray-500">Diesel</div>
-                                        <div className="font-semibold">
-                                            {formatPrice(station.diesel)}
-                                        </div>
+                                        <span className="text-gray-400">
+                      {station.source === "econtrol-match"
+                          ? "Preis: E-Control"
+                          : "Preis: —"}
+                    </span>
                                     </div>
 
-                                    <div className="rounded-lg bg-gray-50 p-2">
-                                        <div className="text-gray-500">Super 95</div>
-                                        <div className="font-semibold">
-                                            {formatPrice(station.super95)}
-                                        </div>
+                                    <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                        Ausgewählter Kraftstoff:{" "}
+                                        <span className="font-semibold">
+                      {fuelType === "diesel" ? "Diesel" : "Benzin"}
+                    </span>
+                                        {" · "}Preis:{" "}
+                                        <span className="font-semibold">
+                      {formatPrice(selectedPrice)}
+                    </span>
                                     </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            onSelectStationAsDestination({
+                                                point: {
+                                                    lat: station.lat,
+                                                    lon: station.lon,
+                                                    label: station.name,
+                                                },
+                                                price: selectedPrice,
+                                                station,
+                                            })
+                                        }
+                                        className="mt-3 w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
+                                    >
+                                        Als Ziel wählen
+                                    </button>
                                 </div>
-
-                                <div className="mt-3 flex items-center justify-between text-xs">
-                  <span
-                      className={
-                          station.open === true
-                              ? "font-medium text-green-600"
-                              : station.open === false
-                                  ? "font-medium text-red-600"
-                                  : "text-gray-500"
-                      }
-                  >
-                    {station.open === true
-                        ? "Geöffnet"
-                        : station.open === false
-                            ? "Geschlossen"
-                            : "Öffnungsstatus unbekannt"}
-                  </span>
-
-                                    <span className="text-gray-400">
-                    {station.source === "econtrol-match"
-                        ? "Preis: E-Control"
-                        : "Preis: —"}
-                  </span>
-                                </div>
-
-                                <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                    Ausgewählter Kraftstoff:{" "}
-                                    <span className="font-semibold">
-                    {fuelType === "diesel" ? "Diesel" : "Benzin"}
-                  </span>
-                                    {" · "}
-                                    Preis:{" "}
-                                    <span className="font-semibold">
-                    {formatPrice(selectedPrice)}
-                  </span>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        onSelectStationAsDestination({
-                                            point: {
-                                                lat: station.lat,
-                                                lon: station.lon,
-                                                label: station.name,
-                                            },
-                                            price: selectedPrice,
-                                            station,
-                                        })
-                                    }
-                                    className="mt-3 w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
-                                >
-                                    Als Ziel wählen
-                                </button>
-                            </div>
-                        </Popup>
+                            </Popup>
+                        </CircleMarker>
 
                         {hasPrice ? (
-                            <Marker
-                                position={[station.lat, station.lon]}
-                                icon={L.divIcon({
-                                    className: "price-badge-marker",
-                                    html: `<div class="price-badge-inner">${selectedPrice!.toFixed(
-                                        3
-                                    )}</div>`,
-                                    iconSize: [52, 22],
-                                    iconAnchor: [26, 36],
-                                })}
-                            />
+                            <PriceBadge station={station} fuelType={fuelType} />
                         ) : null}
-                    </CircleMarker>
+                    </React.Fragment>
                 );
             })}
         </>
@@ -432,15 +411,14 @@ export default function MapPicker({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
+                <ResizeFix />
+                <RecenterControl start={start} end={end} routeGeometry={routeGeometry} />
                 <SearchHereControl onStationsLoaded={setStations} />
                 <FitBounds start={start} end={end} routeGeometry={routeGeometry} />
                 <ClickHandler pickMode={pickMode} onMapPick={onMapPick} />
 
                 {routeGeometry.length > 0 ? (
-                    <Polyline
-                        positions={routeGeometry}
-                        pathOptions={{ color: "#2563eb", weight: 5 }}
-                    />
+                    <Polyline positions={routeGeometry} pathOptions={{ color: "#2563eb", weight: 5 }} />
                 ) : null}
 
                 <StationsLayer
@@ -456,7 +434,81 @@ export default function MapPicker({
                 <Marker position={[end.lat, end.lon]} icon={markerIcon}>
                     <Popup>Ziel: {end.label}</Popup>
                 </Marker>
+
             </MapContainer>
         </div>
     );
+}
+
+function RecenterControl({
+                             start,
+                             end,
+                             routeGeometry,
+                         }: {
+    start: Point;
+    end: Point;
+    routeGeometry: [number, number][];
+}) {
+    const map = useMap();
+
+    function handleRecenter() {
+        const points =
+            routeGeometry.length > 0
+                ? routeGeometry
+                : [
+                    [start.lat, start.lon],
+                    [end.lat, end.lon],
+                ];
+
+        map.fitBounds(points as [number, number][], { padding: [30, 30] });
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 50);
+    }
+
+    return (
+        <div className="pointer-events-none absolute left-3 top-3 z-1000">
+            <button
+                type="button"
+                onClick={handleRecenter}
+                className="pointer-events-auto rounded-full bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-lg"
+            >
+                Zentrieren
+            </button>
+        </div>
+    );
+}
+
+function ResizeFix() {
+    const map = useMap();
+
+    useEffect(() => {
+        const container = map.getContainer();
+
+        const runInvalidate = () => {
+            requestAnimationFrame(() => {
+                map.invalidateSize();
+            });
+        };
+
+        const observer = new ResizeObserver(() => {
+            runInvalidate();
+        });
+
+        observer.observe(container);
+
+        // direkt nach Mount auch einmal
+        const t1 = setTimeout(runInvalidate, 0);
+        const t2 = setTimeout(runInvalidate, 150);
+        const t3 = setTimeout(runInvalidate, 400);
+
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearTimeout(t3);
+            observer.disconnect();
+        };
+    }, [map]);
+
+    return null;
 }

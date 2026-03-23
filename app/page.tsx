@@ -105,11 +105,9 @@ async function fetchRoute(start: Point, end: Point): Promise<RouteData | null> {
   const url = `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`;
 
   const res = await fetch(url);
-
   if (!res.ok) return null;
 
   const data = await res.json();
-
   if (!data.routes || !data.routes.length) return null;
 
   const route = data.routes[0];
@@ -137,13 +135,10 @@ export default function Page() {
   const [tankSize, setTankSize] = useState(45);
   const [avgSpeed, setAvgSpeed] = useState(70);
 
-  const [searchLoading, setSearchLoading] = useState<"start" | "end" | null>(
-      null
-  );
+  const [searchLoading, setSearchLoading] = useState<"start" | "end" | null>(null);
   const [error, setError] = useState("");
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
-
   const [mapPickMode, setMapPickMode] = useState<"start" | "end" | null>(null);
 
   async function geocode(query: string): Promise<Point | null> {
@@ -152,17 +147,12 @@ export default function Page() {
     )}`;
 
     const res = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
+      headers: { Accept: "application/json" },
     });
 
-    if (!res.ok) {
-      throw new Error("Adresssuche fehlgeschlagen.");
-    }
+    if (!res.ok) throw new Error("Adresssuche fehlgeschlagen.");
 
     const data: GeocodeResult[] = await res.json();
-
     if (!data.length) return null;
 
     return {
@@ -223,14 +213,11 @@ export default function Page() {
           setRouteData(null);
         }
       } finally {
-        if (!cancelled) {
-          setRouteLoading(false);
-        }
+        if (!cancelled) setRouteLoading(false);
       }
     }
 
     loadRoute();
-
     return () => {
       cancelled = true;
     };
@@ -238,7 +225,6 @@ export default function Page() {
 
   const oneWayKm = routeData?.distanceKm ?? 0;
   const roundTripKm = oneWayKm * 2;
-
   const estimatedHoursOneWay =
       routeData?.durationHours ?? (avgSpeed > 0 ? oneWayKm / avgSpeed : 0);
   const estimatedHoursRoundTrip = estimatedHoursOneWay * 2;
@@ -251,7 +237,6 @@ export default function Page() {
   const netSaving = grossSavingFullTank - tripCost;
 
   const breakEvenDiff = tankSize > 0 ? tripCost / tankSize : 0;
-
   const maxConsumption =
       roundTripKm > 0 && destinationPrice > 0
           ? (tankSize * priceDifference) / ((roundTripKm / 100) * destinationPrice)
@@ -259,224 +244,320 @@ export default function Page() {
 
   const profit = useMemo(() => getProfitLevel(netSaving), [netSaving]);
 
+  const controls = (
+      <div className="space-y-5">
+        <div>
+          <label className="mb-2 block text-sm font-medium">Kraftstoff</label>
+          <select
+              value={fuelType}
+              onChange={(e) => setFuelType(e.target.value as FuelType)}
+              className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+          >
+            <option value="diesel">Diesel</option>
+            <option value="super95">Benzin</option>
+          </select>
+        </div>
+
+        <LocationField
+            label="Startpunkt"
+            value={startText}
+            onChange={setStartText}
+            onSearch={() => handleSearch("start")}
+            onPickOnMap={() => setMapPickMode("start")}
+            loading={searchLoading === "start"}
+            pickActive={mapPickMode === "start"}
+        />
+
+        <LocationField
+            label="Zielort"
+            value={endText}
+            onChange={setEndText}
+            onSearch={() => handleSearch("end")}
+            onPickOnMap={() => setMapPickMode("end")}
+            loading={searchLoading === "end"}
+            pickActive={mapPickMode === "end"}
+        />
+
+        <SliderNumberField
+            label="Spritpreis zuhause"
+            min={1}
+            max={3}
+            step={0.001}
+            value={localPrice}
+            onChange={setLocalPrice}
+            unit="€/L"
+        />
+
+        <SliderNumberField
+            label="Spritpreis am Ziel"
+            min={1}
+            max={3}
+            step={0.001}
+            value={destinationPrice}
+            onChange={setDestinationPrice}
+            unit="€/L"
+        />
+
+        <SliderNumberField
+            label="Verbrauch"
+            min={3}
+            max={25}
+            step={0.1}
+            value={consumption}
+            onChange={setConsumption}
+            unit="L / 100 km"
+        />
+
+        <SliderNumberField
+            label="Tankgröße"
+            min={20}
+            max={120}
+            step={1}
+            value={tankSize}
+            onChange={setTankSize}
+            unit="L"
+        />
+
+        <SliderNumberField
+            label="Ø Geschwindigkeit"
+            min={30}
+            max={130}
+            step={1}
+            value={avgSpeed}
+            onChange={setAvgSpeed}
+            unit="km/h"
+        />
+
+        {mapPickMode ? (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Klicke jetzt auf die Karte, um{" "}
+              {mapPickMode === "start" ? "den Startpunkt" : "den Zielort"} zu setzen.
+            </div>
+        ) : null}
+
+        {error ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+        ) : null}
+      </div>
+  );
+
+  const rightContent = (
+      <section className="space-y-6">
+        <div className="map-resizable rounded-3xl bg-white shadow-sm">
+          <div className="h-full overflow-hidden rounded-3xl">
+            <MapPicker
+                start={startPoint}
+                end={endPoint}
+                routeGeometry={routeData?.geometry ?? []}
+                pickMode={mapPickMode}
+                fuelType={fuelType}
+                onMapPick={(type, point) => {
+                  if (type === "start") {
+                    setStartPoint(point);
+                    setStartText(point.label);
+                  } else {
+                    setEndPoint(point);
+                    setEndText(point.label);
+                  }
+                  setMapPickMode(null);
+                }}
+                onSelectStationAsDestination={({ point, price }) => {
+                  setEndPoint(point);
+                  setEndText(point.label);
+                  if (price !== null && price !== undefined) {
+                    setDestinationPrice(price);
+                  }
+                }}
+            />
+          </div>
+        </div>
+
+        <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-500">Netto-Ersparnis</span>
+            <span className={`text-sm font-semibold ${profit.colorClass}`}>{profit.label}</span>
+          </div>
+          <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
+            {formatCurrency(netSaving)}
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-white p-5 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm text-gray-500">Lohnt sich Skala</span>
+            <span className={`text-sm font-semibold ${profit.colorClass}`}>{profit.label}</span>
+          </div>
+
+          <div className="relative pt-2 pb-8">
+            <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
+            <div
+                className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
+                style={{ left: `${profit.percent}%` }}
+            >
+              ▲
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-600">
+            Je weiter rechts, desto stärker lohnt sich die Fahrt.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+              title="Einfache Strecke"
+              value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
+          />
+          <StatCard
+              title="Hin & retour"
+              value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
+          />
+          <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
+          <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
+          <StatCard
+              title="Fahrzeit einfach"
+              value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
+          />
+          <StatCard
+              title="Fahrzeit gesamt"
+              value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
+          />
+          <StatCard
+              title="Ersparnis bei vollem Tank"
+              value={formatCurrency(grossSavingFullTank)}
+          />
+          <StatCard
+              title="Netto-Ersparnis"
+              value={formatCurrency(netSaving)}
+              valueClassName={profit.colorClass}
+          />
+          <StatCard
+              title="Break-even Unterschied"
+              value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
+          />
+          <StatCard
+              title="Max. Verbrauch"
+              value={`${maxConsumption.toFixed(1)} L / 100 km`}
+          />
+        </div>
+      </section>
+  );
+
   return (
       <main className="min-h-screen bg-neutral-100 p-4 md:p-8">
-        <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_1fr]">
-          <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <div className="mx-auto hidden max-w-7xl gap-6 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
+          <section className="rounded-3xl bg-white p-6 shadow-sm self-start">
+            <h1 className="text-3xl font-bold">Tankify</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
+            </p>
+            <div className="mt-6">{controls}</div>
+          </section>
+          {rightContent}
+        </div>
+
+        <div className="lg:hidden">
+          <div className="fixed inset-0 z-0">
+            <MapPicker
+                start={startPoint}
+                end={endPoint}
+                routeGeometry={routeData?.geometry ?? []}
+                pickMode={mapPickMode}
+                fuelType={fuelType}
+                onMapPick={(type, point) => {
+                  if (type === "start") {
+                    setStartPoint(point);
+                    setStartText(point.label);
+                  } else {
+                    setEndPoint(point);
+                    setEndText(point.label);
+                  }
+                  setMapPickMode(null);
+                }}
+                onSelectStationAsDestination={({ point, price }) => {
+                  setEndPoint(point);
+                  setEndText(point.label);
+                  if (price !== null && price !== undefined) {
+                    setDestinationPrice(price);
+                  }
+                }}
+            />
+          </div>
+
+          <div className="mobile-sheet relative z-10 mt-[52vh] rounded-t-[28px] bg-white px-4 pb-10 pt-3 shadow-2xl">
+            <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300" />
             <h1 className="text-3xl font-bold">Tankify</h1>
             <p className="mt-2 text-sm text-gray-600">
               Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
             </p>
 
-            <div className="mt-6 space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Kraftstoff
-                </label>
-                <select
-                    value={fuelType}
-                    onChange={(e) => setFuelType(e.target.value as FuelType)}
-                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
-                >
-                  <option value="diesel">Diesel</option>
-                  <option value="super95">Benzin</option>
-                </select>
-              </div>
+            <div className="mt-6 space-y-6">
+              {controls}
 
-              <LocationField
-                  label="Startpunkt"
-                  value={startText}
-                  onChange={setStartText}
-                  onSearch={() => handleSearch("start")}
-                  onPickOnMap={() => setMapPickMode("start")}
-                  loading={searchLoading === "start"}
-                  pickActive={mapPickMode === "start"}
-              />
-
-              <LocationField
-                  label="Zielort"
-                  value={endText}
-                  onChange={setEndText}
-                  onSearch={() => handleSearch("end")}
-                  onPickOnMap={() => setMapPickMode("end")}
-                  loading={searchLoading === "end"}
-                  pickActive={mapPickMode === "end"}
-              />
-
-              <SliderNumberField
-                  label="Spritpreis zuhause"
-                  min={1}
-                  max={3}
-                  step={0.001}
-                  value={localPrice}
-                  onChange={setLocalPrice}
-                  unit="€/L"
-              />
-
-              <SliderNumberField
-                  label="Spritpreis am Ziel"
-                  min={1}
-                  max={3}
-                  step={0.001}
-                  value={destinationPrice}
-                  onChange={setDestinationPrice}
-                  unit="€/L"
-              />
-
-              <SliderNumberField
-                  label="Verbrauch"
-                  min={3}
-                  max={25}
-                  step={0.1}
-                  value={consumption}
-                  onChange={setConsumption}
-                  unit="L / 100 km"
-              />
-
-              <SliderNumberField
-                  label="Tankgröße"
-                  min={20}
-                  max={120}
-                  step={1}
-                  value={tankSize}
-                  onChange={setTankSize}
-                  unit="L"
-              />
-
-              <SliderNumberField
-                  label="Ø Geschwindigkeit"
-                  min={30}
-                  max={130}
-                  step={1}
-                  value={avgSpeed}
-                  onChange={setAvgSpeed}
-                  unit="km/h"
-              />
-
-              {mapPickMode ? (
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                    Klicke jetzt auf die Karte, um{" "}
-                    {mapPickMode === "start" ? "den Startpunkt" : "den Zielort"} zu
-                    setzen.
-                  </div>
-              ) : null}
-
-              {error ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
-                  </div>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="space-y-6">
-            <div className="h-80 overflow-hidden rounded-3xl bg-white shadow-sm md:h-105">
-              <MapPicker
-                  start={startPoint}
-                  end={endPoint}
-                  routeGeometry={routeData?.geometry ?? []}
-                  pickMode={mapPickMode}
-                  fuelType={fuelType}
-                  onMapPick={(type, point) => {
-                    if (type === "start") {
-                      setStartPoint(point);
-                      setStartText(point.label);
-                    } else {
-                      setEndPoint(point);
-                      setEndText(point.label);
-                    }
-
-                    setMapPickMode(null);
-                  }}
-                  onSelectStationAsDestination={({ point, price }) => {
-                    setEndPoint(point);
-                    setEndText(point.label);
-
-                    if (price !== null && price !== undefined) {
-                      setDestinationPrice(price);
-                    }
-                  }}
-              />
-            </div>
-
-            <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Netto-Ersparnis</span>
-                <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                {profit.label}
-              </span>
-              </div>
-
-              <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
-                {formatCurrency(netSaving)}
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm text-gray-500">Lohnt sich Skala</span>
-                <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                {profit.label}
-              </span>
-              </div>
-
-              <div className="relative pt-2 pb-8">
-                <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
-
-                <div
-                    className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
-                    style={{ left: `${profit.percent}%` }}
-                >
-                  ▲
+              <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Netto-Ersparnis</span>
+                  <span className={`text-sm font-semibold ${profit.colorClass}`}>
+                  {profit.label}
+                </span>
+                </div>
+                <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
+                  {formatCurrency(netSaving)}
                 </div>
               </div>
 
-              <p className="text-sm text-gray-600">
-                Je weiter rechts, desto stärker lohnt sich die Fahrt.
-              </p>
-            </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Lohnt sich Skala</span>
+                  <span className={`text-sm font-semibold ${profit.colorClass}`}>
+                  {profit.label}
+                </span>
+                </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <StatCard
-                  title="Einfache Strecke"
-                  value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
-              />
-              <StatCard
-                  title="Hin & retour"
-                  value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
-              />
-              <StatCard
-                  title="Preisunterschied"
-                  value={`${priceDifference.toFixed(3)} €/L`}
-              />
-              <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
-              <StatCard
-                  title="Fahrzeit einfach"
-                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
-              />
-              <StatCard
-                  title="Fahrzeit gesamt"
-                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
-              />
-              <StatCard
-                  title="Ersparnis bei vollem Tank"
-                  value={formatCurrency(grossSavingFullTank)}
-              />
-              <StatCard
-                  title="Netto-Ersparnis"
-                  value={formatCurrency(netSaving)}
-                  valueClassName={profit.colorClass}
-              />
-              <StatCard
-                  title="Break-even Unterschied"
-                  value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
-              />
-              <StatCard
-                  title="Max. Verbrauch"
-                  value={`${maxConsumption.toFixed(1)} L / 100 km`}
-              />
+                <div className="relative pt-2 pb-8">
+                  <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
+                  <div
+                      className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
+                      style={{ left: `${profit.percent}%` }}
+                  >
+                    ▲
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <StatCard
+                    title="Einfache Strecke"
+                    value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
+                />
+                <StatCard
+                    title="Hin & retour"
+                    value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
+                />
+                <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
+                <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
+                <StatCard
+                    title="Fahrzeit einfach"
+                    value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
+                />
+                <StatCard
+                    title="Fahrzeit gesamt"
+                    value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
+                />
+                <StatCard
+                    title="Ersparnis bei vollem Tank"
+                    value={formatCurrency(grossSavingFullTank)}
+                />
+                <StatCard
+                    title="Netto-Ersparnis"
+                    value={formatCurrency(netSaving)}
+                    valueClassName={profit.colorClass}
+                />
+              </div>
             </div>
-          </section>
+          </div>
         </div>
       </main>
   );
@@ -539,9 +620,7 @@ function SliderNumberField({
               max={max}
               step={step}
               value={Number(formatInputValue(value, step))}
-              onChange={(e) =>
-                  onChange(clamp(Number(e.target.value || 0), min, max))
-              }
+              onChange={(e) => onChange(clamp(Number(e.target.value || 0), min, max))}
               className="w-full rounded-xl border border-gray-300 px-3 py-2 sm:w-28"
           />
         </div>
@@ -579,10 +658,7 @@ function LocationField({
               }}
               className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
           />
-          <button
-              onClick={onSearch}
-              className="rounded-2xl bg-black px-4 py-3 text-white"
-          >
+          <button onClick={onSearch} className="rounded-2xl bg-black px-4 py-3 text-white">
             {loading ? "..." : "Suchen"}
           </button>
           <button
