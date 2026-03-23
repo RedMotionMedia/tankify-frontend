@@ -1,8 +1,16 @@
 "use client";
 
-import L from "leaflet";
-import { useMemo, useState } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
+import L, { type LeafletMouseEvent } from "leaflet";
+import { useEffect, useMemo } from "react";
+import {
+    MapContainer,
+    Marker,
+    Polyline,
+    Popup,
+    TileLayer,
+    useMap,
+    useMapEvents,
+} from "react-leaflet";
 
 type Point = {
     lat: number;
@@ -13,18 +21,12 @@ type Point = {
 type Props = {
     start: Point;
     end: Point;
-    onSelectStart: (point: Point) => void;
-    onSelectEnd: (point: Point) => void;
+    routeGeometry: [number, number][];
+    pickMode: "start" | "end" | null;
+    onMapPick: (type: "start" | "end", point: Point) => void;
 };
 
-const startIcon = new L.Icon({
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-});
-
-const endIcon = new L.Icon({
+const markerIcon = new L.Icon({
     iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
     shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     iconSize: [25, 41],
@@ -49,31 +51,49 @@ async function reverseGeocode(lat: number, lon: number) {
 }
 
 function ClickHandler({
-                          onSelectStart,
-                          onSelectEnd,
+                          pickMode,
+                          onMapPick,
                       }: {
-    onSelectStart: (point: Point) => void;
-    onSelectEnd: (point: Point) => void;
+    pickMode: "start" | "end" | null;
+    onMapPick: (type: "start" | "end", point: Point) => void;
 }) {
-    const [nextTarget, setNextTarget] = useState<"start" | "end">("start");
-
     useMapEvents({
-        async click(e) {
+        async click(e: LeafletMouseEvent) {
+            if (!pickMode) return;
+
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
             const label = await reverseGeocode(lat, lon);
 
-            const point = { lat, lon, label };
-
-            if (nextTarget === "start") {
-                onSelectStart(point);
-                setNextTarget("end");
-            } else {
-                onSelectEnd(point);
-                setNextTarget("start");
-            }
+            onMapPick(pickMode, { lat, lon, label });
         },
     });
+
+    return null;
+}
+
+function FitBounds({
+                       start,
+                       end,
+                       routeGeometry,
+                   }: {
+    start: Point;
+    end: Point;
+    routeGeometry: [number, number][];
+}) {
+    const map = useMap();
+
+    useEffect(() => {
+        const points =
+            routeGeometry.length > 0
+                ? routeGeometry
+                : [
+                    [start.lat, start.lon],
+                    [end.lat, end.lon],
+                ];
+
+        map.fitBounds(points as [number, number][], { padding: [30, 30] });
+    }, [map, start, end, routeGeometry]);
 
     return null;
 }
@@ -81,10 +101,11 @@ function ClickHandler({
 export default function MapPicker({
                                       start,
                                       end,
-                                      onSelectStart,
-                                      onSelectEnd,
+                                      routeGeometry,
+                                      pickMode,
+                                      onMapPick,
                                   }: Props) {
-    const center: [number, number] = useMemo(() => {
+    const center = useMemo<[number, number]>(() => {
         return [(start.lat + end.lat) / 2, (start.lon + end.lon) / 2];
     }, [start, end]);
 
@@ -95,13 +116,18 @@ export default function MapPicker({
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            <ClickHandler onSelectStart={onSelectStart} onSelectEnd={onSelectEnd} />
+            <FitBounds start={start} end={end} routeGeometry={routeGeometry} />
+            <ClickHandler pickMode={pickMode} onMapPick={onMapPick} />
 
-            <Marker position={[start.lat, start.lon]} icon={startIcon}>
+            {routeGeometry.length > 0 ? (
+                <Polyline positions={routeGeometry} pathOptions={{ color: "#2563eb", weight: 5 }} />
+            ) : null}
+
+            <Marker position={[start.lat, start.lon]} icon={markerIcon}>
                 <Popup>Start: {start.label}</Popup>
             </Marker>
 
-            <Marker position={[end.lat, end.lon]} icon={endIcon}>
+            <Marker position={[end.lat, end.lon]} icon={markerIcon}>
                 <Popup>Ziel: {end.label}</Popup>
             </Marker>
         </MapContainer>

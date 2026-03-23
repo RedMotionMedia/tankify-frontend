@@ -3,18 +3,18 @@ import "leaflet/dist/leaflet.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Tank Trip Calculator",
-  description: "Berechnet, ob sich Tanken am Ziel lohnt.",
+    title: "Tank Trip Calculator",
+    description: "Berechnet, ob sich Tanken am Ziel lohnt.",
 };
 
 export default function RootLayout({
-                                     children,
+                                       children,
                                    }: Readonly<{
-  children: React.ReactNode;
+    children: React.ReactNode;
 }>) {
-  return (
-      <html lang="de">
-      <body>{children}</body>
-      </html>
-  );
+    return (
+        <html lang="de">
+        <body>{children}</body>
+        </html>
+    );
 }

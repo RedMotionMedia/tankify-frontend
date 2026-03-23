@@ -19,6 +19,12 @@ type GeocodeResult = {
   lon: string;
 };
 
+type RouteData = {
+  distanceKm: number;
+  durationHours: number;
+  geometry: [number, number][];
+};
+
 const DEFAULT_START: Point = {
   lat: 48.3069,
   lon: 14.2858,
@@ -30,25 +36,6 @@ const DEFAULT_END: Point = {
   lon: 14.3111,
   label: "Vyšší Brod",
 };
-
-function haversineKm(a: Point, b: Point) {
-  const R = 6371;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
-
-  const lat1 = (a.lat * Math.PI) / 180;
-  const lat2 = (b.lat * Math.PI) / 180;
-
-  const x =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2) *
-      Math.cos(lat1) *
-      Math.cos(lat2);
-
-  const y = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-  return R * y;
-}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("de-AT", {
@@ -66,6 +53,68 @@ function formatDuration(hours: number) {
   return `${h} h ${m} min`;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getProfitLevel(netSaving: number) {
+  if (netSaving < 0) {
+    return {
+      label: "Lohnt sich nicht",
+      colorClass: "text-red-600",
+      bgClass: "bg-red-50",
+      percent: 10,
+    };
+  }
+
+  if (netSaving < 5) {
+    return {
+      label: "Knapp lohnend",
+      colorClass: "text-yellow-600",
+      bgClass: "bg-yellow-50",
+      percent: 40,
+    };
+  }
+
+  if (netSaving < 15) {
+    return {
+      label: "Lohnend",
+      colorClass: "text-lime-600",
+      bgClass: "bg-lime-50",
+      percent: 70,
+    };
+  }
+
+  return {
+    label: "Sehr lohnend",
+    colorClass: "text-green-600",
+    bgClass: "bg-green-50",
+    percent: 100,
+  };
+}
+
+async function fetchRoute(start: Point, end: Point): Promise<RouteData | null> {
+  const url = `https://router.project-osrm.org/route/v1/driving/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`;
+
+  const res = await fetch(url);
+
+  if (!res.ok) return null;
+
+  const data = await res.json();
+
+  if (!data.routes || !data.routes.length) return null;
+
+  const route = data.routes[0];
+
+  return {
+    distanceKm: route.distance / 1000,
+    durationHours: route.duration / 3600,
+    geometry: route.geometry.coordinates.map(
+        (coord: [number, number]) => [coord[1], coord[0]]
+    ),
+  };
+}
+
 export default function Page() {
   const [startText, setStartText] = useState("Linz");
   const [endText, setEndText] = useState("Vyšší Brod");
@@ -75,7 +124,7 @@ export default function Page() {
 
   const [localPrice, setLocalPrice] = useState(2.142);
   const [destinationPrice, setDestinationPrice] = useState(1.585);
-  const [consumption, setConsumption] = useState(5.0);
+  const [consumption, setConsumption] = useState(6.0);
   const [tankSize, setTankSize] = useState(45);
   const [avgSpeed, setAvgSpeed] = useState(70);
 
@@ -83,6 +132,10 @@ export default function Page() {
       null
   );
   const [error, setError] = useState("");
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeData, setRouteData] = useState<RouteData | null>(null);
+
+  const [mapPickMode, setMapPickMode] = useState<"start" | "end" | null>(null);
 
   async function geocode(query: string): Promise<Point | null> {
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
@@ -130,18 +183,57 @@ export default function Page() {
         setEndPoint(point);
         setEndText(point.label);
       }
-    } catch (e) {
+    } catch {
       setError("Suche fehlgeschlagen. Bitte später erneut probieren.");
     } finally {
       setSearchLoading(null);
     }
   }
 
-  const oneWayKm = useMemo(() => {
-    return haversineKm(startPoint, endPoint);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRoute() {
+      setRouteLoading(true);
+      setError("");
+
+      try {
+        const route = await fetchRoute(startPoint, endPoint);
+
+        if (!cancelled) {
+          if (route) {
+            setRouteData(route);
+          } else {
+            setError("Route konnte nicht berechnet werden.");
+            setRouteData(null);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Route konnte nicht geladen werden.");
+          setRouteData(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setRouteLoading(false);
+        }
+      }
+    }
+
+    loadRoute();
+
+    return () => {
+      cancelled = true;
+    };
   }, [startPoint, endPoint]);
 
+  const oneWayKm = routeData?.distanceKm ?? 0;
   const roundTripKm = oneWayKm * 2;
+
+  const estimatedHoursOneWay =
+      routeData?.durationHours ?? (avgSpeed > 0 ? oneWayKm / avgSpeed : 0);
+  const estimatedHoursRoundTrip = estimatedHoursOneWay * 2;
+
   const tripLiters = (roundTripKm / 100) * consumption;
   const tripCost = tripLiters * destinationPrice;
 
@@ -149,21 +241,17 @@ export default function Page() {
   const grossSavingFullTank = tankSize * priceDifference;
   const netSaving = grossSavingFullTank - tripCost;
 
-  const estimatedHoursOneWay = oneWayKm / avgSpeed;
-  const estimatedHoursRoundTrip = roundTripKm / avgSpeed;
+  const breakEvenDiff = tankSize > 0 ? tripCost / tankSize : 0;
 
-  const breakEvenDiff = tripCost / tankSize;
   const maxConsumption =
-      roundTripKm > 0
+      roundTripKm > 0 && destinationPrice > 0
           ? (tankSize * priceDifference) / ((roundTripKm / 100) * destinationPrice)
           : 0;
 
-  useEffect(() => {
-    setError("");
-  }, [localPrice, destinationPrice, consumption, tankSize, avgSpeed]);
+  const profit = useMemo(() => getProfitLevel(netSaving), [netSaving]);
 
   return (
-      <main className="min-h-screen p-6 md:p-10">
+      <main className="min-h-screen bg-neutral-100 p-6 md:p-10">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_1fr]">
           <section className="rounded-3xl bg-white p-6 shadow-sm">
             <h1 className="text-3xl font-bold">Tank Trip Calculator</h1>
@@ -172,86 +260,83 @@ export default function Page() {
             </p>
 
             <div className="mt-6 space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium">Startpunkt</label>
-                <div className="flex gap-2">
-                  <input
-                      value={startText}
-                      onChange={(e) => setStartText(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
-                      placeholder="z. B. Linz"
-                  />
-                  <button
-                      onClick={() => handleSearch("start")}
-                      className="rounded-2xl bg-black px-4 py-3 text-white"
-                  >
-                    {searchLoading === "start" ? "..." : "Suchen"}
-                  </button>
-                </div>
-              </div>
+              <LocationField
+                  label="Startpunkt"
+                  value={startText}
+                  onChange={setStartText}
+                  onSearch={() => handleSearch("start")}
+                  onPickOnMap={() => setMapPickMode("start")}
+                  loading={searchLoading === "start"}
+                  pickActive={mapPickMode === "start"}
+              />
 
-              <div>
-                <label className="mb-2 block text-sm font-medium">Zielort</label>
-                <div className="flex gap-2">
-                  <input
-                      value={endText}
-                      onChange={(e) => setEndText(e.target.value)}
-                      className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
-                      placeholder="z. B. Vyšší Brod"
-                  />
-                  <button
-                      onClick={() => handleSearch("end")}
-                      className="rounded-2xl bg-black px-4 py-3 text-white"
-                  >
-                    {searchLoading === "end" ? "..." : "Suchen"}
-                  </button>
-                </div>
-              </div>
+              <LocationField
+                  label="Zielort"
+                  value={endText}
+                  onChange={setEndText}
+                  onSearch={() => handleSearch("end")}
+                  onPickOnMap={() => setMapPickMode("end")}
+                  loading={searchLoading === "end"}
+                  pickActive={mapPickMode === "end"}
+              />
 
-              <SliderField
-                  label={`Spritpreis zuhause: ${localPrice.toFixed(3)} €/L`}
+              <SliderNumberField
+                  label="Spritpreis zuhause"
                   min={1}
                   max={3}
                   step={0.001}
                   value={localPrice}
                   onChange={setLocalPrice}
+                  unit="€/L"
               />
 
-              <SliderField
-                  label={`Spritpreis am Ziel: ${destinationPrice.toFixed(3)} €/L`}
+              <SliderNumberField
+                  label="Spritpreis am Ziel"
                   min={1}
                   max={3}
                   step={0.001}
                   value={destinationPrice}
                   onChange={setDestinationPrice}
+                  unit="€/L"
               />
 
-              <SliderField
-                  label={`Verbrauch: ${consumption.toFixed(1)} L / 100 km`}
+              <SliderNumberField
+                  label="Verbrauch"
                   min={3}
-                  max={20}
+                  max={25}
                   step={0.1}
                   value={consumption}
                   onChange={setConsumption}
+                  unit="L / 100 km"
               />
 
-              <SliderField
-                  label={`Tankgröße: ${tankSize.toFixed(0)} L`}
+              <SliderNumberField
+                  label="Tankgröße"
                   min={20}
                   max={120}
                   step={1}
                   value={tankSize}
                   onChange={setTankSize}
+                  unit="L"
               />
 
-              <SliderField
-                  label={`Ø Geschwindigkeit: ${avgSpeed.toFixed(0)} km/h`}
+              <SliderNumberField
+                  label="Ø Geschwindigkeit"
                   min={30}
                   max={130}
                   step={1}
                   value={avgSpeed}
                   onChange={setAvgSpeed}
+                  unit="km/h"
               />
+
+              {mapPickMode ? (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    Klicke jetzt auf die Karte, um{" "}
+                    {mapPickMode === "start" ? "den Startpunkt" : "den Zielort"} zu
+                    setzen.
+                  </div>
+              ) : null}
 
               {error ? (
                   <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -262,39 +347,77 @@ export default function Page() {
           </section>
 
           <section className="space-y-6">
-            <div className="h-[420px] overflow-hidden rounded-3xl bg-white shadow-sm">
+            <div className="h-105 overflow-hidden rounded-3xl bg-white shadow-sm">
               <MapPicker
                   start={startPoint}
                   end={endPoint}
-                  onSelectStart={(point) => {
-                    setStartPoint(point);
-                    setStartText(point.label);
-                  }}
-                  onSelectEnd={(point) => {
-                    setEndPoint(point);
-                    setEndText(point.label);
+                  routeGeometry={routeData?.geometry ?? []}
+                  pickMode={mapPickMode}
+                  onMapPick={(type, point) => {
+                    if (type === "start") {
+                      setStartPoint(point);
+                      setStartText(point.label);
+                    } else {
+                      setEndPoint(point);
+                      setEndText(point.label);
+                    }
+
+                    setMapPickMode(null);
                   }}
               />
             </div>
 
+            <div className="rounded-3xl bg-white p-5 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm text-gray-500">Lohnt sich Skala</span>
+                <span className={`text-sm font-semibold ${profit.colorClass}`}>
+                {profit.label}
+              </span>
+              </div>
+
+              <div className="relative h-4 overflow-hidden rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500">
+                <div
+                    className="absolute top-1/2 h-6 w-1 -translate-y-1/2 rounded bg-black"
+                    style={{ left: `${profit.percent}%` }}
+                />
+              </div>
+
+              <p className="mt-3 text-sm text-gray-600">
+                Je weiter rechts, desto stärker lohnt sich die Fahrt.
+              </p>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <StatCard title="Einfache Strecke" value={`${oneWayKm.toFixed(1)} km`} />
-              <StatCard title="Hin & retour" value={`${roundTripKm.toFixed(1)} km`} />
-              <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
+              <StatCard
+                  title="Einfache Strecke"
+                  value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
+              />
+              <StatCard
+                  title="Hin & retour"
+                  value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
+              />
+              <StatCard
+                  title="Preisunterschied"
+                  value={`${priceDifference.toFixed(3)} €/L`}
+              />
               <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
               <StatCard
                   title="Fahrzeit einfach"
-                  value={formatDuration(estimatedHoursOneWay)}
+                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
               />
               <StatCard
                   title="Fahrzeit gesamt"
-                  value={formatDuration(estimatedHoursRoundTrip)}
+                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
               />
               <StatCard
                   title="Ersparnis bei vollem Tank"
                   value={formatCurrency(grossSavingFullTank)}
               />
-              <StatCard title="Netto-Ersparnis" value={formatCurrency(netSaving)} />
+              <StatCard
+                  title="Netto-Ersparnis"
+                  value={formatCurrency(netSaving)}
+                  valueClassName={profit.colorClass}
+              />
               <StatCard
                   title="Break-even Unterschied"
                   value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
@@ -305,19 +428,13 @@ export default function Page() {
               />
             </div>
 
-            <div
-                className={`rounded-3xl p-6 shadow-sm ${
-                    netSaving >= 0
-                        ? "bg-emerald-50 text-emerald-900"
-                        : "bg-red-50 text-red-900"
-                }`}
-            >
-              <h2 className="text-2xl font-bold">
+            <div className={`rounded-3xl p-6 shadow-sm ${profit.bgClass}`}>
+              <h2 className={`text-2xl font-bold ${profit.colorClass}`}>
                 {netSaving >= 0 ? "Ja, es lohnt sich." : "Nein, es lohnt sich nicht."}
               </h2>
-              <p className="mt-2 text-base">
+              <p className="mt-2 text-base text-gray-800">
                 {netSaving >= 0
-                    ? `Du sparst bei einem vollen Tank ungefähr ${formatCurrency(
+                    ? `Du sparst ungefähr ${formatCurrency(
                         netSaving
                     )} nach Abzug der Fahrtkosten.`
                     : `Du verlierst ungefähr ${formatCurrency(
@@ -325,61 +442,121 @@ export default function Page() {
                     )} durch die Fahrt.`}
               </p>
             </div>
-
-            <div className="rounded-3xl bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-semibold">Bedienung</h3>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-gray-700">
-                <li>Adressen eingeben und auf „Suchen“ klicken.</li>
-                <li>Oder auf der Karte klicken: zuerst Start, dann Ziel.</li>
-                <li>Regler anpassen und sofort Ergebnis sehen.</li>
-                <li>
-                  Distanz ist Luftlinie. Für exakte Straßenroute könntest du später
-                  OSRM oder GraphHopper ergänzen.
-                </li>
-              </ul>
-            </div>
           </section>
         </div>
       </main>
   );
 }
 
-function StatCard({ title, value }: { title: string; value: string }) {
+function StatCard({
+                    title,
+                    value,
+                    valueClassName = "text-gray-900",
+                  }: {
+  title: string;
+  value: string;
+  valueClassName?: string;
+}) {
   return (
       <div className="rounded-3xl bg-white p-5 shadow-sm">
         <div className="text-sm text-gray-500">{title}</div>
-        <div className="mt-2 text-2xl font-bold">{value}</div>
+        <div className={`mt-2 text-2xl font-bold ${valueClassName}`}>{value}</div>
       </div>
   );
 }
 
-function SliderField({
-                       label,
-                       min,
-                       max,
-                       step,
-                       value,
-                       onChange,
-                     }: {
+function SliderNumberField({
+                             label,
+                             min,
+                             max,
+                             step,
+                             value,
+                             onChange,
+                             unit,
+                           }: {
   label: string;
   min: number;
   max: number;
   step: number;
   value: number;
   onChange: (value: number) => void;
+  unit: string;
+}) {
+  return (
+      <div>
+        <label className="mb-2 block text-sm font-medium">
+          {label}: {value.toFixed(step < 1 ? 3 : 0)} {unit}
+        </label>
+
+        <div className="flex items-center gap-3">
+          <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={value}
+              onChange={(e) => onChange(Number(e.target.value))}
+              className="w-full"
+          />
+
+          <input
+              type="number"
+              min={min}
+              max={max}
+              step={step}
+              value={value}
+              onChange={(e) =>
+                  onChange(clamp(Number(e.target.value || 0), min, max))
+              }
+              className="w-28 rounded-xl border border-gray-300 px-3 py-2"
+          />
+        </div>
+      </div>
+  );
+}
+
+function LocationField({
+                         label,
+                         value,
+                         onChange,
+                         onSearch,
+                         onPickOnMap,
+                         loading,
+                         pickActive,
+                       }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSearch: () => void;
+  onPickOnMap: () => void;
+  loading: boolean;
+  pickActive: boolean;
 }) {
   return (
       <div>
         <label className="mb-2 block text-sm font-medium">{label}</label>
-        <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-full"
-        />
+
+        <div className="flex gap-2">
+          <input
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+          />
+          <button
+              onClick={onSearch}
+              className="rounded-2xl bg-black px-4 py-3 text-white"
+          >
+            {loading ? "..." : "Suchen"}
+          </button>
+          <button
+              onClick={onPickOnMap}
+              className={`rounded-2xl px-4 py-3 text-white ${
+                  pickActive ? "bg-blue-600" : "bg-gray-700"
+              }`}
+          >
+            Karte
+          </button>
+        </div>
       </div>
   );
 }
