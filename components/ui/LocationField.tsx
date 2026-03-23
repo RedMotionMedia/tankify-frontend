@@ -25,7 +25,7 @@ export default function LocationField({
         <div>
             <label className="mb-2 block text-sm font-medium">{label}</label>
 
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex gap-2 flex-row">
                 <input
                     value={value}
                     onChange={(e) => onChange(e.target.value)}

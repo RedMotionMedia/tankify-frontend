@@ -22,10 +22,18 @@ export default function SliderNumberField({
     return (
         <div>
             <label className="mb-2 block text-sm font-medium">
-                {label}: {formatInputValue(value, step)} {unit}
+                {label}: <input
+                type="number"
+                min={min}
+                max={max}
+                step={step}
+                value={Number(formatInputValue(value, step))}
+                onChange={(e) => onChange(clamp(Number(e.target.value || 0), min, max))}
+                className="rounded-xl border border-gray-300 px-3 py-2 w-20 sm:w-auto"
+            /> {unit}
             </label>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex gap-3 flex-row sm:items-center">
                 <input
                     type="range"
                     min={min}
@@ -36,15 +44,7 @@ export default function SliderNumberField({
                     className="w-full"
                 />
 
-                <input
-                    type="number"
-                    min={min}
-                    max={max}
-                    step={step}
-                    value={Number(formatInputValue(value, step))}
-                    onChange={(e) => onChange(clamp(Number(e.target.value || 0), min, max))}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 sm:w-28"
-                />
+
             </div>
         </div>
     );

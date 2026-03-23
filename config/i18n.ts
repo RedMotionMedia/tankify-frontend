@@ -165,7 +165,7 @@ export const translations: Record<Language, TranslationSchema> = {
             title: "Preise",
             description: "Vergleiche den Preis zuhause mit dem Preis am Ziel.",
             fuelType: "Kraftstoff",
-            localPrice: "Preis zuhause",
+            localPrice: "Preis Vorort",
             destinationPrice: "Preis am Ziel",
             priceDifference: "Preisunterschied",
             breakEvenDiff: "Break-even Preisunterschied",

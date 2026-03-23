@@ -14,6 +14,7 @@ import {geocode} from "@/lib/geocode";
 import {useRoute} from "@/hooks/useRoute";
 import {useBottomSheet} from "@/hooks/useBottomSheet";
 import {FuelType, Language, MapPickMode, Point} from "@/types/tankify";
+import WorthPanel from "@/components/calculator/WorthPanel";
 
 const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
     ssr: false,
@@ -49,6 +50,7 @@ export default function TankifyCalculator() {
         onTouchMoveContent,
         onTouchEnd,
         minimizeBottomSheet,
+        setBottomSheet,
     } = useBottomSheet();
 
     const {routeData, routeLoading, routeError} = useRoute(startPoint, endPoint);
@@ -114,6 +116,7 @@ export default function TankifyCalculator() {
     }
 
     const calculation = useMemo(() => {
+        setBottomSheet(window.innerHeight*0.2);
         return calculateTankify({
             oneWayKm: routeData?.distanceKm ?? 0,
             durationHours: routeData?.durationHours ?? 0,
@@ -264,6 +267,12 @@ export default function TankifyCalculator() {
                             </div>
                         </div>
 
+                        <WorthPanel
+                            t={t}
+                            language={language}
+                            profit={profit}
+                            netSaving={calculation.netSaving}/>
+
                         <ResultsPanel
                             t={t}
                             language={language}
@@ -321,7 +330,7 @@ export default function TankifyCalculator() {
                         />
                     </div>
 
-                    <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
+                    <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
                         <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
                             <h1 className="text-lg font-bold">{t.app.title}</h1>
                         </div>

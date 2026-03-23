@@ -7,6 +7,9 @@ export function useBottomSheet() {
     const [dragging, setDragging] = useState(false);
     const [startY, setStartY] = useState(0);
     const [startOffset, setStartOffset] = useState(0);
+    const snapTopMultiplicator = 0;
+    const snapMidMultiplicator = 0.45;
+    const snapBottomMultiplicator = 0.74;
 
     useEffect(() => {
         setSheetY(window.innerHeight * 0.58);
@@ -62,9 +65,9 @@ export function useBottomSheet() {
         setDragging(false);
 
         const h = window.innerHeight;
-        const snapTop = h * 0;
-        const snapMid = h * 0.45;
-        const snapBottom = h * 0.74;
+        const snapTop = h * snapTopMultiplicator;
+        const snapMid = h * snapMidMultiplicator;
+        const snapBottom = h * snapBottomMultiplicator;
 
         const options = [snapTop, snapMid, snapBottom];
         const nearest = options.reduce((prev, curr) =>
@@ -76,17 +79,31 @@ export function useBottomSheet() {
 
     function minimizeBottomSheet() {
         const h = window.innerHeight;
-        setSheetY(h * 0.8);
+
+        sheetContentRef.current?.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+
+        setSheetY(h * snapBottomMultiplicator);
+    }
+
+    function setBottomSheet(snapHeight: number) {
+        setSheetY(snapHeight);
     }
 
     return {
         sheetContentRef,
         sheetY,
         dragging,
+        snapTopMultiplicator,
+        snapMidMultiplicator,
+        snapBottomMultiplicator,
         onTouchStart,
         onTouchMoveHandle,
         onTouchMoveContent,
         onTouchEnd,
         minimizeBottomSheet,
+        setBottomSheet,
     };
 }

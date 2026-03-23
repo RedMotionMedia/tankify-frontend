@@ -1,6 +1,7 @@
-import { TranslationSchema } from "@/config/i18n";
-import { Language } from "@/types/tankify";
+import {TranslationSchema} from "@/config/i18n";
+import {Language} from "@/types/tankify";
 import ResultsPanel from "./ResultsPanel";
+import WorthPanel from "@/components/calculator/WorthPanel";
 
 type ProfitLevel = {
     labelKey: "notWorthIt" | "barelyWorthIt" | "worthIt" | "veryWorthIt";
@@ -79,7 +80,7 @@ export default function MobileBottomSheet({
                     onTouchMove={onTouchMoveHandle}
                     onTouchEnd={onTouchEnd}
                 >
-                    <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300" />
+                    <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300"/>
 
                     <p className="text-center text-sm font-medium text-gray-500">
                         {t.app.mobilePullUp}
@@ -95,6 +96,18 @@ export default function MobileBottomSheet({
                 </div>
 
                 <div className="mt-6 space-y-6 px-4">
+
+                    <WorthPanel
+                        t={t}
+                        language={language}
+                        profit={profit}
+                        netSaving={netSaving}/>
+
+                    <div>
+                        <h3 className="mb-3 text-lg font-bold">{t.app.adjustCalculator}</h3>
+                        {controls}
+                    </div>
+
                     <ResultsPanel
                         t={t}
                         language={language}
@@ -112,12 +125,10 @@ export default function MobileBottomSheet({
                         maxConsumption={maxConsumption}
                     />
 
-                    <div>
-                        <h3 className="mb-3 text-lg font-bold">{t.app.adjustCalculator}</h3>
-                        {controls}
-                    </div>
+
                 </div>
             </div>
         </div>
-    );
+    )
+        ;
 }
