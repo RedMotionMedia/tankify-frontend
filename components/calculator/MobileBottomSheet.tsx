@@ -33,6 +33,7 @@ type Props = {
     breakEvenDiff: number;
     maxConsumption: number;
     profit: ProfitLevel;
+    isSheetReady: boolean;
 };
 
 export default function MobileBottomSheet({
@@ -58,13 +59,14 @@ export default function MobileBottomSheet({
                                               breakEvenDiff,
                                               maxConsumption,
                                               profit,
+                                              isSheetReady
                                           }: Props) {
     return (
         <div
             className="fixed inset-x-0 bottom-0 z-10"
             style={{
                 transform: `translateY(${sheetY}px)`,
-                transition: dragging ? "none" : "transform 0.25s ease",
+                transition: !isSheetReady || dragging ? "none" : "transform 0.25s ease",
             }}
         >
             <div

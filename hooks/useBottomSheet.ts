@@ -10,9 +10,15 @@ export function useBottomSheet() {
     const snapTopMultiplicator = 0;
     const snapMidMultiplicator = 0.45;
     const snapBottomMultiplicator = 0.74;
+    const [isSheetReady, setIsSheetReady] = useState(false);
 
     useEffect(() => {
-        setSheetY(window.innerHeight * 0.58);
+        const frame = window.requestAnimationFrame(() => {
+            setSheetY(window.innerHeight * 0.63);
+            setIsSheetReady(true);
+        });
+
+        return () => window.cancelAnimationFrame(frame);
     }, []);
 
     function onTouchStart(e: React.TouchEvent) {
@@ -96,9 +102,7 @@ export function useBottomSheet() {
         sheetContentRef,
         sheetY,
         dragging,
-        snapTopMultiplicator,
-        snapMidMultiplicator,
-        snapBottomMultiplicator,
+        isSheetReady,
         onTouchStart,
         onTouchMoveHandle,
         onTouchMoveContent,

@@ -222,6 +222,9 @@ function StationsLayer({
     }) => void;
     t: TranslationSchema;
 }) {
+
+    const map = useMap();
+
     return (
         <>
             {stations.map((station) => {
@@ -314,7 +317,7 @@ function StationsLayer({
                                     <div className="mt-3 grid gap-2">
                                         <button
                                             type="button"
-                                            onClick={() =>
+                                            onClick={() => {
                                                 onSelectStationAsStart({
                                                     point: {
                                                         lat: station.lat,
@@ -323,7 +326,10 @@ function StationsLayer({
                                                     },
                                                     price: selectedPrice,
                                                     station,
-                                                })
+                                                });
+
+                                                map.closePopup();
+                                            }
                                             }
                                             className="w-full rounded-xl bg-gray-800 px-3 py-2 text-sm font-medium text-white"
                                         >
@@ -332,7 +338,7 @@ function StationsLayer({
 
                                         <button
                                             type="button"
-                                            onClick={() =>
+                                            onClick={() => {
                                                 onSelectStationAsDestination({
                                                     point: {
                                                         lat: station.lat,
@@ -341,7 +347,10 @@ function StationsLayer({
                                                     },
                                                     price: selectedPrice,
                                                     station,
-                                                })
+                                                });
+
+                                                map.closePopup();
+                                            }
                                             }
                                             className="w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
                                         >

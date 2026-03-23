@@ -45,6 +45,7 @@ export default function TankifyCalculator() {
         sheetContentRef,
         sheetY,
         dragging,
+        isSheetReady,
         onTouchStart,
         onTouchMoveHandle,
         onTouchMoveContent,
@@ -116,7 +117,6 @@ export default function TankifyCalculator() {
     }
 
     const calculation = useMemo(() => {
-        setBottomSheet(window.innerHeight*0.2);
         return calculateTankify({
             oneWayKm: routeData?.distanceKm ?? 0,
             durationHours: routeData?.durationHours ?? 0,
@@ -310,6 +310,7 @@ export default function TankifyCalculator() {
                                     setEndText(point.label);
                                 }
                                 setMapPickMode(null);
+                                setBottomSheet(window.innerHeight*0.2);
                             }}
                             onSelectStationAsStart={({point, price}) => {
                                 setStartPoint(point);
@@ -318,6 +319,7 @@ export default function TankifyCalculator() {
                                 if (price !== null && price !== undefined) {
                                     setLocalPrice(price);
                                 }
+                                setBottomSheet(window.innerHeight*0.2);
                             }}
                             onSelectStationAsDestination={({point, price}) => {
                                 setEndPoint(point);
@@ -326,6 +328,7 @@ export default function TankifyCalculator() {
                                 if (price !== null && price !== undefined) {
                                     setDestinationPrice(price);
                                 }
+                                setBottomSheet(window.innerHeight*0.2);
                             }}
                         />
                     </div>
@@ -346,7 +349,7 @@ export default function TankifyCalculator() {
                         </button>
                     </div>
 
-                    <MobileBottomSheet
+                    { isSheetReady && (<MobileBottomSheet
                         t={t}
                         language={language}
                         sheetContentRef={sheetContentRef}
@@ -369,7 +372,8 @@ export default function TankifyCalculator() {
                         breakEvenDiff={calculation.breakEvenDiff}
                         maxConsumption={calculation.maxConsumption}
                         profit={profit}
-                    />
+                        isSheetReady={isSheetReady}
+                    />)}
                 </div>
             </main>
         </>
