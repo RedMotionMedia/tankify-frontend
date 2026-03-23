@@ -3,7 +3,7 @@ import "leaflet/dist/leaflet.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Tank Trip Calculator",
+    title: "Tankify",
     description: "Berechnet, ob sich Tanken am Ziel lohnt.",
 };
 

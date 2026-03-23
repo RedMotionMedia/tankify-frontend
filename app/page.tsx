@@ -254,7 +254,7 @@ export default function Page() {
       <main className="min-h-screen bg-neutral-100 p-6 md:p-10">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_1fr]">
           <section className="rounded-3xl bg-white p-6 shadow-sm">
-            <h1 className="text-3xl font-bold">Tank Trip Calculator</h1>
+            <h1 className="text-3xl font-bold">Tankify</h1>
             <p className="mt-2 text-sm text-gray-600">
               Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
             </p>
@@ -375,14 +375,18 @@ export default function Page() {
               </span>
               </div>
 
-              <div className="relative h-4 overflow-hidden rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500">
+              <div className="relative pt-2 pb-8">
+                <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
+
                 <div
-                    className="absolute top-1/2 h-6 w-1 -translate-y-1/2 rounded bg-black"
+                    className="absolute bottom-0 -translate-x-1/2"
                     style={{ left: `${profit.percent}%` }}
-                />
+                >
+                  <div className="text-lg leading-none">▲</div>
+                </div>
               </div>
 
-              <p className="mt-3 text-sm text-gray-600">
+              <p className="text-sm text-gray-600">
                 Je weiter rechts, desto stärker lohnt sich die Fahrt.
               </p>
             </div>
@@ -540,6 +544,11 @@ function LocationField({
           <input
               value={value}
               onChange={(e) => onChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  onSearch();
+                }
+              }}
               className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
           />
           <button
