@@ -209,7 +209,7 @@ export default function Page() {
         setDragging(false);
 
         const h = window.innerHeight;
-        const snapTop = h * 0.1;
+        const snapTop = h * 0;
         const snapMid = h * 0.45;
         const snapBottom = h * 0.92;
 
@@ -330,225 +330,269 @@ export default function Page() {
 
   const profit = useMemo(() => getProfitLevel(netSaving), [netSaving]);
 
-  const controls = (
-      <div className="space-y-5">
-        <div>
-          <label className="mb-2 block text-sm font-medium">Kraftstoff</label>
-          <select
-              value={fuelType}
-              onChange={(e) => setFuelType(e.target.value as FuelType)}
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
-          >
-            <option value="diesel">Diesel</option>
-            <option value="super95">Benzin</option>
-          </select>
+    const controls = (
+        <div className="space-y-6">
+            <section className="space-y-4">
+                <div>
+                    <h2 className="text-lg font-bold">Route</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                        Wähle Start und Ziel, um die Strecke und das Sparpotenzial zu berechnen.
+                    </p>
+                </div>
+
+                <LocationField
+                    label="Startort"
+                    value={startText}
+                    onChange={setStartText}
+                    onSearch={() => handleSearch("start")}
+                    onPickOnMap={() => {
+                        setMapPickMode("start");
+                        minimizeBottomSheet();
+                    }}
+                    loading={searchLoading === "start"}
+                    pickActive={mapPickMode === "start"}
+                />
+
+                <LocationField
+                    label="Zielort"
+                    value={endText}
+                    onChange={setEndText}
+                    onSearch={() => handleSearch("end")}
+                    onPickOnMap={() => {
+                        setMapPickMode("end");
+                        minimizeBottomSheet();
+                    }}
+                    loading={searchLoading === "end"}
+                    pickActive={mapPickMode === "end"}
+                />
+            </section>
+
+            <section className="space-y-4">
+                <div>
+                    <h2 className="text-lg font-bold">Preise</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                        Vergleiche den Preis zuhause mit dem Preis am Ziel.
+                    </p>
+                </div>
+
+                <div>
+                    <label className="mb-2 block text-sm font-medium">Kraftstoff</label>
+                    <select
+                        value={fuelType}
+                        onChange={(e) => setFuelType(e.target.value as FuelType)}
+                        className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                    >
+                        <option value="diesel">Diesel</option>
+                        <option value="super95">Benzin</option>
+                    </select>
+                </div>
+
+                <SliderNumberField
+                    label="Preis zuhause"
+                    min={1}
+                    max={3}
+                    step={0.001}
+                    value={localPrice}
+                    onChange={setLocalPrice}
+                    unit="€/L"
+                />
+
+                <SliderNumberField
+                    label="Preis am Ziel"
+                    min={1}
+                    max={3}
+                    step={0.001}
+                    value={destinationPrice}
+                    onChange={setDestinationPrice}
+                    unit="€/L"
+                />
+            </section>
+
+            <section className="space-y-4">
+                <div>
+                    <h2 className="text-lg font-bold">Fahrzeug</h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                        Diese Werte beeinflussen die Fahrtkosten und die Ersparnis.
+                    </p>
+                </div>
+
+                <SliderNumberField
+                    label="Verbrauch"
+                    min={3}
+                    max={25}
+                    step={0.1}
+                    value={consumption}
+                    onChange={setConsumption}
+                    unit="L / 100 km"
+                />
+
+                <SliderNumberField
+                    label="Tankgröße"
+                    min={20}
+                    max={120}
+                    step={1}
+                    value={tankSize}
+                    onChange={setTankSize}
+                    unit="L"
+                />
+
+                <SliderNumberField
+                    label="Ø Geschwindigkeit"
+                    min={30}
+                    max={130}
+                    step={1}
+                    value={avgSpeed}
+                    onChange={setAvgSpeed}
+                    unit="km/h"
+                />
+            </section>
+
+            {mapPickMode ? (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    Klicke jetzt auf die Karte, um{" "}
+                    {mapPickMode === "start" ? "den Startort" : "den Zielort"} zu setzen.
+                </div>
+            ) : null}
+
+            {error ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                </div>
+            ) : null}
         </div>
+    );
 
-        <LocationField
-            label="Startpunkt"
-            value={startText}
-            onChange={setStartText}
-            onSearch={() => handleSearch("start")}
-            onPickOnMap={() => {
-                setMapPickMode("start");
-                minimizeBottomSheet();
-            }
-            }
-            loading={searchLoading === "start"}
-            pickActive={mapPickMode === "start"}
-        />
-
-        <LocationField
-            label="Zielort"
-            value={endText}
-            onChange={setEndText}
-            onSearch={() => handleSearch("end")}
-            onPickOnMap={() => {
-                setMapPickMode("end");
-                minimizeBottomSheet();
-            }
-            }
-            loading={searchLoading === "end"}
-            pickActive={mapPickMode === "end"}
-        />
-
-        <SliderNumberField
-            label="Spritpreis zuhause"
-            min={1}
-            max={3}
-            step={0.001}
-            value={localPrice}
-            onChange={setLocalPrice}
-            unit="€/L"
-        />
-
-        <SliderNumberField
-            label="Spritpreis am Ziel"
-            min={1}
-            max={3}
-            step={0.001}
-            value={destinationPrice}
-            onChange={setDestinationPrice}
-            unit="€/L"
-        />
-
-        <SliderNumberField
-            label="Verbrauch"
-            min={3}
-            max={25}
-            step={0.1}
-            value={consumption}
-            onChange={setConsumption}
-            unit="L / 100 km"
-        />
-
-        <SliderNumberField
-            label="Tankgröße"
-            min={20}
-            max={120}
-            step={1}
-            value={tankSize}
-            onChange={setTankSize}
-            unit="L"
-        />
-
-        <SliderNumberField
-            label="Ø Geschwindigkeit"
-            min={30}
-            max={130}
-            step={1}
-            value={avgSpeed}
-            onChange={setAvgSpeed}
-            unit="km/h"
-        />
-
-        {mapPickMode ? (
-            <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              Klicke jetzt auf die Karte, um{" "}
-              {mapPickMode === "start" ? "den Startpunkt" : "den Zielort"} zu setzen.
+    const rightContent = (
+        <section className="space-y-6">
+            <div className="map-resizable rounded-3xl bg-white shadow-sm">
+                <div className="h-full overflow-hidden rounded-3xl">
+                    <MapPicker
+                        start={startPoint}
+                        end={endPoint}
+                        routeGeometry={routeData?.geometry ?? []}
+                        pickMode={mapPickMode}
+                        fuelType={fuelType}
+                        onMapPick={(type, point) => {
+                            if (type === "start") {
+                                setStartPoint(point);
+                                setStartText(point.label);
+                            } else {
+                                setEndPoint(point);
+                                setEndText(point.label);
+                            }
+                            setMapPickMode(null);
+                        }}
+                        onSelectStationAsDestination={({ point, price }) => {
+                            setEndPoint(point);
+                            setEndText(point.label);
+                            if (price !== null && price !== undefined) {
+                                setDestinationPrice(price);
+                            }
+                        }}
+                    />
+                </div>
             </div>
-        ) : null}
+            <div className={`rounded-3xl p-6 shadow-sm ${profit.bgClass}`}>
+                <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Lohnt sich die Fahrt?</span>
+                    <span className={`text-sm font-semibold ${profit.colorClass}`}>
+          {profit.label}
+        </span>
+                </div>
 
-        {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
+                <div className={`mt-2 text-4xl font-bold ${profit.colorClass}`}>
+                    {formatCurrency(netSaving)}
+                </div>
+
+                <p className="mt-2 text-sm text-gray-600">
+                    Netto-Ersparnis nach Hin- und Rückfahrt
+                </p>
             </div>
-        ) : null}
-      </div>
-  );
+            <div className="rounded-3xl bg-white p-5 shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Einschätzung</span>
+                    <span className={`text-sm font-semibold ${profit.colorClass}`}>
+          {profit.label}
+        </span>
+                </div>
 
-  const rightContent = (
-      <section className="space-y-6">
-        <div className="map-resizable rounded-3xl bg-white shadow-sm">
-          <div className="h-full overflow-hidden rounded-3xl">
-            <MapPicker
-                start={startPoint}
-                end={endPoint}
-                routeGeometry={routeData?.geometry ?? []}
-                pickMode={mapPickMode}
-                fuelType={fuelType}
-                onMapPick={(type, point) => {
-                  if (type === "start") {
-                    setStartPoint(point);
-                    setStartText(point.label);
-                  } else {
-                    setEndPoint(point);
-                    setEndText(point.label);
-                  }
-                  setMapPickMode(null);
-                }}
-                onSelectStationAsDestination={({ point, price }) => {
-                  setEndPoint(point);
-                  setEndText(point.label);
-                  if (price !== null && price !== undefined) {
-                    setDestinationPrice(price);
-                  }
-                }}
-            />
-          </div>
-        </div>
+                <div className="relative pt-2 pb-8">
+                    <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
+                    <div
+                        className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
+                        style={{ left: `${profit.percent}%` }}
+                    >
+                        ▲
+                    </div>
+                </div>
 
-        <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Netto-Ersparnis</span>
-            <span className={`text-sm font-semibold ${profit.colorClass}`}>{profit.label}</span>
-          </div>
-          <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
-            {formatCurrency(netSaving)}
-          </div>
-        </div>
-
-        <div className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm text-gray-500">Lohnt sich Skala</span>
-            <span className={`text-sm font-semibold ${profit.colorClass}`}>{profit.label}</span>
-          </div>
-
-          <div className="relative pt-2 pb-8">
-            <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
-            <div
-                className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
-                style={{ left: `${profit.percent}%` }}
-            >
-              ▲
+                <p className="text-sm text-gray-600">
+                    Je weiter rechts, desto mehr lohnt sich das Tanken am Ziel.
+                </p>
             </div>
-          </div>
 
-          <p className="text-sm text-gray-600">
-            Je weiter rechts, desto stärker lohnt sich die Fahrt.
-          </p>
-        </div>
+            <div>
+                <h2 className="mb-3 text-xl font-bold">Wichtige Kennzahlen</h2>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+                        title="Einfache Strecke"
+                        value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
+                    />
+                    <StatCard
+                        title="Hin & retour"
+                        value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
+                    />
+                    <StatCard
+                        title="Preisunterschied"
+                        value={`${priceDifference.toFixed(3)} €/L`}
+                    />
+                    <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
+                    <StatCard
+                        title="Fahrzeit einfach"
+                        value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
+                    />
+                    <StatCard
+                        title="Fahrzeit gesamt"
+                        value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
+                    />
+                    <StatCard
+                        title="Ersparnis bei vollem Tank"
+                        value={formatCurrency(grossSavingFullTank)}
+                    />
+                    <StatCard
+                        title="Netto-Ersparnis"
+                        value={formatCurrency(netSaving)}
+                        valueClassName={profit.colorClass}
+                    />
+                </div>
+            </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard
-              title="Einfache Strecke"
-              value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
-          />
-          <StatCard
-              title="Hin & retour"
-              value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
-          />
-          <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
-          <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
-          <StatCard
-              title="Fahrzeit einfach"
-              value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
-          />
-          <StatCard
-              title="Fahrzeit gesamt"
-              value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
-          />
-          <StatCard
-              title="Ersparnis bei vollem Tank"
-              value={formatCurrency(grossSavingFullTank)}
-          />
-          <StatCard
-              title="Netto-Ersparnis"
-              value={formatCurrency(netSaving)}
-              valueClassName={profit.colorClass}
-          />
-          <StatCard
-              title="Break-even Unterschied"
-              value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
-          />
-          <StatCard
-              title="Max. Verbrauch"
-              value={`${maxConsumption.toFixed(1)} L / 100 km`}
-          />
-        </div>
-      </section>
-  );
+            <div>
+                <h2 className="mb-3 text-xl font-bold">Details</h2>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                    <StatCard
+                        title="Break-even Unterschied"
+                        value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
+                    />
+                    <StatCard
+                        title="Max. Verbrauch"
+                        value={`${maxConsumption.toFixed(1)} L / 100 km`}
+                    />
+                </div>
+            </div>
+        </section>
+    );
 
   return (
       <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
           <div className="mx-auto hidden max-w-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
-          <section className="rounded-3xl bg-white p-6 shadow-sm self-start">
-            <h1 className="text-3xl font-bold">Tankify</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
-            </p>
-            <div className="mt-6">{controls}</div>
-          </section>
+              <section className="rounded-3xl bg-white p-6 shadow-sm self-start">
+                  <h1 className="text-3xl font-bold">Tankify</h1>
+                  <p className="mt-2 text-sm text-gray-600">
+                      Berechne, ob sich die Fahrt zu einer günstigeren Tankstelle wirklich auszahlt.
+                  </p>
+                  <div className="mt-6">{controls}</div>
+              </section>
           {rightContent}
         </div>
 
@@ -580,48 +624,68 @@ export default function Page() {
                   />
               </div>
 
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
+                  <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
+                      <h1 className="text-lg font-bold">Tankify</h1>
+                  </div>
+              </div>
+
               <div
                   className="fixed inset-x-0 bottom-0 z-10"
                   style={{
                       transform: `translateY(${sheetY}px)`,
                       transition: dragging ? "none" : "transform 0.25s ease",
-                  }}>
+                  }}
+              >
                   <div
                       ref={sheetContentRef}
-                      className="mobile-sheet w-screen rounded-t-[28px] bg-white px-4 pb-10 pt-3 shadow-2xl"
+                      className="mobile-sheet w-screen rounded-t-[28px] bg-white pb-10 shadow-2xl"
                       onTouchStart={onTouchStart}
                       onTouchMove={onTouchMove2}
-                      onTouchEnd={onTouchEnd}>
-                      <div className="sheet-handle w-full"
-                           onTouchStart={onTouchStart}
-                           onTouchMove={onTouchMove}
-                           onTouchEnd={onTouchEnd}
+                      onTouchEnd={onTouchEnd}
+                  >
+                      <div
+                          className="sheet-handle w-screen pt-3 px-4"
+                          onTouchStart={onTouchStart}
+                          onTouchMove={onTouchMove}
+                          onTouchEnd={onTouchEnd}
                       >
-                          <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300"/>
-                          <h1 className="text-3xl font-bold">Tankify</h1>
-                          <p className="mt-2 text-sm text-gray-600">
-                              Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
+                          <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300" />
+
+                          <p className="text-center text-sm font-medium text-gray-500">
+                              Nach oben ziehen für Details
+                          </p>
+
+                          <h2 className="mt-3 text-2xl font-bold text-center">
+                              Tanken am Ziel vergleichen
+                          </h2>
+
+                          <p className="mt-2 text-sm text-center text-gray-600">
+                              Prüfe, ob sich die Fahrt zum günstigeren Tanken wirklich auszahlt.
                           </p>
                       </div>
 
-                      <div className="mt-6 space-y-6">
-                          {controls}
-
+                      <div className="mt-6 space-y-6 px-4">
                           <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
                               <div className="flex items-center justify-between">
-                                  <span className="text-sm text-gray-500">Netto-Ersparnis</span>
+                                  <span className="text-sm text-gray-500">Lohnt sich die Fahrt?</span>
                                   <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                                      {profit.label}
-                                    </span>
+              {profit.label}
+            </span>
                               </div>
+
                               <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
                                   {formatCurrency(netSaving)}
                               </div>
+
+                              <p className="mt-2 text-sm text-gray-600">
+                                  Netto-Ersparnis nach Hin- und Rückfahrt
+                              </p>
                           </div>
 
                           <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
                               <div className="mb-2 flex items-center justify-between">
-                                  <span className="text-sm text-gray-500">Lohnt sich Skala</span>
+                                  <span className="text-sm text-gray-500">Einschätzung</span>
                                   <span className={`text-sm font-semibold ${profit.colorClass}`}>
               {profit.label}
             </span>
@@ -636,36 +700,70 @@ export default function Page() {
                                       ▲
                                   </div>
                               </div>
+
+                              <p className="text-sm text-gray-600">
+                                  Je weiter rechts, desto mehr lohnt sich das Tanken am Ziel.
+                              </p>
                           </div>
 
-                          <div className="grid gap-4 sm:grid-cols-2">
-                              <StatCard
-                                  title="Einfache Strecke"
-                                  value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
-                              />
-                              <StatCard
-                                  title="Hin & retour"
-                                  value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
-                              />
-                              <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
-                              <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
-                              <StatCard
-                                  title="Fahrzeit einfach"
-                                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
-                              />
-                              <StatCard
-                                  title="Fahrzeit gesamt"
-                                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
-                              />
-                              <StatCard
-                                  title="Ersparnis bei vollem Tank"
-                                  value={formatCurrency(grossSavingFullTank)}
-                              />
-                              <StatCard
-                                  title="Netto-Ersparnis"
-                                  value={formatCurrency(netSaving)}
-                                  valueClassName={profit.colorClass}
-                              />
+                          <div>
+                              <h3 className="mb-3 text-lg font-bold">Wichtige Kennzahlen</h3>
+
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                  <StatCard
+                                      title="Einfache Strecke"
+                                      value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
+                                  />
+                                  <StatCard
+                                      title="Hin- und Rückfahrt"
+                                      value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
+                                  />
+                                  <StatCard
+                                      title="Preisunterschied"
+                                      value={`${priceDifference.toFixed(3)} €/L`}
+                                  />
+                                  <StatCard
+                                      title="Fahrtkosten"
+                                      value={formatCurrency(tripCost)}
+                                  />
+                                  <StatCard
+                                      title="Fahrzeit einfach"
+                                      value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
+                                  />
+                                  <StatCard
+                                      title="Fahrzeit gesamt"
+                                      value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
+                                  />
+                                  <StatCard
+                                      title="Ersparnis bei vollem Tank"
+                                      value={formatCurrency(grossSavingFullTank)}
+                                  />
+                                  <StatCard
+                                      title="Netto-Ersparnis"
+                                      value={formatCurrency(netSaving)}
+                                      valueClassName={profit.colorClass}
+                                  />
+                              </div>
+                          </div>
+
+                          <div>
+                              <h3 className="mb-3 text-lg font-bold">Details</h3>
+
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                  <StatCard
+                                      title="Break-even Preisunterschied"
+                                      value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
+                                  />
+                                  <StatCard
+                                      title="Max. Verbrauch"
+                                      value={`${maxConsumption.toFixed(1)} L / 100 km`}
+                                  />
+                              </div>
+                          </div>
+
+                          <div>
+                              <h3 className="mb-3 text-lg font-bold">Rechner anpassen</h3>
+                              {controls}
                           </div>
                       </div>
                   </div>
