@@ -178,13 +178,40 @@ export default function Page() {
         }
     }
 
+    function onTouchMove2(e: React.TouchEvent) {
+        if (!dragging) return;
+
+        const currentY = e.touches[0].clientY;
+        const delta = currentY - startY;
+        const content = sheetContentRef.current;
+
+        const atTop = !content || content.scrollTop <= 0;
+        const atEnd = !content || content.scrollTop+window.innerHeight >= content.scrollHeight;
+
+
+        // nach unten ziehen -> nur wenn Inhalt ganz oben ist
+        if (delta > 0 && atTop) {
+            setSheetY(Math.max(0, startOffset + delta));
+            return;
+        }
+
+        //delat < 0 --> nach oben
+        //delat > 0 --> nach unten
+
+        // nach oben ziehen -> Sheet öffnen, solange es nicht ganz oben ist
+        if (delta < 0 && sheetY > 0 && atEnd) {
+            setSheetY(Math.max(0, startOffset + delta));
+        }
+
+    }
+
     function onTouchEnd() {
         setDragging(false);
 
         const h = window.innerHeight;
-        const snapTop = 0;
+        const snapTop = h * 0.1;
         const snapMid = h * 0.45;
-        const snapBottom = h * 0.8;
+        const snapBottom = h * 0.92;
 
         const options = [snapTop, snapMid, snapBottom];
         const nearest = options.reduce((prev, curr) =>
@@ -563,9 +590,13 @@ export default function Page() {
                       ref={sheetContentRef}
                       className="mobile-sheet w-screen rounded-t-[28px] bg-white px-4 pb-10 pt-3 shadow-2xl"
                       onTouchStart={onTouchStart}
-                      onTouchMove={onTouchMove}
+                      onTouchMove={onTouchMove2}
                       onTouchEnd={onTouchEnd}>
-                      <div className="sheet-handle w-full">
+                      <div className="sheet-handle w-full"
+                           onTouchStart={onTouchStart}
+                           onTouchMove={onTouchMove}
+                           onTouchEnd={onTouchEnd}
+                      >
                           <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300"/>
                           <h1 className="text-3xl font-bold">Tankify</h1>
                           <p className="mt-2 text-sm text-gray-600">
