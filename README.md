@@ -1,38 +1,180 @@
-# Tankify
+# 🚗 Tankify Frontend
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+A modern Next.js app that helps you decide whether it’s worth driving to a cheaper fuel station.
 
-## Getting Started
+It calculates:
 
-First, run the development server:
+* ⛽ Fuel cost for the trip
+* 💸 Savings compared to local fuel price
+* 📍 Real driving distance (via routing)
+* ⏱ Estimated travel time
+* 📊 Profitability (visual indicator)
+
+---
+
+## ✨ Features
+
+* 🗺 Interactive OpenStreetMap with Leaflet
+* 📍 Select start & destination via:
+
+    * Address search
+    * Map click mode
+* 🛣 Real road routing (OSRM)
+* 📈 Profit indicator (red → yellow → green)
+* 🎚 Sliders + manual input for:
+
+    * Fuel prices
+    * Consumption
+    * Tank size
+    * Average speed
+* 🎯 Calculates:
+
+    * Distance
+    * Duration
+    * Trip cost
+    * Net savings
+    * Break-even price difference
+    * Max consumption
+
+---
+
+## 🛠 Tech Stack
+
+* **Next.js (App Router)**
+* **React**
+* **TypeScript**
+* **Tailwind CSS**
+* **React Leaflet** (OpenStreetMap)
+* **OSRM API** (routing)
+* **Nominatim API** (geocoding)
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/RedMotionMedia/tankify-frontend.git
+cd tankify-frontend
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Run development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## ⚙️ How It Works
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Routing (distance + time)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Uses OSRM:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+https://router.project-osrm.org
+```
 
-## Deploy on Vercel
+Returns:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+* Distance (meters)
+* Duration (seconds)
+* Route geometry
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+### 2. Calculations
+
+#### Trip fuel usage
+
+```
+tripLiters = (distance_roundtrip / 100) * consumption
+```
+
+#### Trip cost
+
+```
+tripCost = tripLiters * destinationPrice
+```
+
+#### Savings
+
+```
+grossSaving = tankSize * (localPrice - destinationPrice)
+netSaving = grossSaving - tripCost
+```
+
+#### Break-even
+
+```
+breakEven = tripCost / tankSize
+```
+
+---
+
+## 🎨 UI Logic
+
+### Profit Indicator
+
+| Range | Meaning            |
+| ----- | ------------------ |
+| < 0€  | Not worth it 🔴    |
+| 0–5€  | Barely worth it 🟡 |
+| 5–15€ | Worth it 🟢        |
+| >15€  | Very worth it 🟢🔥 |
+
+---
+
+## ⚠️ Limitations
+
+* Uses public APIs (rate limited)
+* Routing is approximate (no live traffic)
+* Fuel prices must be entered manually
+
+---
+
+## 🔮 Possible Improvements
+
+* 🔌 Live fuel price integration
+* 📍 Nearby fuel station suggestions
+* 💾 Save favorite routes
+* 🌙 Dark mode
+* 📱 Mobile PWA version
+
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+## 🙌 Credits
+
+* OpenStreetMap
+* OSRM
+* React Leaflet
+
+---
+
+## 💡 Idea
+
+Built to answer one simple question:
+
+> “Is it actually worth driving for cheaper fuel?”
+
+Now you know 😄
