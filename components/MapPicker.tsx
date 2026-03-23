@@ -19,6 +19,8 @@ type Point = {
     label: string;
 };
 
+type FuelType = "diesel" | "super95";
+
 type Station = {
     id: string;
     lat: number;
@@ -37,7 +39,13 @@ type Props = {
     end: Point;
     routeGeometry: [number, number][];
     pickMode: "start" | "end" | null;
+    fuelType: FuelType;
     onMapPick: (type: "start" | "end", point: Point) => void;
+    onSelectStationAsDestination: (payload: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) => void;
 };
 
 const markerIcon = new L.Icon({
@@ -76,7 +84,7 @@ async function fetchStationsForVisibleMap(bounds: {
     east: number;
     centerLat: number;
     centerLon: number;
-}): Promise<Station[]> {
+}): Promise<{ stations: Station[]; error?: string | null }> {
     const params = new URLSearchParams({
         south: String(bounds.south),
         west: String(bounds.west),
@@ -89,11 +97,18 @@ async function fetchStationsForVisibleMap(bounds: {
     const res = await fetch(`/api/stations?${params.toString()}`);
 
     if (!res.ok) {
-        return [];
+        let message = "Tankstellen konnten nicht geladen werden.";
+        try {
+            const data = await res.json();
+            if (data?.error) message = data.error;
+        } catch {
+            // ignore
+        }
+        return { stations: [], error: message };
     }
 
     const data = await res.json();
-    return data.stations ?? [];
+    return { stations: data.stations ?? [], error: null };
 }
 
 function ClickHandler({
@@ -173,9 +188,9 @@ function SearchHereControl({
     }, [map]);
 
     async function handleSearchHere() {
-        const zoom = map.getZoom();
+        const currentZoom = map.getZoom();
 
-        if (zoom < 13) {
+        if (currentZoom < 13) {
             setHint("Bitte näher hineinzoomen (mindestens Zoom 13).");
             onStationsLoaded([]);
             return;
@@ -188,7 +203,7 @@ function SearchHereControl({
             const bounds = map.getBounds();
             const center = map.getCenter();
 
-            const stations = await fetchStationsForVisibleMap({
+            const result = await fetchStationsForVisibleMap({
                 south: bounds.getSouth(),
                 west: bounds.getWest(),
                 north: bounds.getNorth(),
@@ -197,12 +212,17 @@ function SearchHereControl({
                 centerLon: center.lng,
             });
 
-            onStationsLoaded(stations);
-            setHint(
-                stations.length > 0
-                    ? `${stations.length} Tankstellen geladen.`
-                    : "Keine Tankstellen gefunden."
-            );
+            onStationsLoaded(result.stations);
+
+            if (result.error) {
+                setHint(result.error);
+            } else {
+                setHint(
+                    result.stations.length > 0
+                        ? `${result.stations.length} Tankstellen geladen.`
+                        : "Keine Tankstellen gefunden."
+                );
+            }
         } catch (error) {
             console.error(error);
             onStationsLoaded([]);
@@ -213,7 +233,7 @@ function SearchHereControl({
     }
 
     return (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-[1000] -translate-x-1/2">
+        <div className="pointer-events-none absolute left-1/2 top-3 z-1000 -translate-x-1/2">
             <div className="flex flex-col items-center gap-2">
                 <button
                     type="button"
@@ -231,100 +251,160 @@ function SearchHereControl({
     );
 }
 
+function PriceBadge({
+                        station,
+                        fuelType,
+                    }: {
+    station: Station;
+    fuelType: FuelType;
+}) {
+    const value = fuelType === "diesel" ? station.diesel : station.super95;
+
+    if (value === null || value === undefined) return null;
+
+    return (
+        <div className="rounded-full bg-blue-600 px-2 py-1 text-[11px] font-semibold text-white shadow">
+            {value.toFixed(3)}
+        </div>
+    );
+}
+
 function StationsLayer({
                            stations,
-                           onSelectStation,
+                           fuelType,
+                           onSelectStationAsDestination,
                        }: {
     stations: Station[];
-    onSelectStation: (point: Point) => void;
+    fuelType: FuelType;
+    onSelectStationAsDestination: (payload: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) => void;
 }) {
     return (
         <>
-            {stations.map((station) => (
-                <CircleMarker
-                    key={station.id}
-                    center={[station.lat, station.lon]}
-                    radius={8}
-                    pathOptions={{
-                        color: station.diesel || station.super95 ? "#2563eb" : "#dc2626",
-                        fillColor: station.diesel || station.super95 ? "#60a5fa" : "#ef4444",
-                        fillOpacity: 0.9,
-                        weight: 2,
-                    }}
-                    eventHandlers={{
-                        click: () =>
-                            onSelectStation({
-                                lat: station.lat,
-                                lon: station.lon,
-                                label: station.name,
-                            }),
-                    }}
-                >
-                    <Popup>
-                        <div className="min-w-[220px]">
-                            <div className="text-base font-semibold">{station.name}</div>
+            {stations.map((station) => {
+                const selectedPrice =
+                    fuelType === "diesel" ? station.diesel : station.super95;
 
-                            {station.address ? (
-                                <div className="mt-1 text-sm text-gray-700">{station.address}</div>
-                            ) : null}
+                const hasPrice =
+                    selectedPrice !== null && selectedPrice !== undefined;
 
-                            {station.city ? (
-                                <div className="text-sm text-gray-500">{station.city}</div>
-                            ) : null}
+                return (
+                    <CircleMarker
+                        key={station.id}
+                        center={[station.lat, station.lon]}
+                        radius={8}
+                        pathOptions={{
+                            color: hasPrice ? "#2563eb" : "#dc2626",
+                            fillColor: hasPrice ? "#60a5fa" : "#ef4444",
+                            fillOpacity: 0.9,
+                            weight: 2,
+                        }}
+                    >
+                        <Popup>
+                            <div className="min-w-60">
+                                <div className="text-base font-semibold">{station.name}</div>
 
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                                <div className="rounded-lg bg-gray-50 p-2">
-                                    <div className="text-gray-500">Diesel</div>
-                                    <div className="font-semibold">{formatPrice(station.diesel)}</div>
+                                {station.address ? (
+                                    <div className="mt-1 text-sm text-gray-700">
+                                        {station.address}
+                                    </div>
+                                ) : null}
+
+                                {station.city ? (
+                                    <div className="text-sm text-gray-500">{station.city}</div>
+                                ) : null}
+
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                                    <div className="rounded-lg bg-gray-50 p-2">
+                                        <div className="text-gray-500">Diesel</div>
+                                        <div className="font-semibold">
+                                            {formatPrice(station.diesel)}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg bg-gray-50 p-2">
+                                        <div className="text-gray-500">Super 95</div>
+                                        <div className="font-semibold">
+                                            {formatPrice(station.super95)}
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="rounded-lg bg-gray-50 p-2">
-                                    <div className="text-gray-500">Super 95</div>
-                                    <div className="font-semibold">{formatPrice(station.super95)}</div>
+                                <div className="mt-3 flex items-center justify-between text-xs">
+                  <span
+                      className={
+                          station.open === true
+                              ? "font-medium text-green-600"
+                              : station.open === false
+                                  ? "font-medium text-red-600"
+                                  : "text-gray-500"
+                      }
+                  >
+                    {station.open === true
+                        ? "Geöffnet"
+                        : station.open === false
+                            ? "Geschlossen"
+                            : "Öffnungsstatus unbekannt"}
+                  </span>
+
+                                    <span className="text-gray-400">
+                    {station.source === "econtrol-match"
+                        ? "Preis: E-Control"
+                        : "Preis: —"}
+                  </span>
                                 </div>
+
+                                <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                    Ausgewählter Kraftstoff:{" "}
+                                    <span className="font-semibold">
+                    {fuelType === "diesel" ? "Diesel" : "Benzin"}
+                  </span>
+                                    {" · "}
+                                    Preis:{" "}
+                                    <span className="font-semibold">
+                    {formatPrice(selectedPrice)}
+                  </span>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        onSelectStationAsDestination({
+                                            point: {
+                                                lat: station.lat,
+                                                lon: station.lon,
+                                                label: station.name,
+                                            },
+                                            price: selectedPrice,
+                                            station,
+                                        })
+                                    }
+                                    className="mt-3 w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
+                                >
+                                    Als Ziel wählen
+                                </button>
                             </div>
+                        </Popup>
 
-                            <div className="mt-3 flex items-center justify-between text-xs">
-                <span
-                    className={
-                        station.open === true
-                            ? "font-medium text-green-600"
-                            : station.open === false
-                                ? "font-medium text-red-600"
-                                : "text-gray-500"
-                    }
-                >
-                  {station.open === true
-                      ? "Geöffnet"
-                      : station.open === false
-                          ? "Geschlossen"
-                          : "Öffnungsstatus unbekannt"}
-                </span>
-
-                                <span className="text-gray-400">
-                  {station.source === "econtrol-match"
-                      ? "Preis: E-Control"
-                      : "Preis: —"}
-                </span>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    onSelectStation({
-                                        lat: station.lat,
-                                        lon: station.lon,
-                                        label: station.name,
-                                    })
-                                }
-                                className="mt-3 w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
-                            >
-                                Als Ziel wählen
-                            </button>
-                        </div>
-                    </Popup>
-                </CircleMarker>
-            ))}
+                        {hasPrice ? (
+                            <Marker
+                                position={[station.lat, station.lon]}
+                                icon={L.divIcon({
+                                    className: "price-badge-marker",
+                                    html: `<div class="price-badge-inner">${selectedPrice!.toFixed(
+                                        3
+                                    )}</div>`,
+                                    iconSize: [52, 22],
+                                    iconAnchor: [26, 36],
+                                })}
+                            />
+                        ) : null}
+                    </CircleMarker>
+                );
+            })}
         </>
     );
 }
@@ -334,7 +414,9 @@ export default function MapPicker({
                                       end,
                                       routeGeometry,
                                       pickMode,
+                                      fuelType,
                                       onMapPick,
+                                      onSelectStationAsDestination,
                                   }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
 
@@ -363,7 +445,8 @@ export default function MapPicker({
 
                 <StationsLayer
                     stations={stations}
-                    onSelectStation={(point) => onMapPick("end", point)}
+                    fuelType={fuelType}
+                    onSelectStationAsDestination={onSelectStationAsDestination}
                 />
 
                 <Marker position={[start.lat, start.lon]} icon={markerIcon}>

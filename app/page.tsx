@@ -13,6 +13,8 @@ type Point = {
   label: string;
 };
 
+type FuelType = "diesel" | "super95";
+
 type GeocodeResult = {
   display_name: string;
   lat: string;
@@ -55,6 +57,12 @@ function formatDuration(hours: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function formatInputValue(value: number, step: number) {
+  if (step >= 1) return value.toFixed(0);
+  if (step >= 0.1) return value.toFixed(1);
+  return value.toFixed(3);
 }
 
 function getProfitLevel(netSaving: number) {
@@ -122,6 +130,7 @@ export default function Page() {
   const [startPoint, setStartPoint] = useState<Point>(DEFAULT_START);
   const [endPoint, setEndPoint] = useState<Point>(DEFAULT_END);
 
+  const [fuelType, setFuelType] = useState<FuelType>("diesel");
   const [localPrice, setLocalPrice] = useState(2.142);
   const [destinationPrice, setDestinationPrice] = useState(1.585);
   const [consumption, setConsumption] = useState(6.0);
@@ -251,7 +260,7 @@ export default function Page() {
   const profit = useMemo(() => getProfitLevel(netSaving), [netSaving]);
 
   return (
-      <main className="min-h-screen bg-neutral-100 p-6 md:p-10">
+      <main className="min-h-screen bg-neutral-100 p-4 md:p-8">
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[420px_1fr]">
           <section className="rounded-3xl bg-white p-6 shadow-sm">
             <h1 className="text-3xl font-bold">Tankify</h1>
@@ -260,6 +269,20 @@ export default function Page() {
             </p>
 
             <div className="mt-6 space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Kraftstoff
+                </label>
+                <select
+                    value={fuelType}
+                    onChange={(e) => setFuelType(e.target.value as FuelType)}
+                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                >
+                  <option value="diesel">Diesel</option>
+                  <option value="super95">Benzin</option>
+                </select>
+              </div>
+
               <LocationField
                   label="Startpunkt"
                   value={startText}
@@ -347,12 +370,13 @@ export default function Page() {
           </section>
 
           <section className="space-y-6">
-            <div className="h-105 overflow-hidden rounded-3xl bg-white shadow-sm">
+            <div className="h-80 overflow-hidden rounded-3xl bg-white shadow-sm md:h-105">
               <MapPicker
                   start={startPoint}
                   end={endPoint}
                   routeGeometry={routeData?.geometry ?? []}
                   pickMode={mapPickMode}
+                  fuelType={fuelType}
                   onMapPick={(type, point) => {
                     if (type === "start") {
                       setStartPoint(point);
@@ -364,7 +388,28 @@ export default function Page() {
 
                     setMapPickMode(null);
                   }}
+                  onSelectStationAsDestination={({ point, price }) => {
+                    setEndPoint(point);
+                    setEndText(point.label);
+
+                    if (price !== null && price !== undefined) {
+                      setDestinationPrice(price);
+                    }
+                  }}
               />
+            </div>
+
+            <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">Netto-Ersparnis</span>
+                <span className={`text-sm font-semibold ${profit.colorClass}`}>
+                {profit.label}
+              </span>
+              </div>
+
+              <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
+                {formatCurrency(netSaving)}
+              </div>
             </div>
 
             <div className="rounded-3xl bg-white p-5 shadow-sm">
@@ -379,10 +424,10 @@ export default function Page() {
                 <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
 
                 <div
-                    className="absolute bottom-0 -translate-x-1/2"
+                    className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
                     style={{ left: `${profit.percent}%` }}
                 >
-                  <div className="text-lg leading-none">▲</div>
+                  ▲
                 </div>
               </div>
 
@@ -391,7 +436,7 @@ export default function Page() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <StatCard
                   title="Einfache Strecke"
                   value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
@@ -430,21 +475,6 @@ export default function Page() {
                   title="Max. Verbrauch"
                   value={`${maxConsumption.toFixed(1)} L / 100 km`}
               />
-            </div>
-
-            <div className={`rounded-3xl p-6 shadow-sm ${profit.bgClass}`}>
-              <h2 className={`text-2xl font-bold ${profit.colorClass}`}>
-                {netSaving >= 0 ? "Ja, es lohnt sich." : "Nein, es lohnt sich nicht."}
-              </h2>
-              <p className="mt-2 text-base text-gray-800">
-                {netSaving >= 0
-                    ? `Du sparst ungefähr ${formatCurrency(
-                        netSaving
-                    )} nach Abzug der Fahrtkosten.`
-                    : `Du verlierst ungefähr ${formatCurrency(
-                        Math.abs(netSaving)
-                    )} durch die Fahrt.`}
-              </p>
             </div>
           </section>
         </div>
@@ -489,10 +519,10 @@ function SliderNumberField({
   return (
       <div>
         <label className="mb-2 block text-sm font-medium">
-          {label}: {value.toFixed(step < 1 ? 3 : 0)} {unit}
+          {label}: {formatInputValue(value, step)} {unit}
         </label>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
               type="range"
               min={min}
@@ -508,11 +538,11 @@ function SliderNumberField({
               min={min}
               max={max}
               step={step}
-              value={value}
+              value={Number(formatInputValue(value, step))}
               onChange={(e) =>
                   onChange(clamp(Number(e.target.value || 0), min, max))
               }
-              className="w-28 rounded-xl border border-gray-300 px-3 py-2"
+              className="w-full rounded-xl border border-gray-300 px-3 py-2 sm:w-28"
           />
         </div>
       </div>
@@ -540,14 +570,12 @@ function LocationField({
       <div>
         <label className="mb-2 block text-sm font-medium">{label}</label>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
               value={value}
               onChange={(e) => onChange(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onSearch();
-                }
+                if (e.key === "Enter") onSearch();
               }}
               className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
           />

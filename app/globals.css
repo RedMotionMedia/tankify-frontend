@@ -17,3 +17,24 @@ body {
   height: 100%;
   width: 100%;
 }
+
+.price-badge-marker {
+  background: transparent;
+  border: none;
+}
+
+.price-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
