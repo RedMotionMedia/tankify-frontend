@@ -1,20 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import {useEffect, useMemo, useState} from "react";
 import RouteSection from "./RouteSection";
 import PriceSection from "./PriceSection";
-import VehicleSection from "./VehicleSection";
 import ResultsPanel from "./ResultsPanel";
-import SettingsPanel from "./SettingsPanel";
 import MobileBottomSheet from "./MobileBottomSheet";
-import { getTranslations } from "@/config/i18n";
-import { DEFAULT_END, DEFAULT_START } from "@/lib/constants";
-import { calculateTankify, getProfitLevel } from "@/lib/calc";
-import { geocode } from "@/lib/geocode";
-import { useRoute } from "@/hooks/useRoute";
-import { useBottomSheet } from "@/hooks/useBottomSheet";
-import { FuelType, Language, MapPickMode, Point } from "@/types/tankify";
+import SettingsModal from "./SettingsModal";
+import {getTranslations} from "@/config/i18n";
+import {DEFAULT_END, DEFAULT_START} from "@/lib/constants";
+import {calculateTankify, getProfitLevel} from "@/lib/calc";
+import {geocode} from "@/lib/geocode";
+import {useRoute} from "@/hooks/useRoute";
+import {useBottomSheet} from "@/hooks/useBottomSheet";
+import {FuelType, Language, MapPickMode, Point} from "@/types/tankify";
 
 const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
     ssr: false,
@@ -22,6 +21,7 @@ const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
 
 export default function TankifyCalculator() {
     const [language, setLanguage] = useState<Language>("de");
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     const [startText, setStartText] = useState("Linz");
     const [endText, setEndText] = useState("Vyšší Brod");
@@ -51,7 +51,7 @@ export default function TankifyCalculator() {
         minimizeBottomSheet,
     } = useBottomSheet();
 
-    const { routeData, routeLoading, routeError } = useRoute(startPoint, endPoint);
+    const {routeData, routeLoading, routeError} = useRoute(startPoint, endPoint);
 
     const t = getTranslations(language);
 
@@ -137,14 +137,8 @@ export default function TankifyCalculator() {
         [calculation.netSaving]
     );
 
-    const controls = (
+    const routeControls = (
         <div className="space-y-6">
-            <SettingsPanel
-                language={language}
-                setLanguage={setLanguage}
-                t={t}
-            />
-
             <RouteSection
                 t={t}
                 startText={startText}
@@ -174,16 +168,6 @@ export default function TankifyCalculator() {
                 setDestinationPrice={setDestinationPrice}
             />
 
-            <VehicleSection
-                t={t}
-                consumption={consumption}
-                setConsumption={setConsumption}
-                tankSize={tankSize}
-                setTankSize={setTankSize}
-                avgSpeed={avgSpeed}
-                setAvgSpeed={setAvgSpeed}
-            />
-
             {mapPickMode ? (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
                     {t.route.pickHint}{" "}
@@ -200,49 +184,170 @@ export default function TankifyCalculator() {
     );
 
     return (
-        <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
-            <div className="mx-auto hidden max-w-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
-                <section className="self-start rounded-3xl bg-white p-6 shadow-sm">
-                    <h1 className="text-3xl font-bold">{t.app.title}</h1>
-                    <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
-                    <div className="mt-6">{controls}</div>
-                </section>
+        <>
+            <SettingsModal
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                t={t}
+                language={language}
+                setLanguage={setLanguage}
+                fuelType={fuelType}
+                setFuelType={setFuelType}
+                consumption={consumption}
+                setConsumption={setConsumption}
+                tankSize={tankSize}
+                setTankSize={setTankSize}
+                avgSpeed={avgSpeed}
+                setAvgSpeed={setAvgSpeed}
+            />
 
-                <section className="space-y-6">
-                    <div className="map-resizable rounded-3xl bg-white shadow-sm">
-                        <div className="h-full overflow-hidden rounded-3xl">
-                            <MapPicker
-                                start={startPoint}
-                                end={endPoint}
-                                routeGeometry={routeData?.geometry ?? []}
-                                pickMode={mapPickMode}
-                                fuelType={fuelType}
-                                t={t}
-                                onMapPick={(type, point) => {
-                                    if (type === "start") {
+            <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
+                <div className="mx-auto hidden max-w-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
+                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                            <div>
+                                <h1 className="text-3xl font-bold">{t.app.title}</h1>
+                                <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setSettingsOpen(true)}
+                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
+                                aria-label="Open settings"
+                                title="Settings"
+                            >
+                                ⚙️
+                            </button>
+                        </div>
+
+                        <div className="mt-6">{routeControls}</div>
+                    </section>
+
+                    <section className="space-y-6">
+                        <div className="map-resizable rounded-3xl bg-white shadow-sm">
+                            <div className="h-full overflow-hidden rounded-3xl">
+                                <MapPicker
+                                    start={startPoint}
+                                    end={endPoint}
+                                    routeGeometry={routeData?.geometry ?? []}
+                                    pickMode={mapPickMode}
+                                    fuelType={fuelType}
+                                    t={t}
+                                    onMapPick={(type, point) => {
+                                        if (type === "start") {
+                                            setStartPoint(point);
+                                            setStartText(point.label);
+                                        } else {
+                                            setEndPoint(point);
+                                            setEndText(point.label);
+                                        }
+                                        setMapPickMode(null);
+                                    }}
+                                    onSelectStationAsStart={({point, price}) => {
                                         setStartPoint(point);
                                         setStartText(point.label);
-                                    } else {
+
+                                        if (price !== null && price !== undefined) {
+                                            setLocalPrice(price);
+                                        }
+                                    }}
+                                    onSelectStationAsDestination={({point, price}) => {
                                         setEndPoint(point);
                                         setEndText(point.label);
-                                    }
-                                    setMapPickMode(null);
-                                }}
-                                onSelectStationAsDestination={({ point, price }) => {
+
+                                        if (price !== null && price !== undefined) {
+                                            setDestinationPrice(price);
+                                        }
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <ResultsPanel
+                            t={t}
+                            language={language}
+                            profit={profit}
+                            routeLoading={routeLoading}
+                            oneWayKm={routeData?.distanceKm ?? 0}
+                            roundTripKm={calculation.roundTripKm}
+                            priceDifference={calculation.priceDifference}
+                            tripCost={calculation.tripCost}
+                            estimatedHoursOneWay={calculation.estimatedHoursOneWay}
+                            estimatedHoursRoundTrip={calculation.estimatedHoursRoundTrip}
+                            grossSavingFullTank={calculation.grossSavingFullTank}
+                            netSaving={calculation.netSaving}
+                            breakEvenDiff={calculation.breakEvenDiff}
+                            maxConsumption={calculation.maxConsumption}
+                        />
+                    </section>
+                </div>
+
+                <div className="lg:hidden">
+                    <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
+                        <MapPicker
+                            start={startPoint}
+                            end={endPoint}
+                            routeGeometry={routeData?.geometry ?? []}
+                            pickMode={mapPickMode}
+                            fuelType={fuelType}
+                            t={t}
+                            onMapPick={(type, point) => {
+                                if (type === "start") {
+                                    setStartPoint(point);
+                                    setStartText(point.label);
+                                } else {
                                     setEndPoint(point);
                                     setEndText(point.label);
-                                    if (price !== null && price !== undefined) {
-                                        setDestinationPrice(price);
-                                    }
-                                }}
-                            />
-                        </div>
+                                }
+                                setMapPickMode(null);
+                            }}
+                            onSelectStationAsStart={({point, price}) => {
+                                setStartPoint(point);
+                                setStartText(point.label);
+
+                                if (price !== null && price !== undefined) {
+                                    setLocalPrice(price);
+                                }
+                            }}
+                            onSelectStationAsDestination={({point, price}) => {
+                                setEndPoint(point);
+                                setEndText(point.label);
+
+                                if (price !== null && price !== undefined) {
+                                    setDestinationPrice(price);
+                                }
+                            }}
+                        />
                     </div>
 
-                    <ResultsPanel
+                    <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
+                        <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
+                            <h1 className="text-lg font-bold">{t.app.title}</h1>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setSettingsOpen(true)}
+                            className="rounded-full bg-white/90 px-3 py-2 text-lg shadow-md backdrop-blur"
+                            aria-label="Open settings"
+                            title="Settings"
+                        >
+                            ⚙️
+                        </button>
+                    </div>
+
+                    <MobileBottomSheet
                         t={t}
                         language={language}
-                        profit={profit}
+                        sheetContentRef={sheetContentRef}
+                        sheetY={sheetY}
+                        dragging={dragging}
+                        onTouchStart={onTouchStart}
+                        onTouchMoveHandle={onTouchMoveHandle}
+                        onTouchMoveContent={onTouchMoveContent}
+                        onTouchEnd={onTouchEnd}
+                        controls={routeControls}
                         routeLoading={routeLoading}
                         oneWayKm={routeData?.distanceKm ?? 0}
                         roundTripKm={calculation.roundTripKm}
@@ -254,70 +359,10 @@ export default function TankifyCalculator() {
                         netSaving={calculation.netSaving}
                         breakEvenDiff={calculation.breakEvenDiff}
                         maxConsumption={calculation.maxConsumption}
-                    />
-                </section>
-            </div>
-
-            <div className="lg:hidden">
-                <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
-                    <MapPicker
-                        start={startPoint}
-                        end={endPoint}
-                        routeGeometry={routeData?.geometry ?? []}
-                        pickMode={mapPickMode}
-                        fuelType={fuelType}
-                        t={t}
-                        onMapPick={(type, point) => {
-                            if (type === "start") {
-                                setStartPoint(point);
-                                setStartText(point.label);
-                            } else {
-                                setEndPoint(point);
-                                setEndText(point.label);
-                            }
-                            setMapPickMode(null);
-                        }}
-                        onSelectStationAsDestination={({ point, price }) => {
-                            setEndPoint(point);
-                            setEndText(point.label);
-                            if (price !== null && price !== undefined) {
-                                setDestinationPrice(price);
-                            }
-                        }}
+                        profit={profit}
                     />
                 </div>
-
-                <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2">
-                    <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
-                        <h1 className="text-lg font-bold">{t.app.title}</h1>
-                    </div>
-                </div>
-
-                <MobileBottomSheet
-                    t={t}
-                    language={language}
-                    sheetContentRef={sheetContentRef}
-                    sheetY={sheetY}
-                    dragging={dragging}
-                    onTouchStart={onTouchStart}
-                    onTouchMoveHandle={onTouchMoveHandle}
-                    onTouchMoveContent={onTouchMoveContent}
-                    onTouchEnd={onTouchEnd}
-                    controls={controls}
-                    routeLoading={routeLoading}
-                    oneWayKm={routeData?.distanceKm ?? 0}
-                    roundTripKm={calculation.roundTripKm}
-                    priceDifference={calculation.priceDifference}
-                    tripCost={calculation.tripCost}
-                    estimatedHoursOneWay={calculation.estimatedHoursOneWay}
-                    estimatedHoursRoundTrip={calculation.estimatedHoursRoundTrip}
-                    grossSavingFullTank={calculation.grossSavingFullTank}
-                    netSaving={calculation.netSaving}
-                    breakEvenDiff={calculation.breakEvenDiff}
-                    maxConsumption={calculation.maxConsumption}
-                    profit={profit}
-                />
-            </div>
-        </main>
+            </main>
+        </>
     );
 }

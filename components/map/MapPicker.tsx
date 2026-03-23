@@ -1,22 +1,13 @@
 "use client";
 
-import L, { type LeafletMouseEvent } from "leaflet";
-import React, { useEffect, useMemo, useState } from "react";
-import {
-    CircleMarker,
-    MapContainer,
-    Marker,
-    Polyline,
-    Popup,
-    TileLayer,
-    useMap,
-    useMapEvents,
-} from "react-leaflet";
-import { TranslationSchema } from "@/config/i18n";
-import { FuelType, MapPickMode, Point, Station } from "@/types/tankify";
-import { reverseGeocode } from "@/lib/geocode";
-import { formatPrice } from "@/lib/format";
-import { fetchStationsForVisibleMap } from "@/lib/route";
+import L, {type LeafletMouseEvent} from "leaflet";
+import React, {useEffect, useMemo, useState} from "react";
+import {CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents,} from "react-leaflet";
+import {TranslationSchema} from "@/config/i18n";
+import {FuelType, MapPickMode, Point, Station} from "@/types/tankify";
+import {reverseGeocode} from "@/lib/geocode";
+import {formatPrice} from "@/lib/format";
+import {fetchStationsForVisibleMap} from "@/lib/route";
 
 type Props = {
     start: Point;
@@ -27,6 +18,11 @@ type Props = {
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
     onSelectStationAsDestination: (payload: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) => void;
+    onSelectStationAsStart: (payload: {
         point: Point;
         price?: number | null;
         station: Station;
@@ -50,10 +46,12 @@ function ClickHandler({
     useMapEvents({
         async click(e: LeafletMouseEvent) {
             if (!pickMode) return;
+
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
             const label = await reverseGeocode(lat, lon);
-            onMapPick(pickMode, { lat, lon, label });
+
+            onMapPick(pickMode, {lat, lon, label});
         },
     });
 
@@ -80,7 +78,7 @@ function FitBounds({
                     [end.lat, end.lon],
                 ];
 
-        map.fitBounds(points as [number, number][], { padding: [30, 30] });
+        map.fitBounds(points as [number, number][], {padding: [30, 30]});
     }, [map, start, end, routeGeometry]);
 
     return null;
@@ -95,7 +93,7 @@ function SearchHereControl({
 }) {
     const map = useMap();
     const [loading, setLoading] = useState(false);
-    const [hint, setHint] = useState(t.route.tapSearchHere);
+    const [hint, setHint] = useState<string>(t.route.tapSearchHere);
 
     useEffect(() => {
         setHint(t.route.tapSearchHere);
@@ -170,7 +168,8 @@ function SearchHereControl({
                     {loading ? t.route.loading : t.route.searchHere}
                 </button>
 
-                <div className="w-65 rounded-full bg-white/50 px-3 py-1 text-center text-[10px] text-gray-700 shadow md:w-auto md:text-xs">
+                <div
+                    className="w-65 rounded-full bg-white/50 px-3 py-1 text-center text-[10px] text-gray-700 shadow md:w-auto md:text-xs">
                     {hint}
                 </div>
             </div>
@@ -206,11 +205,17 @@ function StationsLayer({
                            stations,
                            fuelType,
                            onSelectStationAsDestination,
+                           onSelectStationAsStart,
                            t,
                        }: {
     stations: Station[];
     fuelType: FuelType;
     onSelectStationAsDestination: (payload: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) => void;
+    onSelectStationAsStart: (payload: {
         point: Point;
         price?: number | null;
         station: Station;
@@ -306,28 +311,48 @@ function StationsLayer({
                     </span>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            onSelectStationAsDestination({
-                                                point: {
-                                                    lat: station.lat,
-                                                    lon: station.lon,
-                                                    label: station.name,
-                                                },
-                                                price: selectedPrice,
-                                                station,
-                                            })
-                                        }
-                                        className="mt-3 w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
-                                    >
-                                        {t.route.setAsDestination}
-                                    </button>
+                                    <div className="mt-3 grid gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                onSelectStationAsStart({
+                                                    point: {
+                                                        lat: station.lat,
+                                                        lon: station.lon,
+                                                        label: station.name,
+                                                    },
+                                                    price: selectedPrice,
+                                                    station,
+                                                })
+                                            }
+                                            className="w-full rounded-xl bg-gray-800 px-3 py-2 text-sm font-medium text-white"
+                                        >
+                                            {t.route.setAsStart}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                onSelectStationAsDestination({
+                                                    point: {
+                                                        lat: station.lat,
+                                                        lon: station.lon,
+                                                        label: station.name,
+                                                    },
+                                                    price: selectedPrice,
+                                                    station,
+                                                })
+                                            }
+                                            className="w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
+                                        >
+                                            {t.route.setAsDestination}
+                                        </button>
+                                    </div>
                                 </div>
                             </Popup>
                         </CircleMarker>
 
-                        {hasPrice ? <PriceBadge station={station} fuelType={fuelType} /> : null}
+                        {hasPrice ? <PriceBadge station={station} fuelType={fuelType}/> : null}
                     </React.Fragment>
                 );
             })}
@@ -344,6 +369,7 @@ export default function MapPicker({
                                       t,
                                       onMapPick,
                                       onSelectStationAsDestination,
+                                      onSelectStationAsStart,
                                   }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
 
@@ -359,20 +385,21 @@ export default function MapPicker({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                <ResizeFix />
-                <RecenterControl start={start} end={end} routeGeometry={routeGeometry} t={t} />
-                <SearchHereControl onStationsLoaded={setStations} t={t} />
-                <FitBounds start={start} end={end} routeGeometry={routeGeometry} />
-                <ClickHandler pickMode={pickMode} onMapPick={onMapPick} />
+                <ResizeFix/>
+                <RecenterControl start={start} end={end} routeGeometry={routeGeometry} t={t}/>
+                <SearchHereControl onStationsLoaded={setStations} t={t}/>
+                <FitBounds start={start} end={end} routeGeometry={routeGeometry}/>
+                <ClickHandler pickMode={pickMode} onMapPick={onMapPick}/>
 
                 {routeGeometry.length > 0 ? (
-                    <Polyline positions={routeGeometry} pathOptions={{ color: "#2563eb", weight: 5 }} />
+                    <Polyline positions={routeGeometry} pathOptions={{color: "#2563eb", weight: 5}}/>
                 ) : null}
 
                 <StationsLayer
                     stations={stations}
                     fuelType={fuelType}
                     onSelectStationAsDestination={onSelectStationAsDestination}
+                    onSelectStationAsStart={onSelectStationAsStart}
                     t={t}
                 />
 
@@ -414,7 +441,7 @@ function RecenterControl({
                     [end.lat, end.lon],
                 ];
 
-        map.fitBounds(points as [number, number][], { padding: [30, 30] });
+        map.fitBounds(points as [number, number][], {padding: [30, 30]});
 
         setTimeout(() => {
             map.invalidateSize();

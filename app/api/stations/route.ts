@@ -18,6 +18,13 @@ type CacheEntry = {
     expiresAt: number;
 };
 
+type Bounds = {
+    south: number;
+    west: number;
+    north: number;
+    east: number;
+};
+
 type EControlStation = {
     id: string;
     lat: number;
@@ -28,6 +35,36 @@ type EControlStation = {
     diesel?: number | null;
     super95?: number | null;
     open?: boolean | null;
+};
+
+type OverpassElement = {
+    id: number | string;
+    type: string;
+    lat?: number;
+    lon?: number;
+    center?: {
+        lat?: number;
+        lon?: number;
+    };
+    tags?: Record<string, string | undefined>;
+};
+
+type EControlPrice = {
+    fuelType?: string;
+    amount?: number | null;
+};
+
+type EControlApiItem = {
+    id?: string | number;
+    name?: string;
+    open?: boolean | null;
+    location?: {
+        latitude?: number;
+        longitude?: number;
+        address?: string;
+        city?: string;
+    };
+    prices?: EControlPrice[];
 };
 
 const cache = new Map<string, CacheEntry>();
@@ -131,24 +168,27 @@ function normalizeName(value: string | undefined): string {
         .trim();
 }
 
-function normalizeOverpassStations(elements: any[]): (null | {
-    id: string;
-    lat: number;
-    lon: number;
-    name: any;
-    address: string | undefined;
-    city: any;
-    diesel: null;
-    super95: null;
-    open: null;
-    source: string
-})[] {
-    return elements
-        .map((el) => {
-            const lat = el.lat ?? el.center?.lat;
-            const lon = el.lon ?? el.center?.lon;
+function normalizeStationName(value: string | undefined): string {
+    const normalized = normalizeName(value);
+    return normalized || "fuel station";
+}
 
-            if (typeof lat !== "number" || typeof lon !== "number") return null;
+function getOverpassLatLon(el: OverpassElement): { lat: number; lon: number } | null {
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+
+    if (typeof lat !== "number" || typeof lon !== "number") {
+        return null;
+    }
+
+    return { lat, lon };
+}
+
+function normalizeOverpassStations(elements: OverpassElement[]): Station[] {
+    return elements
+        .map((el): Station | null => {
+            const coords = getOverpassLatLon(el);
+            if (!coords) return null;
 
             const tags = el.tags ?? {};
             const parts = [
@@ -156,41 +196,25 @@ function normalizeOverpassStations(elements: any[]): (null | {
                 tags["addr:housenumber"],
                 tags["addr:postcode"],
                 tags["addr:city"],
-            ].filter(Boolean);
+            ].filter(Boolean) as string[];
 
             return {
                 id: `${el.type}-${el.id}`,
-                lat,
-                lon,
+                lat: coords.lat,
+                lon: coords.lon,
                 name: tags.name || tags.brand || tags.operator || "Fuel Station",
                 address: parts.join(", ") || undefined,
                 city: tags["addr:city"] || undefined,
                 diesel: null,
                 super95: null,
                 open: null,
-                source: "overpass" as const,
+                source: "overpass",
             };
         })
-        .filter((s): s is Station => s !== null);
+        .filter((station): station is Station => station !== null);
 }
 
-async function fetchOverpassStations(bounds: {
-    south: number;
-    west: number;
-    north: number;
-    east: number;
-}): Promise<({
-    id: string;
-    lat: number;
-    lon: number;
-    name: any;
-    address: string | undefined;
-    city: any;
-    diesel: null;
-    super95: null;
-    open: null;
-    source: string
-} | null)[]> {
+async function fetchOverpassStations(bounds: Bounds): Promise<Station[]> {
     const query = `
 [out:json][timeout:25];
 (
@@ -209,16 +233,43 @@ out center tags;
         body: query,
     });
 
-    if (res.status === 429) {
-        return [];
-    }
+    if (res.status === 429) return [];
+
     if (!res.ok) {
         console.error(`Overpass failed with status ${res.status}`);
         return [];
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as { elements?: OverpassElement[] };
     return normalizeOverpassStations(data.elements ?? []);
+}
+
+function normalizeEControlItem(item: EControlApiItem): EControlStation | null {
+    const lat = item.location?.latitude;
+    const lon = item.location?.longitude;
+
+    if (typeof lat !== "number" || typeof lon !== "number") {
+        return null;
+    }
+
+    const prices = Array.isArray(item.prices) ? item.prices : [];
+
+    const diesel =
+        prices.find((p) => p.fuelType === "DIE")?.amount ?? null;
+    const super95 =
+        prices.find((p) => p.fuelType === "SUP")?.amount ?? null;
+
+    return {
+        id: `econtrol-${item.id ?? `${lat}-${lon}`}`,
+        lat,
+        lon,
+        name: item.name || "Fuel Station",
+        address: item.location?.address,
+        city: item.location?.city,
+        diesel,
+        super95,
+        open: item.open ?? null,
+    };
 }
 
 async function fetchEControlByFuel(
@@ -253,31 +304,13 @@ async function fetchEControlByFuel(
         return [];
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as unknown;
 
-    return (Array.isArray(data) ? data : []).map((item: any) => {
-        const prices = Array.isArray(item.prices) ? item.prices : [];
+    if (!Array.isArray(data)) return [];
 
-        const diesel =
-            prices.find((p: any) => p.fuelType === "DIE")?.amount ?? null;
-        const super95 =
-            prices.find((p: any) => p.fuelType === "SUP")?.amount ?? null;
-
-        return {
-            id: `econtrol-${item.id}`,
-            lat: item.location?.latitude,
-            lon: item.location?.longitude,
-            name: item.name || "Fuel Station",
-            address: item.location?.address,
-            city: item.location?.city,
-            diesel,
-            super95,
-            open: item.open ?? null,
-        };
-    }).filter(
-        (s: EControlStation) =>
-            typeof s.lat === "number" && typeof s.lon === "number"
-    );
+    return data
+        .map((item) => normalizeEControlItem(item as EControlApiItem))
+        .filter((station): station is EControlStation => station !== null);
 }
 
 async function fetchEControlEnriched(
@@ -300,8 +333,12 @@ async function fetchEControlEnriched(
         }
 
         const current = merged.get(key)!;
+
         merged.set(key, {
             ...current,
+            name: station.name || current.name,
+            address: station.address || current.address,
+            city: station.city || current.city,
             diesel:
                 station.diesel !== null && station.diesel !== undefined
                     ? station.diesel
@@ -317,11 +354,48 @@ async function fetchEControlEnriched(
     return [...merged.values()];
 }
 
+function dedupeStations(stations: Station[]): Station[] {
+    const map = new Map<string, Station>();
+
+    for (const station of stations) {
+        const key = `${roundCoord(station.lat, 5)}:${roundCoord(station.lon, 5)}`;
+
+        if (!map.has(key)) {
+            map.set(key, station);
+            continue;
+        }
+
+        const current = map.get(key)!;
+
+        map.set(key, {
+            ...current,
+            name: station.name || current.name,
+            address: station.address || current.address,
+            city: station.city || current.city,
+            diesel:
+                station.diesel !== null && station.diesel !== undefined
+                    ? station.diesel
+                    : current.diesel,
+            super95:
+                station.super95 !== null && station.super95 !== undefined
+                    ? station.super95
+                    : current.super95,
+            open: station.open ?? current.open,
+            source:
+                current.source === "econtrol-match" || station.source === "econtrol-match"
+                    ? "econtrol-match"
+                    : "overpass",
+        });
+    }
+
+    return [...map.values()];
+}
+
 function mergeStations(
     overpassStations: Station[],
     econtrolStations: EControlStation[]
 ): Station[] {
-    return overpassStations.map((station) => {
+    const merged = overpassStations.map((station) => {
         let bestMatch: EControlStation | null = null;
         let bestScore = Number.POSITIVE_INFINITY;
 
@@ -333,10 +407,9 @@ function mergeStations(
                 candidate.lon
             );
 
-            const sameName =
-                normalizeName(station.name) &&
-                normalizeName(candidate.name) &&
-                normalizeName(station.name) === normalizeName(candidate.name);
+            const stationName = normalizeStationName(station.name);
+            const candidateName = normalizeStationName(candidate.name);
+            const sameName = stationName === candidateName;
 
             const score = sameName ? distance * 0.5 : distance;
 
@@ -355,9 +428,7 @@ function mergeStations(
             bestMatch.lon
         );
 
-        if (realDistance > 120) {
-            return station;
-        }
+        if (realDistance > 120) return station;
 
         return {
             ...station,
@@ -373,8 +444,16 @@ function mergeStations(
                     ? bestMatch.super95
                     : station.super95,
             open: bestMatch.open ?? station.open,
-            source: "econtrol-match",
+            source: "econtrol-match" as const,
         };
+    });
+
+    return dedupeStations(merged).sort((a, b) => {
+        const aHasPrice = a.diesel != null || a.super95 != null;
+        const bHasPrice = b.diesel != null || b.super95 != null;
+
+        if (aHasPrice !== bHasPrice) return aHasPrice ? -1 : 1;
+        return a.name.localeCompare(b.name, "de");
     });
 }
 
@@ -415,15 +494,16 @@ export async function GET(req: NextRequest) {
             centerLon
         );
 
-        const cached = cache.get(cacheKey);
         const now = Date.now();
+        const cached = cache.get(cacheKey);
 
         if (cached && cached.expiresAt > now) {
             return NextResponse.json(
                 { stations: cached.data, cached: true },
                 {
                     headers: {
-                        "Cache-Control": "public, max-age=300, stale-while-revalidate=900",
+                        "Cache-Control":
+                            "public, max-age=300, stale-while-revalidate=900",
                     },
                 }
             );
@@ -451,7 +531,8 @@ export async function GET(req: NextRequest) {
             },
             {
                 headers: {
-                    "Cache-Control": "public, max-age=300, stale-while-revalidate=900",
+                    "Cache-Control":
+                        "public, max-age=300, stale-while-revalidate=900",
                 },
             }
         );

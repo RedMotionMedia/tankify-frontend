@@ -1,5 +1,5 @@
-import { TranslationSchema } from "@/config/i18n";
-import { FuelType } from "@/types/tankify";
+import {TranslationSchema} from "@/config/i18n";
+import {FuelType} from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
 
 type Props = {
@@ -14,8 +14,6 @@ type Props = {
 
 export default function PriceSection({
                                          t,
-                                         fuelType,
-                                         setFuelType,
                                          localPrice,
                                          setLocalPrice,
                                          destinationPrice,
@@ -26,20 +24,6 @@ export default function PriceSection({
             <div>
                 <h2 className="text-lg font-bold">{t.pricing.title}</h2>
                 <p className="mt-1 text-sm text-gray-600">{t.pricing.description}</p>
-            </div>
-
-            <div>
-                <label className="mb-2 block text-sm font-medium">
-                    {t.pricing.fuelType}
-                </label>
-                <select
-                    value={fuelType}
-                    onChange={(e) => setFuelType(e.target.value as FuelType)}
-                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
-                >
-                    <option value="diesel">{t.pricing.diesel}</option>
-                    <option value="super95">{t.pricing.super95}</option>
-                </select>
             </div>
 
             <SliderNumberField
