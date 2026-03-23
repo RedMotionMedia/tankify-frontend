@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const MapPicker = dynamic(() => import("@/components/MapPicker"), {
   ssr: false,
@@ -140,6 +140,65 @@ export default function Page() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [mapPickMode, setMapPickMode] = useState<"start" | "end" | null>(null);
+    const sheetContentRef = useRef<HTMLDivElement | null>(null);
+
+    const [sheetY, setSheetY] = useState(0);
+    const [dragging, setDragging] = useState(false);
+    const [startY, setStartY] = useState(0);
+    const [startOffset, setStartOffset] = useState(0);
+
+    useEffect(() => {
+        setSheetY(window.innerHeight * 0.58);
+    }, []);
+
+    function onTouchStart(e: React.TouchEvent) {
+        setDragging(true);
+        setStartY(e.touches[0].clientY);
+        setStartOffset(sheetY);
+    }
+
+    function onTouchMove(e: React.TouchEvent) {
+        if (!dragging) return;
+
+        const currentY = e.touches[0].clientY;
+        const delta = currentY - startY;
+        const content = sheetContentRef.current;
+
+        const atTop = !content || content.scrollTop <= 0;
+
+        // nach unten ziehen -> nur wenn Inhalt ganz oben ist
+        if (delta > 0 && atTop) {
+            setSheetY(Math.max(0, startOffset + delta));
+            return;
+        }
+
+        // nach oben ziehen -> Sheet öffnen, solange es nicht ganz oben ist
+        if (delta < 0 && sheetY > 0) {
+            setSheetY(Math.max(0, startOffset + delta));
+        }
+    }
+
+    function onTouchEnd() {
+        setDragging(false);
+
+        const h = window.innerHeight;
+        const snapTop = 0;
+        const snapMid = h * 0.45;
+        const snapBottom = h * 0.8;
+
+        const options = [snapTop, snapMid, snapBottom];
+        const nearest = options.reduce((prev, curr) =>
+            Math.abs(curr - sheetY) < Math.abs(prev - sheetY) ? curr : prev
+        );
+
+        setSheetY(nearest);
+    }
+
+    function minimizeBottomSheet() {
+        const h = window.innerHeight;
+        const snapBottom = h * 0.8;
+        setSheetY(snapBottom);
+    }
 
   async function geocode(query: string): Promise<Point | null> {
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(
@@ -263,7 +322,11 @@ export default function Page() {
             value={startText}
             onChange={setStartText}
             onSearch={() => handleSearch("start")}
-            onPickOnMap={() => setMapPickMode("start")}
+            onPickOnMap={() => {
+                setMapPickMode("start");
+                minimizeBottomSheet();
+            }
+            }
             loading={searchLoading === "start"}
             pickActive={mapPickMode === "start"}
         />
@@ -273,7 +336,11 @@ export default function Page() {
             value={endText}
             onChange={setEndText}
             onSearch={() => handleSearch("end")}
-            onPickOnMap={() => setMapPickMode("end")}
+            onPickOnMap={() => {
+                setMapPickMode("end");
+                minimizeBottomSheet();
+            }
+            }
             loading={searchLoading === "end"}
             pickActive={mapPickMode === "end"}
         />
@@ -446,8 +513,8 @@ export default function Page() {
   );
 
   return (
-      <main className="min-h-screen bg-neutral-100 p-4 md:p-8">
-        <div className="mx-auto hidden max-w-7xl gap-6 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
+      <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
+          <div className="mx-auto hidden max-w-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
           <section className="rounded-3xl bg-white p-6 shadow-sm self-start">
             <h1 className="text-3xl font-bold">Tankify</h1>
             <p className="mt-2 text-sm text-gray-600">
@@ -458,107 +525,121 @@ export default function Page() {
           {rightContent}
         </div>
 
-        <div className="lg:hidden">
-          <div className="fixed inset-0 z-0">
-            <MapPicker
-                start={startPoint}
-                end={endPoint}
-                routeGeometry={routeData?.geometry ?? []}
-                pickMode={mapPickMode}
-                fuelType={fuelType}
-                onMapPick={(type, point) => {
-                  if (type === "start") {
-                    setStartPoint(point);
-                    setStartText(point.label);
-                  } else {
-                    setEndPoint(point);
-                    setEndText(point.label);
-                  }
-                  setMapPickMode(null);
-                }}
-                onSelectStationAsDestination={({ point, price }) => {
-                  setEndPoint(point);
-                  setEndText(point.label);
-                  if (price !== null && price !== undefined) {
-                    setDestinationPrice(price);
-                  }
-                }}
-            />
-          </div>
-
-          <div className="mobile-sheet relative z-10 mt-[52vh] rounded-t-[28px] bg-white px-4 pb-10 pt-3 shadow-2xl">
-            <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300" />
-            <h1 className="text-3xl font-bold">Tankify</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
-            </p>
-
-            <div className="mt-6 space-y-6">
-              {controls}
-
-              <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Netto-Ersparnis</span>
-                  <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                  {profit.label}
-                </span>
-                </div>
-                <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
-                  {formatCurrency(netSaving)}
-                </div>
+          <div className="lg:hidden">
+              <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
+                  <MapPicker
+                      start={startPoint}
+                      end={endPoint}
+                      routeGeometry={routeData?.geometry ?? []}
+                      pickMode={mapPickMode}
+                      fuelType={fuelType}
+                      onMapPick={(type, point) => {
+                          if (type === "start") {
+                              setStartPoint(point);
+                              setStartText(point.label);
+                          } else {
+                              setEndPoint(point);
+                              setEndText(point.label);
+                          }
+                          setMapPickMode(null);
+                      }}
+                      onSelectStationAsDestination={({ point, price }) => {
+                          setEndPoint(point);
+                          setEndText(point.label);
+                          if (price !== null && price !== undefined) {
+                              setDestinationPrice(price);
+                          }
+                      }}
+                  />
               </div>
 
-              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Lohnt sich Skala</span>
-                  <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                  {profit.label}
-                </span>
-                </div>
-
-                <div className="relative pt-2 pb-8">
-                  <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
+              <div
+                  className="fixed inset-x-0 bottom-0 z-10"
+                  style={{
+                      transform: `translateY(${sheetY}px)`,
+                      transition: dragging ? "none" : "transform 0.25s ease",
+                  }}>
                   <div
-                      className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
-                      style={{ left: `${profit.percent}%` }}
-                  >
-                    ▲
-                  </div>
-                </div>
-              </div>
+                      ref={sheetContentRef}
+                      className="mobile-sheet w-screen rounded-t-[28px] bg-white px-4 pb-10 pt-3 shadow-2xl"
+                      onTouchStart={onTouchStart}
+                      onTouchMove={onTouchMove}
+                      onTouchEnd={onTouchEnd}>
+                      <div className="sheet-handle w-full">
+                          <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300"/>
+                          <h1 className="text-3xl font-bold">Tankify</h1>
+                          <p className="mt-2 text-sm text-gray-600">
+                              Berechnet, ob sich die Fahrt zum günstigeren Tanken lohnt.
+                          </p>
+                      </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <StatCard
-                    title="Einfache Strecke"
-                    value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
-                />
-                <StatCard
-                    title="Hin & retour"
-                    value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
-                />
-                <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
-                <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
-                <StatCard
-                    title="Fahrzeit einfach"
-                    value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
-                />
-                <StatCard
-                    title="Fahrzeit gesamt"
-                    value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
-                />
-                <StatCard
-                    title="Ersparnis bei vollem Tank"
-                    value={formatCurrency(grossSavingFullTank)}
-                />
-                <StatCard
-                    title="Netto-Ersparnis"
-                    value={formatCurrency(netSaving)}
-                    valueClassName={profit.colorClass}
-                />
+                      <div className="mt-6 space-y-6">
+                          {controls}
+
+                          <div className={`rounded-3xl p-5 shadow-sm ${profit.bgClass}`}>
+                              <div className="flex items-center justify-between">
+                                  <span className="text-sm text-gray-500">Netto-Ersparnis</span>
+                                  <span className={`text-sm font-semibold ${profit.colorClass}`}>
+                                      {profit.label}
+                                    </span>
+                              </div>
+                              <div className={`mt-2 text-3xl font-bold ${profit.colorClass}`}>
+                                  {formatCurrency(netSaving)}
+                              </div>
+                          </div>
+
+                          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-black/5">
+                              <div className="mb-2 flex items-center justify-between">
+                                  <span className="text-sm text-gray-500">Lohnt sich Skala</span>
+                                  <span className={`text-sm font-semibold ${profit.colorClass}`}>
+              {profit.label}
+            </span>
+                              </div>
+
+                              <div className="relative pt-2 pb-8">
+                                  <div className="h-4 rounded-full bg-linear-to-r from-red-500 via-yellow-400 to-green-500" />
+                                  <div
+                                      className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
+                                      style={{ left: `${profit.percent}%` }}
+                                  >
+                                      ▲
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="grid gap-4 sm:grid-cols-2">
+                              <StatCard
+                                  title="Einfache Strecke"
+                                  value={routeLoading ? "Lade..." : `${oneWayKm.toFixed(1)} km`}
+                              />
+                              <StatCard
+                                  title="Hin & retour"
+                                  value={routeLoading ? "Lade..." : `${roundTripKm.toFixed(1)} km`}
+                              />
+                              <StatCard title="Preisunterschied" value={`${priceDifference.toFixed(3)} €/L`} />
+                              <StatCard title="Fahrtkosten" value={formatCurrency(tripCost)} />
+                              <StatCard
+                                  title="Fahrzeit einfach"
+                                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursOneWay)}
+                              />
+                              <StatCard
+                                  title="Fahrzeit gesamt"
+                                  value={routeLoading ? "Lade..." : formatDuration(estimatedHoursRoundTrip)}
+                              />
+                              <StatCard
+                                  title="Ersparnis bei vollem Tank"
+                                  value={formatCurrency(grossSavingFullTank)}
+                              />
+                              <StatCard
+                                  title="Netto-Ersparnis"
+                                  value={formatCurrency(netSaving)}
+                                  valueClassName={profit.colorClass}
+                              />
+                          </div>
+                      </div>
+                  </div>
               </div>
-            </div>
           </div>
-        </div>
       </main>
   );
 }

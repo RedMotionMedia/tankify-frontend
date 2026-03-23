@@ -216,8 +216,8 @@ function SearchHereControl({
     }
 
     return (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-1000 -translate-x-1/2">
-            <div className="flex flex-col items-center gap-2">
+        <div className="pointer-events-none absolute bottom-1/12 md:bottom-1 left-1/2 z-1000 -translate-x-1/2">
+            <div className="flex flex-col items-center gap-1">
                 <button
                     type="button"
                     onClick={handleSearchHere}
@@ -226,7 +226,7 @@ function SearchHereControl({
                     {loading ? "Lädt ..." : "Hier suchen"}
                 </button>
 
-                <div className="rounded-full bg-white/95 px-3 py-1 text-xs text-gray-700 shadow">
+                <div className="rounded-full bg-white/50 px-3 py-1 text-[10px] md:text-xs text-gray-700 shadow text-center w-65 md:w-auto">
                     {hint}
                 </div>
             </div>
@@ -467,7 +467,7 @@ function RecenterControl({
     }
 
     return (
-        <div className="pointer-events-none absolute left-3 top-3 z-1000">
+        <div className="pointer-events-none absolute right-3 top-3 z-1000">
             <button
                 type="button"
                 onClick={handleRecenter}
