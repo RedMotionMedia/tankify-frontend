@@ -37,7 +37,7 @@ export default function LocationField({
                 <button
                     type="button"
                     onClick={onSearch}
-                    className="rounded-2xl bg-black px-4 py-3 text-white transition active:scale-95 hover:opacity-90"
+                    className="rounded-2xl bg-black px-4 py-3 text-white transition active:scale-95 hover:opacity-80"
                 >
                     {loading ? "..." : searchLabel}
                 </button>

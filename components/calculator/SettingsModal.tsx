@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { TranslationSchema } from "@/config/i18n";
 import { FuelType, Language } from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
@@ -36,29 +36,6 @@ export default function SettingsModal({
                                           avgSpeed,
                                           setAvgSpeed,
                                       }: Props) {
-    const [mounted, setMounted] = useState(open);
-    const [visible, setVisible] = useState(false);
-
-    useEffect(() => {
-        if (open) {
-            setMounted(true);
-
-            const frame = window.requestAnimationFrame(() => {
-                setVisible(true);
-            });
-
-            return () => window.cancelAnimationFrame(frame);
-        }
-
-        setVisible(false);
-
-        const timeout = window.setTimeout(() => {
-            setMounted(false);
-        }, 220);
-
-        return () => window.clearTimeout(timeout);
-    }, [open]);
-
     useEffect(() => {
         if (!open) return;
 
@@ -102,20 +79,21 @@ export default function SettingsModal({
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [open, onClose]);
 
-    if (!mounted) return null;
-
     return (
         <div
-            className="fixed inset-0 z-2000 flex items-center justify-center p-4"
+            className={`fixed inset-0 z-2000 flex items-center justify-center p-4 transition duration-200 ${
+                open ? "pointer-events-auto" : "pointer-events-none"
+            }`}
             aria-hidden={!open}
         >
             <button
                 type="button"
                 aria-label="Close settings overlay"
                 className={`absolute inset-0 transition duration-200 ${
-                    visible ? "bg-black/25 backdrop-blur-sm" : "bg-black/0 backdrop-blur-none"
+                    open ? "bg-black/25 backdrop-blur-sm" : "bg-black/0 backdrop-blur-none"
                 }`}
                 onClick={onClose}
+                tabIndex={open ? 0 : -1}
             />
 
             <div
@@ -124,9 +102,7 @@ export default function SettingsModal({
                 aria-label={t.settings.title}
                 onClick={(e) => e.stopPropagation()}
                 className={`relative z-2001 max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl transition duration-200 sm:p-8 ${
-                    visible
-                        ? "scale-100 opacity-100"
-                        : "scale-95 opacity-0"
+                    open ? "scale-100 opacity-100" : "scale-95 opacity-0"
                 }`}
             >
                 <div className="mb-6 flex items-start justify-between gap-4">
@@ -154,7 +130,7 @@ export default function SettingsModal({
                         </div>
 
                         <div className="flex h-auto flex-row gap-3">
-                            <label className="w-auto block py-3 text-sm font-medium">
+                            <label className="block w-auto py-3 text-sm font-medium">
                                 {t.settings.language}:
                             </label>
 
@@ -169,7 +145,7 @@ export default function SettingsModal({
                         </div>
 
                         <div className="flex h-auto flex-row gap-3">
-                            <label className="w-auto block py-3 text-sm font-medium">
+                            <label className="block w-auto py-3 text-sm font-medium">
                                 {t.pricing.fuelType}:
                             </label>
                             <select

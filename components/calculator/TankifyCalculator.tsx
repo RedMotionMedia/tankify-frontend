@@ -215,7 +215,7 @@ export default function TankifyCalculator() {
                             <button
                                 type="button"
                                 onClick={() => setSettingsOpen(true)}
-                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
+                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50 active:scale-95"
                                 aria-label="Open settings"
                                 title="Settings"
                             >
