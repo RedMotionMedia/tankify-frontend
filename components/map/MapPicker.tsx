@@ -32,6 +32,7 @@ type Props = {
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    debugMode: boolean;
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
     onSelectStationAsDestination: (payload: {
@@ -309,6 +310,7 @@ function StationPopupContent({
     fuelType,
     measurementSystem,
     currencySystem,
+    debugMode,
     t,
     onSelectStationAsStart,
     onSelectStationAsDestination,
@@ -318,6 +320,7 @@ function StationPopupContent({
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    debugMode: boolean;
     t: TranslationSchema;
     onSelectStationAsStart: (payload: {
         point: Point;
@@ -508,7 +511,7 @@ function StationPopupContent({
                     </details>
                 ) : null}
 
-                {station.econtrol ? (
+                {debugMode && station.econtrol ? (
                     <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
                         <summary className="text-xs font-semibold text-gray-700">
                             {t.station.rawData}
@@ -566,6 +569,7 @@ function StationsLayer({
                            fuelType,
                            measurementSystem,
                            currencySystem,
+                           debugMode,
                            onSelectStationAsDestination,
                            onSelectStationAsStart,
                            t,
@@ -574,6 +578,7 @@ function StationsLayer({
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    debugMode: boolean;
     onSelectStationAsDestination: (payload: {
         point: Point;
         price?: number | null;
@@ -610,6 +615,7 @@ function StationsLayer({
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
                                     currencySystem={currencySystem}
+                                    debugMode={debugMode}
                                     t={t}
                                     onSelectStationAsStart={(payload) => {
                                         onSelectStationAsStart(payload);
@@ -916,6 +922,7 @@ export default function MapPicker({
                                       fuelType,
                                       measurementSystem,
                                       currencySystem,
+                                      debugMode,
                                       t,
                                       onMapPick,
                                       onSelectStationAsDestination,
@@ -950,6 +957,7 @@ export default function MapPicker({
                     fuelType={fuelType}
                     measurementSystem={measurementSystem}
                     currencySystem={currencySystem}
+                    debugMode={debugMode}
                     onSelectStationAsDestination={onSelectStationAsDestination}
                     onSelectStationAsStart={onSelectStationAsStart}
                     t={t}

@@ -16,6 +16,9 @@ type Props = {
     t: TranslationSchema;
     language: Language;
     setLanguage: (language: Language) => void;
+    debugAllowed: boolean;
+    debugMode: boolean;
+    setDebugMode: (value: boolean) => void;
     fuelType: FuelType;
     setFuelType: (value: FuelType) => void;
     currencySystem: CurrencySystem;
@@ -36,6 +39,9 @@ export default function SettingsModal({
                                           t,
                                           language,
                                           setLanguage,
+                                          debugAllowed,
+                                          debugMode,
+                                          setDebugMode,
                                           fuelType,
                                           setFuelType,
                                           currencySystem,
@@ -51,6 +57,7 @@ export default function SettingsModal({
                                       }: Props) {
     const [cacheClearing, setCacheClearing] = useState(false);
     const [cacheStatus, setCacheStatus] = useState<"ok" | "error" | null>(null);
+    const showDebugControls = debugAllowed;
 
     useEffect(() => {
         if (!open) return;
@@ -218,27 +225,47 @@ export default function SettingsModal({
                             </select>
                         </div>
 
-                        <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                            <div className="text-sm font-semibold text-gray-900">
-                                {t.settings.logoCache}
-                            </div>
-                            <div className="mt-1 text-xs text-gray-600">
-                                {cacheStatus === "ok"
-                                    ? t.settings.cacheCleared
-                                    : cacheStatus === "error"
-                                        ? t.settings.cacheClearFailed
-                                        : " "}
-                            </div>
+                        {showDebugControls ? (
+                            <div className="mt-2 space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                <label className="flex items-center justify-between gap-4">
+                                    <span className="text-sm font-semibold text-gray-900">
+                                        {t.settings.enableDebugMode}
+                                    </span>
+                                    <input
+                                        type="checkbox"
+                                        checked={debugMode}
+                                        onChange={(e) => setDebugMode(e.target.checked)}
+                                        className="h-5 w-5 accent-gray-900"
+                                    />
+                                </label>
 
-                            <button
-                                type="button"
-                                onClick={handleClearLogoCache}
-                                disabled={cacheClearing}
-                                className="mt-3 w-full rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm active:scale-[0.99] disabled:opacity-60"
-                            >
-                                {cacheClearing ? t.settings.clearing : t.settings.clearLogoCache}
-                            </button>
-                        </div>
+                                {debugMode ? (
+                                    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                                        <div className="text-sm font-semibold text-gray-900">
+                                            {t.settings.logoCache}
+                                        </div>
+                                        <div className="mt-1 text-xs text-gray-600">
+                                            {cacheStatus === "ok"
+                                                ? t.settings.cacheCleared
+                                                : cacheStatus === "error"
+                                                    ? t.settings.cacheClearFailed
+                                                    : " "}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleClearLogoCache}
+                                            disabled={cacheClearing}
+                                            className="mt-3 w-full rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm active:scale-[0.99] disabled:opacity-60"
+                                        >
+                                            {cacheClearing
+                                                ? t.settings.clearing
+                                                : t.settings.clearLogoCache}
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </section>
 
                     <section className="space-y-4">

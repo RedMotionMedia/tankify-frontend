@@ -17,6 +17,7 @@ export type TranslationSchema = {
         clearing: string;
         cacheCleared: string;
         cacheClearFailed: string;
+        enableDebugMode: string;
     };
     app: {
         title: string;
@@ -161,6 +162,7 @@ export const translations: Record<Language, TranslationSchema> = {
             clearing: "Leere ...",
             cacheCleared: "Logo-Cache wurde geleert.",
             cacheClearFailed: "Cache konnte nicht geleert werden.",
+            enableDebugMode: "Debug-Modus aktivieren",
         },
         app: {
             title: "Tankify",
@@ -308,6 +310,7 @@ export const translations: Record<Language, TranslationSchema> = {
             clearing: "Clearing ...",
             cacheCleared: "Logo cache cleared.",
             cacheClearFailed: "Failed to clear cache.",
+            enableDebugMode: "Enable Debug Mode",
         },
         app: {
             title: "Tankify",

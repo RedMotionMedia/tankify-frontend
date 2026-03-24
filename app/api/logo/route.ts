@@ -304,10 +304,10 @@ export async function POST(req: NextRequest) {
 
     // Safety: avoid exposing cache flush in production unless explicitly enabled.
     const allow =
-        (process.env.NEXT_PUBLIC_ENABLE_CACHE_CLEAR ?? "").trim() === "1" ||
-        (process.env.ENABLE_CACHE_CLEAR ?? "").trim() === "1";
+        process.env.NODE_ENV !== "production" ||
+        (process.env.ENABLE_DEBUG_MODE ?? "").trim() === "1";
 
-    if (process.env.NODE_ENV === "production" && !allow) {
+    if (!allow) {
         return new NextResponse("Forbidden", { status: 403 });
     }
 
