@@ -2,6 +2,10 @@
 
 A modern Next.js app that helps you decide whether it’s worth driving to a cheaper fuel station.
 
+<img alt="img.png" src="resources/img.png" width="50%"/>
+<br>
+<img alt="img.png" src="resources/img_1.png" width="50%"/>
+
 It calculates:
 
 * ⛽ Fuel cost for the trip
@@ -40,8 +44,9 @@ It calculates:
 
 ## 🛠 Tech Stack
 
-* **Next.js (App Router)**
-* **React**
+* **Next.js (App Router) 16.2.1**
+* **Node 10.9.3**
+* **React 19.2.4**
 * **TypeScript**
 * **Tailwind CSS**
 * **React Leaflet** (OpenStreetMap)
@@ -168,6 +173,8 @@ MIT License
 * OpenStreetMap
 * OSRM
 * React Leaflet
+* Overpass-API
+* E-Control API
 
 ---
 
