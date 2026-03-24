@@ -1,4 +1,4 @@
-import { Point, RouteData } from "@/types/tankify";
+import {Point, RouteData, Station} from "@/types/tankify";
 
 export async function fetchRoute(
     start: Point,
@@ -30,7 +30,7 @@ export async function fetchStationsForVisibleMap(bounds: {
     east: number;
     centerLat: number;
     centerLon: number;
-}): Promise<{ stations: any[]; error?: string | null }> {
+}): Promise<{stations: Station[]; error?: string | null}> {
     const params = new URLSearchParams({
         south: String(bounds.south),
         west: String(bounds.west),
@@ -54,5 +54,5 @@ export async function fetchStationsForVisibleMap(bounds: {
     }
 
     const data = await res.json();
-    return { stations: data.stations ?? [], error: null };
+    return {stations: (data.stations ?? []) as Station[], error: null};
 }

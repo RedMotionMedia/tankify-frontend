@@ -1,0 +1,135 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "Target stage (GitHub Environment)"
+        type: choice
+        required: true
+        options: [dev, prod]
+      version:
+        description: "Image tag (e.g. v1.1.1 or sha-a80ec8e)"
+        type: string
+        required: true
+
+  workflow_call:
+    inputs:
+      stage:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy Image to Stage
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.stage }}
+
+    steps:
+      - name: Compute owner (lowercase)
+        id: owner
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          echo "owner_lc=$OWNER_LC" >> "$GITHUB_OUTPUT"
+
+      - name: Use provided version as image tag
+        id: resolve
+        run: echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate tag exists in GHCR
+        shell: bash
+        env:
+          OWNER: ${{ steps.owner.outputs.owner_lc }}
+          IMAGE: tankify-frontend
+          TAG: ${{ steps.resolve.outputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Checking if tag exists: ghcr.io/${OWNER}/${IMAGE}:${TAG}"
+
+          TYPE="$(gh api -H "Accept: application/vnd.github+json" "/users/${OWNER}" --jq '.type')"
+          if [ "$TYPE" = "Organization" ]; then
+            API_PATH="/orgs/${OWNER}/packages/container/${IMAGE}/versions?per_page=100"
+          else
+            API_PATH="/users/${OWNER}/packages/container/${IMAGE}/versions?per_page=100"
+          fi
+
+          json="$(gh api -H "Accept: application/vnd.github+json" "$API_PATH")"
+          tags="$(echo "$json" | jq -r '.[].metadata.container.tags[]?' | sort -u)"
+
+          if echo "$tags" | grep -qx "$TAG"; then
+            echo "Tag found: $TAG"
+          else
+            echo "Tag NOT found: $TAG"
+            echo
+            echo "Available tags (unique):"
+            echo "$tags"
+            exit 1
+          fi
+
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          # Adjust this repo name/path to your GitOps repo.
+          repository: ${{ github.repository_owner }}/tankify-gitops
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+          path: gitops
+
+      - name: Overwrite patch-deployment.yaml with new image tag
+        shell: bash
+        env:
+          STAGE: ${{ inputs.stage }}
+          TAG: ${{ steps.resolve.outputs.tag }}
+          OWNER: ${{ steps.owner.outputs.owner_lc }}
+          REPLICAS: ${{ vars.REPLICAS }}
+        run: |
+          set -euo pipefail
+
+          FILE="gitops/apps/tankify-frontend/overlays/${STAGE}/patch-deployment.yaml"
+          [ -f "$FILE" ] || (echo "ERROR: File not found: $FILE" && exit 1)
+
+          replicas="${REPLICAS:-1}"
+          IMAGE="ghcr.io/${OWNER}/tankify-frontend"
+
+          cat > "$FILE" <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: tankify-frontend
+          spec:
+            replicas: ${replicas}
+            template:
+              spec:
+                containers:
+                  - name: tankify-frontend
+                    image: ${IMAGE}:${TAG}
+          EOF
+
+          git -C gitops diff
+
+      - name: Commit & push
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd gitops
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "No changes detected."
+            exit 0
+          fi
+
+          git add apps/tankify-frontend/overlays/${{ inputs.stage }}/patch-deployment.yaml
+          git commit -m "Deploy ${{ inputs.stage }}: tankify-frontend -> ${{ inputs.version }}"
+          git push
+
