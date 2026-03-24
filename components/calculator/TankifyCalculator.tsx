@@ -74,6 +74,7 @@ export default function TankifyCalculator() {
     const t = getTranslations(language);
 
     useEffect(() => {
+
         const savedLanguage = window.localStorage.getItem("tankify-language");
         const savedCurrency = window.localStorage.getItem("tankify-currency");
         const savedMeasurement = window.localStorage.getItem("tankify-measurement");
@@ -334,6 +335,8 @@ export default function TankifyCalculator() {
                                     routeGeometry={routeData?.geometry ?? []}
                                     pickMode={mapPickMode}
                                     fuelType={fuelType}
+                                    measurementSystem={measurementSystem}
+                                    currencySystem={currencySystem}
                                     t={t}
                                     onMapPick={(type, point) => {
                                         if (type === "start") {
@@ -399,6 +402,8 @@ export default function TankifyCalculator() {
                             routeGeometry={routeData?.geometry ?? []}
                             pickMode={mapPickMode}
                             fuelType={fuelType}
+                            measurementSystem={measurementSystem}
+                            currencySystem={currencySystem}
                             t={t}
                             onMapPick={(type, point) => {
                                 if (type === "start") {
@@ -437,7 +442,7 @@ export default function TankifyCalculator() {
                         />
                     </div>
 
-                    <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
+                    <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
                         <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
                             <h1 className="text-lg font-bold">{t.app.title}</h1>
                         </div>

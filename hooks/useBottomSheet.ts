@@ -8,13 +8,13 @@ export function useBottomSheet() {
     const [startY, setStartY] = useState(0);
     const [startOffset, setStartOffset] = useState(0);
     const snapTopMultiplicator = 0;
-    const snapMidMultiplicator = 0.30;
+    const snapMidMultiplicator = 0.4;
     const snapBottomMultiplicator = 0.82;
     const [isSheetReady, setIsSheetReady] = useState(false);
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
-            setSheetY(window.innerHeight * 0.63);
+            setSheetY(window.innerHeight * 0.68);
             setIsSheetReady(true);
         });
 

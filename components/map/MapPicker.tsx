@@ -1,13 +1,29 @@
 "use client";
 
-import L, {type LeafletMouseEvent} from "leaflet";
-import React, {useEffect, useMemo, useState} from "react";
-import {CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents,} from "react-leaflet";
-import {TranslationSchema} from "@/config/i18n";
-import {FuelType, MapPickMode, Point, Station} from "@/types/tankify";
-import {reverseGeocode} from "@/lib/geocode";
-import {formatPrice} from "@/lib/format";
-import {fetchStationsForVisibleMap} from "@/lib/route";
+import L, { type LeafletMouseEvent } from "leaflet";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+    CircleMarker,
+    MapContainer,
+    Marker,
+    Polyline,
+    Popup,
+    TileLayer,
+    useMap,
+    useMapEvents,
+} from "react-leaflet";
+import { TranslationSchema } from "@/config/i18n";
+import {
+    CurrencySystem,
+    FuelType,
+    MapPickMode,
+    MeasurementSystem,
+    Point,
+    Station,
+} from "@/types/tankify";
+import { reverseGeocode } from "@/lib/geocode";
+import { fetchStationsForVisibleMap } from "@/lib/route";
+import { pricePerLiterToPerGallon } from "@/lib/units";
 
 type Props = {
     start: Point;
@@ -15,6 +31,8 @@ type Props = {
     routeGeometry: [number, number][];
     pickMode: MapPickMode;
     fuelType: FuelType;
+    measurementSystem: MeasurementSystem;
+    currencySystem: CurrencySystem;
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
     onSelectStationAsDestination: (payload: {
@@ -36,6 +54,38 @@ const markerIcon = new L.Icon({
     iconAnchor: [12, 41],
 });
 
+function formatDisplayPrice(
+    value: number | null | undefined,
+    measurementSystem: MeasurementSystem,
+    currencySystem: CurrencySystem
+) {
+    if (value === null || value === undefined) return "—";
+
+    const converted =
+        measurementSystem === "metric"
+            ? value
+            : pricePerLiterToPerGallon(value);
+
+    const symbol = currencySystem === "eur" ? "€" : "$";
+    const unit = measurementSystem === "metric" ? "/L" : "/gal";
+
+    return `${converted.toFixed(3)} ${symbol}${unit}`;
+}
+
+function formatBadgePrice(
+    value: number | null | undefined,
+    measurementSystem: MeasurementSystem
+) {
+    if (value === null || value === undefined) return null;
+
+    const converted =
+        measurementSystem === "metric"
+            ? value
+            : pricePerLiterToPerGallon(value);
+
+    return converted.toFixed(3);
+}
+
 function ClickHandler({
                           pickMode,
                           onMapPick,
@@ -51,7 +101,7 @@ function ClickHandler({
             const lon = e.latlng.lng;
             const label = await reverseGeocode(lat, lon);
 
-            onMapPick(pickMode, {lat, lon, label});
+            onMapPick(pickMode, { lat, lon, label });
         },
     });
 
@@ -78,7 +128,7 @@ function FitBounds({
                     [end.lat, end.lon],
                 ];
 
-        map.fitBounds(points as [number, number][], {padding: [30, 30]});
+        map.fitBounds(points as [number, number][], { padding: [30, 30] });
     }, [map, start, end, routeGeometry]);
 
     return null;
@@ -168,8 +218,7 @@ function SearchHereControl({
                     {loading ? t.route.loading : t.route.searchHere}
                 </button>
 
-                <div
-                    className="w-65 rounded-full bg-white/50 px-3 py-1 text-center text-[10px] text-gray-700 shadow md:w-auto md:text-xs">
+                <div className="w-65 rounded-full bg-white/50 px-3 py-1 text-center text-[10px] text-gray-700 shadow md:w-auto md:text-xs">
                     {hint}
                 </div>
             </div>
@@ -180,12 +229,15 @@ function SearchHereControl({
 function PriceBadge({
                         station,
                         fuelType,
+                        measurementSystem,
                     }: {
     station: Station;
     fuelType: FuelType;
+    measurementSystem: MeasurementSystem;
 }) {
     const value = fuelType === "diesel" ? station.diesel : station.super95;
-    if (value === null || value === undefined) return null;
+    const badgeText = formatBadgePrice(value, measurementSystem);
+    if (!badgeText) return null;
 
     return (
         <Marker
@@ -193,7 +245,7 @@ function PriceBadge({
             interactive={false}
             icon={L.divIcon({
                 className: "price-badge-marker",
-                html: `<div class="price-badge-inner">${value.toFixed(3)}</div>`,
+                html: `<div class="price-badge-inner">${badgeText}</div>`,
                 iconSize: [56, 24],
                 iconAnchor: [28, 38],
             })}
@@ -204,12 +256,16 @@ function PriceBadge({
 function StationsLayer({
                            stations,
                            fuelType,
+                           measurementSystem,
+                           currencySystem,
                            onSelectStationAsDestination,
                            onSelectStationAsStart,
                            t,
                        }: {
     stations: Station[];
     fuelType: FuelType;
+    measurementSystem: MeasurementSystem;
+    currencySystem: CurrencySystem;
     onSelectStationAsDestination: (payload: {
         point: Point;
         price?: number | null;
@@ -222,7 +278,6 @@ function StationsLayer({
     }) => void;
     t: TranslationSchema;
 }) {
-
     const map = useMap();
 
     return (
@@ -264,14 +319,22 @@ function StationsLayer({
                                         <div className="rounded-lg bg-gray-50 p-2">
                                             <div className="text-gray-500">{t.pricing.diesel}</div>
                                             <div className="font-semibold">
-                                                {formatPrice(station.diesel)}
+                                                {formatDisplayPrice(
+                                                    station.diesel,
+                                                    measurementSystem,
+                                                    currencySystem
+                                                )}
                                             </div>
                                         </div>
 
                                         <div className="rounded-lg bg-gray-50 p-2">
                                             <div className="text-gray-500">Super 95</div>
                                             <div className="font-semibold">
-                                                {formatPrice(station.super95)}
+                                                {formatDisplayPrice(
+                                                    station.super95,
+                                                    measurementSystem,
+                                                    currencySystem
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -310,7 +373,11 @@ function StationsLayer({
                                         {" · "}
                                         {t.pricing.sourcePrice}:{" "}
                                         <span className="font-semibold">
-                      {formatPrice(selectedPrice)}
+                      {formatDisplayPrice(
+                          selectedPrice,
+                          measurementSystem,
+                          currencySystem
+                      )}
                     </span>
                                     </div>
 
@@ -329,8 +396,7 @@ function StationsLayer({
                                                 });
 
                                                 map.closePopup();
-                                            }
-                                            }
+                                            }}
                                             className="w-full rounded-xl bg-gray-800 px-3 py-2 text-sm font-medium text-white"
                                         >
                                             {t.route.setAsStart}
@@ -350,8 +416,7 @@ function StationsLayer({
                                                 });
 
                                                 map.closePopup();
-                                            }
-                                            }
+                                            }}
                                             className="w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
                                         >
                                             {t.route.setAsDestination}
@@ -361,7 +426,13 @@ function StationsLayer({
                             </Popup>
                         </CircleMarker>
 
-                        {hasPrice ? <PriceBadge station={station} fuelType={fuelType}/> : null}
+                        {hasPrice ? (
+                            <PriceBadge
+                                station={station}
+                                fuelType={fuelType}
+                                measurementSystem={measurementSystem}
+                            />
+                        ) : null}
                     </React.Fragment>
                 );
             })}
@@ -375,6 +446,8 @@ export default function MapPicker({
                                       routeGeometry,
                                       pickMode,
                                       fuelType,
+                                      measurementSystem,
+                                      currencySystem,
                                       t,
                                       onMapPick,
                                       onSelectStationAsDestination,
@@ -394,19 +467,21 @@ export default function MapPicker({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                <ResizeFix/>
-                <RecenterControl start={start} end={end} routeGeometry={routeGeometry} t={t}/>
-                <SearchHereControl onStationsLoaded={setStations} t={t}/>
-                <FitBounds start={start} end={end} routeGeometry={routeGeometry}/>
-                <ClickHandler pickMode={pickMode} onMapPick={onMapPick}/>
+                <ResizeFix />
+                <RecenterControl start={start} end={end} routeGeometry={routeGeometry} t={t} />
+                <SearchHereControl onStationsLoaded={setStations} t={t} />
+                <FitBounds start={start} end={end} routeGeometry={routeGeometry} />
+                <ClickHandler pickMode={pickMode} onMapPick={onMapPick} />
 
                 {routeGeometry.length > 0 ? (
-                    <Polyline positions={routeGeometry} pathOptions={{color: "#2563eb", weight: 5}}/>
+                    <Polyline positions={routeGeometry} pathOptions={{ color: "#2563eb", weight: 5 }} />
                 ) : null}
 
                 <StationsLayer
                     stations={stations}
                     fuelType={fuelType}
+                    measurementSystem={measurementSystem}
+                    currencySystem={currencySystem}
                     onSelectStationAsDestination={onSelectStationAsDestination}
                     onSelectStationAsStart={onSelectStationAsStart}
                     t={t}
@@ -450,7 +525,7 @@ function RecenterControl({
                     [end.lat, end.lon],
                 ];
 
-        map.fitBounds(points as [number, number][], {padding: [30, 30]});
+        map.fitBounds(points as [number, number][], { padding: [30, 30] });
 
         setTimeout(() => {
             map.invalidateSize();
