@@ -349,7 +349,7 @@ export default function TankifyCalculator() {
                         </button>
                     </div>
 
-                    { isSheetReady && (<MobileBottomSheet
+                    { isSheetReady && !settingsOpen && (<MobileBottomSheet
                         t={t}
                         language={language}
                         sheetContentRef={sheetContentRef}

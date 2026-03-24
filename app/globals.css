@@ -71,8 +71,8 @@ button {
 
 .mobile-sheet {
   width: 100vw;
-  min-height: 24vh;
-  max-height: 82dvh;
+  height: 90dvh;
+  max-height: 90dvh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;

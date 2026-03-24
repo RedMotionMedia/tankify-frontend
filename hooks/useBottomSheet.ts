@@ -8,8 +8,8 @@ export function useBottomSheet() {
     const [startY, setStartY] = useState(0);
     const [startOffset, setStartOffset] = useState(0);
     const snapTopMultiplicator = 0;
-    const snapMidMultiplicator = 0.45;
-    const snapBottomMultiplicator = 0.74;
+    const snapMidMultiplicator = 0.30;
+    const snapBottomMultiplicator = 0.82;
     const [isSheetReady, setIsSheetReady] = useState(false);
 
     useEffect(() => {
@@ -36,12 +36,18 @@ export function useBottomSheet() {
 
         const atTop = !content || content.scrollTop <= 0;
 
+        console.log("currentY ->" + currentY);
+        console.log("delta ->" + delta);
+        console.log("atTop ->" + atTop);
+        console.log("sheetY ->" + sheetY);
+
+
         if (delta > 0 && atTop) {
             setSheetY(Math.max(0, startOffset + delta));
             return;
         }
 
-        if (delta < 0 && sheetY > 0) {
+        if (delta < 0) {
             setSheetY(Math.max(0, startOffset + delta));
         }
     }
@@ -56,6 +62,12 @@ export function useBottomSheet() {
         const atTop = !content || content.scrollTop <= 0;
         const atEnd =
             !content || content.scrollTop + window.innerHeight >= content.scrollHeight;
+
+        console.log("currentY ->" + currentY);
+        console.log("delta ->" + delta);
+        console.log("atTop ->" + atTop);
+        console.log("atEnd ->" + atEnd);
+        console.log("sheetY ->" + sheetY);
 
         if (delta > 0 && atTop) {
             setSheetY(Math.max(0, startOffset + delta));
