@@ -38,6 +38,8 @@ export type Station = {
     open?: boolean | null;
     distanceKm?: number | null;
     source?: "econtrol";
+    brandName?: string | null;
+    logoUrl?: string | null;
     econtrol?: EControlGasStation;
 };
 

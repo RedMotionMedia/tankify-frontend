@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { EControlGasStation } from "@/types/econtrol";
 import { extractPriceAmount, fetchStationsForBounds } from "@/lib/econtrol/sprit";
 import type { Station } from "@/types/tankify";
+import { resolveStationBrandAndLogo } from "@/lib/branding/stationLogo";
 
 type CacheEntry = { data: Station[]; expiresAt: number };
 
@@ -88,6 +89,12 @@ function toStationDto(station: EControlGasStation): Station | null {
     const super95 = extractPriceAmount(station, "SUP");
 
     const id = station.id != null ? `econtrol-${station.id}` : `econtrol-${lat}-${lon}`;
+    const logo = resolveStationBrandAndLogo({
+        stationName: station.name ?? null,
+        website:
+            typeof station.contact?.website === "string" ? station.contact.website : null,
+        email: typeof station.contact?.mail === "string" ? station.contact.mail : null,
+    });
 
     return {
         id,
@@ -102,6 +109,8 @@ function toStationDto(station: EControlGasStation): Station | null {
         open: station.open ?? null,
         distanceKm: typeof station.distance === "number" ? station.distance : null,
         source: "econtrol",
+        brandName: logo.brandName,
+        logoUrl: logo.logoUrl,
         econtrol: station, // pass-through: frontend can display everything (raw)
     };
 }

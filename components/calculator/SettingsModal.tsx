@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TranslationSchema } from "@/config/i18n";
 import {
     CurrencySystem,
@@ -49,6 +49,9 @@ export default function SettingsModal({
                                           avgSpeed,
                                           setAvgSpeed,
                                       }: Props) {
+    const [cacheClearing, setCacheClearing] = useState(false);
+    const [cacheStatus, setCacheStatus] = useState<"ok" | "error" | null>(null);
+
     useEffect(() => {
         if (!open) return;
 
@@ -88,6 +91,24 @@ export default function SettingsModal({
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [open, onClose]);
+
+    async function handleClearLogoCache() {
+        setCacheClearing(true);
+        setCacheStatus(null);
+
+        try {
+            const res = await fetch("/api/logo?action=clear", { method: "POST" });
+            if (!res.ok) throw new Error(String(res.status));
+            setCacheStatus("ok");
+
+            // Optional: allow other components to react (e.g. re-render markers).
+            window.dispatchEvent(new Event("tankify:logo-cache-cleared"));
+        } catch {
+            setCacheStatus("error");
+        } finally {
+            setCacheClearing(false);
+        }
+    }
 
     return (
         <div
@@ -195,6 +216,28 @@ export default function SettingsModal({
                                 <option value="diesel">{t.pricing.diesel}</option>
                                 <option value="super95">{t.pricing.super95}</option>
                             </select>
+                        </div>
+
+                        <div className="mt-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="text-sm font-semibold text-gray-900">
+                                {t.settings.logoCache}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-600">
+                                {cacheStatus === "ok"
+                                    ? t.settings.cacheCleared
+                                    : cacheStatus === "error"
+                                        ? t.settings.cacheClearFailed
+                                        : " "}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleClearLogoCache}
+                                disabled={cacheClearing}
+                                className="mt-3 w-full rounded-2xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm active:scale-[0.99] disabled:opacity-60"
+                            >
+                                {cacheClearing ? t.settings.clearing : t.settings.clearLogoCache}
+                            </button>
                         </div>
                     </section>
 

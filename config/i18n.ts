@@ -12,6 +12,11 @@ export type TranslationSchema = {
         measurement: string;
         metric: string;
         imperial: string;
+        logoCache: string;
+        clearLogoCache: string;
+        clearing: string;
+        cacheCleared: string;
+        cacheClearFailed: string;
     };
     app: {
         title: string;
@@ -151,6 +156,11 @@ export const translations: Record<Language, TranslationSchema> = {
             measurement: "Einheitensystem",
             metric: "Metrisch",
             imperial: "Imperial",
+            logoCache: "Logo-Cache",
+            clearLogoCache: "Logo-Cache leeren",
+            clearing: "Leere ...",
+            cacheCleared: "Logo-Cache wurde geleert.",
+            cacheClearFailed: "Cache konnte nicht geleert werden.",
         },
         app: {
             title: "Tankify",
@@ -293,6 +303,11 @@ export const translations: Record<Language, TranslationSchema> = {
             measurement: "Measurement system",
             metric: "Metric",
             imperial: "Imperial",
+            logoCache: "Logo cache",
+            clearLogoCache: "Clear logo cache",
+            clearing: "Clearing ...",
+            cacheCleared: "Logo cache cleared.",
+            cacheClearFailed: "Failed to clear cache.",
         },
         app: {
             title: "Tankify",

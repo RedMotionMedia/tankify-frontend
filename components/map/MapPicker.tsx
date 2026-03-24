@@ -3,7 +3,6 @@
 import L, { type LeafletMouseEvent } from "leaflet";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    CircleMarker,
     MapContainer,
     Marker,
     Polyline,
@@ -53,6 +52,57 @@ const markerIcon = new L.Icon({
     iconSize: [25, 41],
     iconAnchor: [12, 41],
 });
+
+const stationIconCache = new Map<string, L.DivIcon>();
+
+function getStationInitials(name: string | undefined): string {
+    const value = (name ?? "").trim();
+    if (!value) return "?";
+
+    const parts = value.split(/\s+/).filter(Boolean);
+    const first = parts[0]?.[0] ?? "?";
+    const second = parts[1]?.[0] ?? "";
+    return (first + second).toUpperCase();
+}
+
+function escapeHtmlAttr(value: string): string {
+    return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+}
+
+function getStationDivIcon(station: Station, hasPrice: boolean): L.DivIcon {
+    const size = 34;
+    const logoUrl = station.logoUrl ?? "";
+    const initials = getStationInitials(station.brandName ?? station.name);
+    const key = `${hasPrice ? "p1" : "p0"}|${logoUrl || initials}`;
+
+    const cached = stationIconCache.get(key);
+    if (cached) return cached;
+
+    const ringClass = hasPrice ? "station-logo--ok" : "station-logo--missing";
+    const img = logoUrl
+        ? `<img class="station-logo__img" src="${escapeHtmlAttr(logoUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" />`
+        : "";
+
+    const icon = L.divIcon({
+        className: "station-logo-marker",
+        html: `
+<div class="station-logo ${ringClass}">
+  <div class="station-logo__fallback">${escapeHtmlAttr(initials)}</div>
+  ${img}
+</div>
+`.trim(),
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -(size / 2)],
+    });
+
+    stationIconCache.set(key, icon);
+    return icon;
+}
 
 function formatDisplayPrice(
     value: number | null | undefined,
@@ -247,9 +297,267 @@ function PriceBadge({
                 className: "price-badge-marker",
                 html: `<div class="price-badge-inner">${badgeText}</div>`,
                 iconSize: [56, 24],
-                iconAnchor: [28, 38],
+                iconAnchor: [28, 46],
             })}
         />
+    );
+}
+
+function StationPopupContent({
+    station,
+    selectedPrice,
+    fuelType,
+    measurementSystem,
+    currencySystem,
+    t,
+    onSelectStationAsStart,
+    onSelectStationAsDestination,
+}: {
+    station: Station;
+    selectedPrice: number | null | undefined;
+    fuelType: FuelType;
+    measurementSystem: MeasurementSystem;
+    currencySystem: CurrencySystem;
+    t: TranslationSchema;
+    onSelectStationAsStart: (payload: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) => void;
+    onSelectStationAsDestination: (payload: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) => void;
+}) {
+    const initials = getStationInitials(station.brandName ?? station.name);
+
+    return (
+        <div className="w-[340px] max-w-[70vw] select-text">
+            <div className="flex items-start gap-3">
+                <div
+                    className={
+                        "relative h-11 w-11 shrink-0 overflow-hidden rounded-full border bg-white shadow-sm " +
+                        (selectedPrice != null ? "border-blue-200" : "border-red-200")
+                    }
+                >
+                    <div className="absolute inset-0 grid place-items-center text-xs font-extrabold tracking-tight text-gray-700">
+                        {initials}
+                    </div>
+                    {station.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={station.logoUrl}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="absolute inset-0 h-full w-full object-contain p-1"
+                            onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                        />
+                    ) : null}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-extrabold tracking-tight text-gray-900">
+                        {station.name}
+                    </div>
+
+                    <div className="mt-1 space-y-0.5 text-xs text-gray-600">
+                        {station.address ? <div>{station.address}</div> : null}
+                        {station.postalCode || station.city ? (
+                            <div className="text-gray-500">
+                                {(station.postalCode ? `${station.postalCode} ` : "") +
+                                    (station.city ?? "")}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span
+                            className={
+                                "rounded-full px-2 py-0.5 font-semibold " +
+                                (station.open === true
+                                    ? "bg-green-50 text-green-700 ring-1 ring-green-200"
+                                    : station.open === false
+                                        ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+                                        : "bg-gray-50 text-gray-600 ring-1 ring-gray-200")
+                            }
+                        >
+                            {station.open === true
+                                ? t.station.open
+                                : station.open === false
+                                    ? t.station.closed
+                                    : t.station.unknown}
+                        </span>
+
+                        {station.distanceKm != null ? (
+                            <span className="rounded-full bg-gray-50 px-2 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
+                                {t.station.distance}: {station.distanceKm.toFixed(2)} km
+                            </span>
+                        ) : null}
+
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 ring-1 ring-blue-200">
+                            {t.pricing.sourceEcontrol}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white p-3">
+                    <div className="text-[11px] font-semibold text-gray-600">
+                        {t.pricing.diesel}
+                    </div>
+                    <div className="mt-0.5 text-sm font-extrabold text-gray-900">
+                        {formatDisplayPrice(
+                            station.diesel,
+                            measurementSystem,
+                            currencySystem
+                        )}
+                    </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white p-3">
+                    <div className="text-[11px] font-semibold text-gray-600">Super 95</div>
+                    <div className="mt-0.5 text-sm font-extrabold text-gray-900">
+                        {formatDisplayPrice(
+                            station.super95,
+                            measurementSystem,
+                            currencySystem
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-3 rounded-2xl bg-blue-50 px-3 py-2 text-xs text-blue-900 ring-1 ring-blue-100">
+                <div className="font-semibold">
+                    {t.pricing.selectedFuel}:{" "}
+                    {fuelType === "diesel" ? t.pricing.diesel : t.pricing.super95}
+                </div>
+                <div className="mt-0.5 text-[11px] text-blue-800">
+                    {t.pricing.sourcePrice}:{" "}
+                    <span className="font-bold">
+                        {formatDisplayPrice(
+                            selectedPrice,
+                            measurementSystem,
+                            currencySystem
+                        )}
+                    </span>
+                </div>
+            </div>
+
+            <div className="mt-3 grid gap-2">
+                {station.econtrol?.contact ? (
+                    <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                        <summary className="text-xs font-semibold text-gray-700">
+                            {t.station.contact}
+                        </summary>
+                        <div className="mt-2 space-y-1 text-xs text-gray-700">
+                            {station.econtrol.contact.telephone ? (
+                                <div>
+                                    <span className="font-medium">{t.station.phone}:</span>{" "}
+                                    <a
+                                        href={`tel:${station.econtrol.contact.telephone}`}
+                                        className="underline"
+                                    >
+                                        {station.econtrol.contact.telephone}
+                                    </a>
+                                </div>
+                            ) : null}
+                            {station.econtrol.contact.mail ? (
+                                <div>
+                                    <span className="font-medium">{t.station.mail}:</span>{" "}
+                                    <a
+                                        href={`mailto:${station.econtrol.contact.mail}`}
+                                        className="underline"
+                                    >
+                                        {station.econtrol.contact.mail}
+                                    </a>
+                                </div>
+                            ) : null}
+                            {station.econtrol.contact.website ? (
+                                <div>
+                                    <span className="font-medium">{t.station.website}:</span>{" "}
+                                    <a
+                                        href={
+                                            station.econtrol.contact.website.startsWith("http")
+                                                ? station.econtrol.contact.website
+                                                : `https://${station.econtrol.contact.website}`
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="underline"
+                                    >
+                                        {station.econtrol.contact.website}
+                                    </a>
+                                </div>
+                            ) : null}
+                        </div>
+                    </details>
+                ) : null}
+
+                {station.econtrol?.otherServiceOffers ? (
+                    <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                        <summary className="text-xs font-semibold text-gray-700">
+                            {t.station.otherOffers}
+                        </summary>
+                        <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
+                            {station.econtrol.otherServiceOffers}
+                        </pre>
+                    </details>
+                ) : null}
+
+                {station.econtrol ? (
+                    <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                        <summary className="text-xs font-semibold text-gray-700">
+                            {t.station.rawData}
+                        </summary>
+                        <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
+                            {JSON.stringify(station, null, 2)}
+                        </pre>
+                    </details>
+                ) : null}
+            </div>
+
+            <div className="mt-3 grid gap-2">
+                <button
+                    type="button"
+                    onClick={() =>
+                        onSelectStationAsStart({
+                            point: {
+                                lat: station.lat,
+                                lon: station.lon,
+                                label: station.name,
+                            },
+                            price: selectedPrice,
+                            station,
+                        })
+                    }
+                    className="w-full rounded-2xl bg-gray-900 px-3 py-2.5 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"
+                >
+                    {t.route.setAsStart}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() =>
+                        onSelectStationAsDestination({
+                            point: {
+                                lat: station.lat,
+                                lon: station.lon,
+                                label: station.name,
+                            },
+                            price: selectedPrice,
+                            station,
+                        })
+                    }
+                    className="w-full rounded-2xl bg-black px-3 py-2.5 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"
+                >
+                    {t.route.setAsDestination}
+                </button>
+            </div>
+        </div>
     );
 }
 
@@ -291,18 +599,30 @@ function StationsLayer({
 
                 return (
                     <React.Fragment key={station.id}>
-                        <CircleMarker
-                            center={[station.lat, station.lon]}
-                            radius={8}
-                            pathOptions={{
-                                color: hasPrice ? "#2563eb" : "#dc2626",
-                                fillColor: hasPrice ? "#60a5fa" : "#ef4444",
-                                fillOpacity: 0.9,
-                                weight: 2,
-                            }}
+                        <Marker
+                            position={[station.lat, station.lon]}
+                            icon={getStationDivIcon(station, hasPrice)}
                         >
-                            <Popup>
-                                <div className="min-w-60 select-text">
+                            <Popup maxWidth={420} className="station-popup">
+                                <StationPopupContent
+                                    station={station}
+                                    selectedPrice={selectedPrice}
+                                    fuelType={fuelType}
+                                    measurementSystem={measurementSystem}
+                                    currencySystem={currencySystem}
+                                    t={t}
+                                    onSelectStationAsStart={(payload) => {
+                                        onSelectStationAsStart(payload);
+                                        map.closePopup();
+                                    }}
+                                    onSelectStationAsDestination={(payload) => {
+                                        onSelectStationAsDestination(payload);
+                                        map.closePopup();
+                                    }}
+                                />
+
+                                {/* Legacy popup content (disabled; kept in git history)
+                                    <div className="min-w-60 select-text">
                                     <div className="text-base font-semibold">{station.name}</div>
 
                                     {station.address ? (
@@ -323,7 +643,7 @@ function StationsLayer({
 
                                     {station.distanceKm != null ? (
                                         <div className="text-sm text-gray-500">
-                                            {t.station.distance}: {station.distanceKm.toFixed(2)} km
+                                            {t.station.distance}: {station.distanceKm!.toFixed(2)} km
                                         </div>
                                     ) : null}
 
@@ -570,8 +890,9 @@ function StationsLayer({
                                         </button>
                                     </div>
                                 </div>
+                                */}
                             </Popup>
-                        </CircleMarker>
+                        </Marker>
 
                         {hasPrice ? (
                             <PriceBadge
