@@ -1,3 +1,5 @@
+import type { EControlGasStation } from "@/types/econtrol";
+
 export type Language = "de" | "en";
 
 export type CurrencySystem = "eur" | "usd";
@@ -29,11 +31,14 @@ export type Station = {
     lon: number;
     name: string;
     address?: string;
+    postalCode?: string;
     city?: string;
     diesel?: number | null;
     super95?: number | null;
     open?: boolean | null;
+    distanceKm?: number | null;
     source?: "econtrol";
+    econtrol?: EControlGasStation;
 };
 
 export type MapPickMode = "start" | "end" | null;

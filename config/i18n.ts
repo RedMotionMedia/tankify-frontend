@@ -95,6 +95,18 @@ export type TranslationSchema = {
         unknown: string;
         addressMissing: string;
         cityMissing: string;
+        postalCode: string;
+        distance: string;
+        contact: string;
+        phone: string;
+        fax: string;
+        mail: string;
+        website: string;
+        services: string;
+        payment: string;
+        otherOffers: string;
+        openingHours: string;
+        rawData: string;
     };
     actions: {
         search: string;
@@ -227,6 +239,18 @@ export const translations: Record<Language, TranslationSchema> = {
             unknown: "Öffnungsstatus unbekannt",
             addressMissing: "Keine Adresse verfügbar",
             cityMissing: "Kein Ort verfügbar",
+            postalCode: "PLZ",
+            distance: "Distanz",
+            contact: "Kontakt",
+            phone: "Telefon",
+            fax: "Fax",
+            mail: "E-Mail",
+            website: "Website",
+            services: "Services",
+            payment: "Zahlung",
+            otherOffers: "Sonstiges",
+            openingHours: "Öffnungszeiten",
+            rawData: "Rohdaten (E-Control)",
         },
         actions: {
             search: "Suchen",
@@ -356,6 +380,18 @@ export const translations: Record<Language, TranslationSchema> = {
             unknown: "Opening status unknown",
             addressMissing: "No address available",
             cityMissing: "No city available",
+            postalCode: "Postal code",
+            distance: "Distance",
+            contact: "Contact",
+            phone: "Phone",
+            fax: "Fax",
+            mail: "E-mail",
+            website: "Website",
+            services: "Services",
+            payment: "Payment",
+            otherOffers: "Other offers",
+            openingHours: "Opening hours",
+            rawData: "Raw data (E-Control)",
         },
         actions: {
             search: "Search",

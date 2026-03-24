@@ -315,6 +315,153 @@ function StationsLayer({
                                         <div className="text-sm text-gray-500">{station.city}</div>
                                     ) : null}
 
+                                    {station.postalCode ? (
+                                        <div className="text-sm text-gray-500">
+                                            {t.station.postalCode}: {station.postalCode}
+                                        </div>
+                                    ) : null}
+
+                                    {station.distanceKm != null ? (
+                                        <div className="text-sm text-gray-500">
+                                            {t.station.distance}: {station.distanceKm.toFixed(2)} km
+                                        </div>
+                                    ) : null}
+
+                                    {station.econtrol?.contact ? (
+                                        <div className="mt-2 space-y-1 text-xs text-gray-600">
+                                            <div className="font-medium text-gray-500">
+                                                {t.station.contact}
+                                            </div>
+
+                                            {station.econtrol.contact.telephone ? (
+                                                <div>
+                                                    <span className="font-medium">
+                                                        {t.station.phone}:
+                                                    </span>{" "}
+                                                    {station.econtrol.contact.telephone}
+                                                </div>
+                                            ) : null}
+
+                                            {station.econtrol.contact.fax ? (
+                                                <div>
+                                                    <span className="font-medium">
+                                                        {t.station.fax}:
+                                                    </span>{" "}
+                                                    {station.econtrol.contact.fax}
+                                                </div>
+                                            ) : null}
+
+                                            {station.econtrol.contact.mail ? (
+                                                <div>
+                                                    <span className="font-medium">
+                                                        {t.station.mail}:
+                                                    </span>{" "}
+                                                    <a
+                                                        href={`mailto:${station.econtrol.contact.mail}`}
+                                                        className="underline"
+                                                    >
+                                                        {station.econtrol.contact.mail}
+                                                    </a>
+                                                </div>
+                                            ) : null}
+
+                                            {station.econtrol.contact.website ? (
+                                                <div>
+                                                    <span className="font-medium">
+                                                        {t.station.website}:
+                                                    </span>{" "}
+                                                    <a
+                                                        href={
+                                                            station.econtrol.contact.website.startsWith("http")
+                                                                ? station.econtrol.contact.website
+                                                                : `https://${station.econtrol.contact.website}`
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="underline"
+                                                    >
+                                                        {station.econtrol.contact.website}
+                                                    </a>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+
+                                    {station.econtrol?.offerInformation ? (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                            <div className="font-medium text-gray-500">
+                                                {t.station.services}
+                                            </div>
+                                            <div>
+                                                service:{" "}
+                                                {String(!!station.econtrol.offerInformation.service)}
+                                                {" · "}selfService:{" "}
+                                                {String(!!station.econtrol.offerInformation.selfService)}
+                                                {" · "}unattended:{" "}
+                                                {String(!!station.econtrol.offerInformation.unattended)}
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    {station.econtrol?.paymentMethods ? (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                            <div className="font-medium text-gray-500">
+                                                {t.station.payment}
+                                            </div>
+                                            <div>
+                                                cash:{" "}
+                                                {String(!!station.econtrol.paymentMethods.cash)}
+                                                {" · "}debitCard:{" "}
+                                                {String(!!station.econtrol.paymentMethods.debitCard)}
+                                                {" · "}creditCard:{" "}
+                                                {String(!!station.econtrol.paymentMethods.creditCard)}
+                                            </div>
+                                            {station.econtrol.paymentMethods.others ? (
+                                                <div className="whitespace-pre-wrap text-gray-500">
+                                                    {station.econtrol.paymentMethods.others}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+
+                                    {station.econtrol?.otherServiceOffers ? (
+                                        <details className="mt-2">
+                                            <summary className="cursor-pointer text-xs font-medium text-gray-600">
+                                                {t.station.otherOffers}
+                                            </summary>
+                                            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
+                                                {station.econtrol.otherServiceOffers}
+                                            </pre>
+                                        </details>
+                                    ) : null}
+
+                                    {Array.isArray(station.econtrol?.openingHours) &&
+                                    station.econtrol.openingHours.length > 0 ? (
+                                        <details className="mt-2">
+                                            <summary className="cursor-pointer text-xs font-medium text-gray-600">
+                                                {t.station.openingHours}
+                                            </summary>
+                                            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
+                                                {JSON.stringify(
+                                                    station.econtrol.openingHours,
+                                                    null,
+                                                    2
+                                                )}
+                                            </pre>
+                                        </details>
+                                    ) : null}
+
+                                    {station.econtrol ? (
+                                        <details className="mt-2">
+                                            <summary className="cursor-pointer text-xs font-medium text-gray-600">
+                                                {t.station.rawData}
+                                            </summary>
+                                            <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
+                                                {JSON.stringify(station.econtrol, null, 2)}
+                                            </pre>
+                                        </details>
+                                    ) : null}
+
                                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                                         <div className="rounded-lg bg-gray-50 p-2">
                                             <div className="text-gray-500">{t.pricing.diesel}</div>
