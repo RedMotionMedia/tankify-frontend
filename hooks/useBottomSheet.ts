@@ -9,12 +9,13 @@ export function useBottomSheet() {
     const [startOffset, setStartOffset] = useState(0);
     const snapTopMultiplicator = 0;
     const snapMidMultiplicator = 0.4;
+    const snapWorthMultiplicator = 0.17;
     const snapBottomMultiplicator = 0.82;
     const [isSheetReady, setIsSheetReady] = useState(false);
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
-            setSheetY(window.innerHeight * 0.68);
+            setSheetY(window.innerHeight * 0.67);
             setIsSheetReady(true);
         });
 
@@ -35,11 +36,6 @@ export function useBottomSheet() {
         const content = sheetContentRef.current;
 
         const atTop = !content || content.scrollTop <= 0;
-
-        console.log("currentY ->" + currentY);
-        console.log("delta ->" + delta);
-        console.log("atTop ->" + atTop);
-        console.log("sheetY ->" + sheetY);
 
 
         if (delta > 0 && atTop) {
@@ -62,12 +58,6 @@ export function useBottomSheet() {
         const atTop = !content || content.scrollTop <= 0;
         const atEnd =
             !content || content.scrollTop + window.innerHeight >= content.scrollHeight;
-
-        console.log("currentY ->" + currentY);
-        console.log("delta ->" + delta);
-        console.log("atTop ->" + atTop);
-        console.log("atEnd ->" + atEnd);
-        console.log("sheetY ->" + sheetY);
 
         if (delta > 0 && atTop) {
             setSheetY(Math.max(0, startOffset + delta));
@@ -115,6 +105,7 @@ export function useBottomSheet() {
         sheetY,
         dragging,
         isSheetReady,
+        snapWorthMultiplicator,
         onTouchStart,
         onTouchMoveHandle,
         onTouchMoveContent,

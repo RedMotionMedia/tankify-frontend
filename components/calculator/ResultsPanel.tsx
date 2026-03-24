@@ -84,7 +84,7 @@ export default function ResultsPanel({
         <section className="space-y-6">
             <div>
                 <h2 className="mb-3 text-xl font-bold">{t.result.importantMetrics}</h2>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
                     <StatCard
                         title={t.result.oneWayDistance}
                         value={

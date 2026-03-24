@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {useEffect, useMemo, useRef, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import RouteSection from "./RouteSection";
 import PriceSection from "./PriceSection";
 import ResultsPanel from "./ResultsPanel";
@@ -35,7 +35,7 @@ export default function TankifyCalculator() {
     const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
     const [measurementSystem, setMeasurementSystem] =
         useState<MeasurementSystem>("metric");
-    const previousMeasurementSystem = useRef<MeasurementSystem>("metric");
+    const [storageReady, setStorageReady] = useState(false);
 
     const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -47,12 +47,12 @@ export default function TankifyCalculator() {
 
     const [fuelType, setFuelType] = useState<FuelType>("diesel");
 
-    // These are always stored in the CURRENT visible unit system.
-    const [localPrice, setLocalPrice] = useState(2.142);
-    const [destinationPrice, setDestinationPrice] = useState(1.585);
-    const [consumption, setConsumption] = useState(6.0);
-    const [tankSize, setTankSize] = useState(45);
-    const [avgSpeed, setAvgSpeed] = useState(70);
+    // Persist and calculate in metric/base units to avoid "unit interpretation" bugs.
+    const [localPricePerLiter, setLocalPricePerLiter] = useState(2.142);
+    const [destinationPricePerLiter, setDestinationPricePerLiter] = useState(1.585);
+    const [consumptionLPer100Km, setConsumptionLPer100Km] = useState(6.0);
+    const [tankSizeLiters, setTankSizeLiters] = useState(45);
+    const [avgSpeedKmh, setAvgSpeedKmh] = useState(70);
 
     const [searchLoading, setSearchLoading] = useState<"start" | "end" | null>(null);
     const [error, setError] = useState("");
@@ -63,11 +63,13 @@ export default function TankifyCalculator() {
         sheetY,
         dragging,
         isSheetReady,
+        snapWorthMultiplicator,
         onTouchStart,
         onTouchMoveHandle,
         onTouchMoveContent,
         onTouchEnd,
         minimizeBottomSheet,
+        setBottomSheet,
     } = useBottomSheet();
 
     const {routeData, routeLoading, routeError} = useRoute(startPoint, endPoint);
@@ -78,6 +80,8 @@ export default function TankifyCalculator() {
         const savedLanguage = window.localStorage.getItem("tankify-language");
         const savedCurrency = window.localStorage.getItem("tankify-currency");
         const savedMeasurement = window.localStorage.getItem("tankify-measurement");
+        const savedFuelType = window.localStorage.getItem("tankify-fuelType");
+        const savedInputsRaw = window.localStorage.getItem("tankify-inputs-v1");
 
         if (savedLanguage === "de" || savedLanguage === "en") {
             setLanguage(savedLanguage);
@@ -89,46 +93,85 @@ export default function TankifyCalculator() {
 
         if (savedMeasurement === "metric" || savedMeasurement === "imperial") {
             setMeasurementSystem(savedMeasurement);
-            previousMeasurementSystem.current = savedMeasurement;
         }
+
+        if (savedFuelType === "diesel" || savedFuelType === "super95") {
+            setFuelType(savedFuelType);
+        }
+
+        if (savedInputsRaw) {
+            try {
+                const parsed = JSON.parse(savedInputsRaw) as Partial<{
+                    localPricePerLiter: number;
+                    destinationPricePerLiter: number;
+                    consumptionLPer100Km: number;
+                    tankSizeLiters: number;
+                    avgSpeedKmh: number;
+                }>;
+
+                if (typeof parsed.localPricePerLiter === "number") {
+                    setLocalPricePerLiter(parsed.localPricePerLiter);
+                }
+                if (typeof parsed.destinationPricePerLiter === "number") {
+                    setDestinationPricePerLiter(parsed.destinationPricePerLiter);
+                }
+                if (typeof parsed.consumptionLPer100Km === "number") {
+                    setConsumptionLPer100Km(parsed.consumptionLPer100Km);
+                }
+                if (typeof parsed.tankSizeLiters === "number") {
+                    setTankSizeLiters(parsed.tankSizeLiters);
+                }
+                if (typeof parsed.avgSpeedKmh === "number") {
+                    setAvgSpeedKmh(parsed.avgSpeedKmh);
+                }
+            } catch {
+                // ignore invalid JSON
+            }
+        }
+
+        setStorageReady(true);
     }, []);
 
     useEffect(() => {
+        if (!storageReady) return;
         window.localStorage.setItem("tankify-language", language);
-    }, [language]);
+    }, [language, storageReady]);
 
     useEffect(() => {
+        if (!storageReady) return;
         window.localStorage.setItem("tankify-currency", currencySystem);
-    }, [currencySystem]);
+    }, [currencySystem, storageReady]);
 
     useEffect(() => {
+        if (!storageReady) return;
         window.localStorage.setItem("tankify-measurement", measurementSystem);
-    }, [measurementSystem]);
+    }, [measurementSystem, storageReady]);
 
-    // Convert current input values when switching unit system
     useEffect(() => {
-        const prev = previousMeasurementSystem.current;
+        if (!storageReady) return;
+        window.localStorage.setItem("tankify-fuelType", fuelType);
+    }, [fuelType, storageReady]);
 
-        if (prev === measurementSystem) return;
-
-        if (prev === "metric" && measurementSystem === "imperial") {
-            setLocalPrice((prevValue) => pricePerLiterToPerGallon(prevValue));
-            setDestinationPrice((prevValue) => pricePerLiterToPerGallon(prevValue));
-            setConsumption((prevValue) => lPer100KmToMpg(prevValue));
-            setTankSize((prevValue) => litersToGallons(prevValue));
-            setAvgSpeed((prevValue) => kmhToMph(prevValue));
-        }
-
-        if (prev === "imperial" && measurementSystem === "metric") {
-            setLocalPrice((prevValue) => pricePerGallonToPerLiter(prevValue));
-            setDestinationPrice((prevValue) => pricePerGallonToPerLiter(prevValue));
-            setConsumption((prevValue) => mpgToLPer100Km(prevValue));
-            setTankSize((prevValue) => gallonsToLiters(prevValue));
-            setAvgSpeed((prevValue) => mphToKmh(prevValue));
-        }
-
-        previousMeasurementSystem.current = measurementSystem;
-    }, [measurementSystem]);
+    useEffect(() => {
+        if (!storageReady) return;
+        window.localStorage.setItem(
+            "tankify-inputs-v1",
+            JSON.stringify({
+                localPricePerLiter,
+                destinationPricePerLiter,
+                consumptionLPer100Km,
+                tankSizeLiters,
+                avgSpeedKmh,
+            })
+        );
+    }, [
+        localPricePerLiter,
+        destinationPricePerLiter,
+        consumptionLPer100Km,
+        tankSizeLiters,
+        avgSpeedKmh,
+        storageReady,
+    ]);
 
     useEffect(() => {
         if (routeError === "ROUTE_NOT_CALCULATED") {
@@ -145,6 +188,50 @@ export default function TankifyCalculator() {
             setError("");
         }
     }, [routeError, t]);
+
+    const localPricePerGallon = pricePerLiterToPerGallon(localPricePerLiter);
+    const destinationPricePerGallon = pricePerLiterToPerGallon(destinationPricePerLiter);
+    const consumptionMpg = lPer100KmToMpg(consumptionLPer100Km);
+    const tankSizeGallons = litersToGallons(tankSizeLiters);
+    const avgSpeedMph = kmhToMph(avgSpeedKmh);
+
+    const localPriceDisplay =
+        measurementSystem === "metric" ? localPricePerLiter : localPricePerGallon;
+    const destinationPriceDisplay =
+        measurementSystem === "metric"
+            ? destinationPricePerLiter
+            : destinationPricePerGallon;
+    const consumptionDisplay =
+        measurementSystem === "metric" ? consumptionLPer100Km : consumptionMpg;
+    const tankSizeDisplay =
+        measurementSystem === "metric" ? tankSizeLiters : tankSizeGallons;
+    const avgSpeedDisplay = measurementSystem === "metric" ? avgSpeedKmh : avgSpeedMph;
+
+    const setLocalPrice = (value: number) => {
+        setLocalPricePerLiter(
+            measurementSystem === "metric" ? value : pricePerGallonToPerLiter(value)
+        );
+    };
+
+    const setDestinationPrice = (value: number) => {
+        setDestinationPricePerLiter(
+            measurementSystem === "metric" ? value : pricePerGallonToPerLiter(value)
+        );
+    };
+
+    const setConsumption = (value: number) => {
+        setConsumptionLPer100Km(
+            measurementSystem === "metric" ? value : mpgToLPer100Km(value)
+        );
+    };
+
+    const setTankSize = (value: number) => {
+        setTankSizeLiters(measurementSystem === "metric" ? value : gallonsToLiters(value));
+    };
+
+    const setAvgSpeed = (value: number) => {
+        setAvgSpeedKmh(measurementSystem === "metric" ? value : mphToKmh(value));
+    };
 
     async function handleSearch(type: "start" | "end") {
         try {
@@ -176,38 +263,6 @@ export default function TankifyCalculator() {
             setSearchLoading(null);
         }
     }
-
-    // Normalize current input values into metric/base variables
-    const localPricePerLiter =
-        measurementSystem === "metric"
-            ? localPrice
-            : pricePerGallonToPerLiter(localPrice);
-
-    const localPricePerGallon = pricePerLiterToPerGallon(localPricePerLiter);
-
-    const destinationPricePerLiter =
-        measurementSystem === "metric"
-            ? destinationPrice
-            : pricePerGallonToPerLiter(destinationPrice);
-
-    const destinationPricePerGallon = pricePerLiterToPerGallon(
-        destinationPricePerLiter
-    );
-
-    const consumptionLPer100Km =
-        measurementSystem === "metric" ? consumption : mpgToLPer100Km(consumption);
-
-    const consumptionMpg = lPer100KmToMpg(consumptionLPer100Km);
-
-    const tankSizeLiters =
-        measurementSystem === "metric" ? tankSize : gallonsToLiters(tankSize);
-
-    const tankSizeGallons = litersToGallons(tankSizeLiters);
-
-    const avgSpeedKmh =
-        measurementSystem === "metric" ? avgSpeed : mphToKmh(avgSpeed);
-
-    const avgSpeedMph = kmhToMph(avgSpeedKmh);
 
     const calculation = useMemo(() => {
         return calculateTankify({
@@ -256,13 +311,9 @@ export default function TankifyCalculator() {
 
             <PriceSection
                 t={t}
-                localPrice={measurementSystem === "metric" ? localPricePerLiter : localPricePerGallon}
+                localPrice={localPriceDisplay}
                 setLocalPrice={setLocalPrice}
-                destinationPrice={
-                    measurementSystem === "metric"
-                        ? destinationPricePerLiter
-                        : destinationPricePerGallon
-                }
+                destinationPrice={destinationPriceDisplay}
                 setDestinationPrice={setDestinationPrice}
                 currencySystem={currencySystem}
                 measurementSystem={measurementSystem}
@@ -296,11 +347,11 @@ export default function TankifyCalculator() {
                 setCurrencySystem={setCurrencySystem}
                 measurementSystem={measurementSystem}
                 setMeasurementSystem={setMeasurementSystem}
-                consumption={measurementSystem === "metric" ? consumptionLPer100Km : consumptionMpg}
+                consumption={consumptionDisplay}
                 setConsumption={setConsumption}
-                tankSize={measurementSystem === "metric" ? tankSizeLiters : tankSizeGallons}
+                tankSize={tankSizeDisplay}
                 setTankSize={setTankSize}
-                avgSpeed={measurementSystem === "metric" ? avgSpeedKmh : avgSpeedMph}
+                avgSpeed={avgSpeedDisplay}
                 setAvgSpeed={setAvgSpeed}
             />
 
@@ -353,11 +404,7 @@ export default function TankifyCalculator() {
                                         setStartText(point.label);
 
                                         if (price != null) {
-                                            setLocalPrice(
-                                                measurementSystem === "metric"
-                                                    ? price
-                                                    : pricePerLiterToPerGallon(price)
-                                            );
+                                            setLocalPricePerLiter(price);
                                         }
                                     }}
                                     onSelectStationAsDestination={({point, price}) => {
@@ -365,11 +412,7 @@ export default function TankifyCalculator() {
                                         setEndText(point.label);
 
                                         if (price != null) {
-                                            setDestinationPrice(
-                                                measurementSystem === "metric"
-                                                    ? price
-                                                    : pricePerLiterToPerGallon(price)
-                                            );
+                                            setDestinationPricePerLiter(price);
                                         }
                                     }}
                                 />
@@ -414,30 +457,25 @@ export default function TankifyCalculator() {
                                     setEndText(point.label);
                                 }
                                 setMapPickMode(null);
+                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
                             }}
                             onSelectStationAsStart={({point, price}) => {
                                 setStartPoint(point);
                                 setStartText(point.label);
 
                                 if (price != null) {
-                                    setLocalPrice(
-                                        measurementSystem === "metric"
-                                            ? price
-                                            : pricePerLiterToPerGallon(price)
-                                    );
+                                    setLocalPricePerLiter(price);
                                 }
+                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
                             }}
                             onSelectStationAsDestination={({point, price}) => {
                                 setEndPoint(point);
                                 setEndText(point.label);
 
                                 if (price != null) {
-                                    setDestinationPrice(
-                                        measurementSystem === "metric"
-                                            ? price
-                                            : pricePerLiterToPerGallon(price)
-                                    );
+                                    setDestinationPricePerLiter(price);
                                 }
+                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
                             }}
                         />
                     </div>
