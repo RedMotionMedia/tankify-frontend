@@ -1,7 +1,8 @@
 import {TranslationSchema} from "@/config/i18n";
-import {Language} from "@/types/tankify";
+import {CurrencySystem, MeasurementSystem} from "@/types/tankify";
 import {formatCurrency, formatDuration} from "@/lib/format";
 import StatCard from "@/components/ui/StatCard";
+import {TankifyCalculation} from "@/lib/calc";
 
 type ProfitLevel = {
     labelKey: "notWorthIt" | "barelyWorthIt" | "worthIt" | "veryWorthIt";
@@ -12,64 +13,108 @@ type ProfitLevel = {
 
 type Props = {
     t: TranslationSchema;
-    language: Language;
+    currencySystem: CurrencySystem;
+    measurementSystem: MeasurementSystem;
     profit: ProfitLevel;
     routeLoading: boolean;
-    oneWayKm: number;
-    roundTripKm: number;
-    priceDifference: number;
-    tripCost: number;
-    estimatedHoursOneWay: number;
-    estimatedHoursRoundTrip: number;
-    grossSavingFullTank: number;
-    netSaving: number;
-    breakEvenDiff: number;
-    maxConsumption: number;
+    calculation: TankifyCalculation;
 };
 
 export default function ResultsPanel({
                                          t,
-                                         language,
+                                         currencySystem,
+                                         measurementSystem,
                                          profit,
                                          routeLoading,
-                                         oneWayKm,
-                                         roundTripKm,
-                                         priceDifference,
-                                         tripCost,
-                                         estimatedHoursOneWay,
-                                         estimatedHoursRoundTrip,
-                                         grossSavingFullTank,
-                                         netSaving,
-                                         breakEvenDiff,
-                                         maxConsumption,
+                                         calculation,
                                      }: Props) {
+    const distanceValue =
+        measurementSystem === "metric"
+            ? {
+                oneWay: calculation.oneWayDistanceKm,
+                roundTrip: calculation.roundTripDistanceKm,
+                unit: t.units.km,
+            }
+            : {
+                oneWay: calculation.oneWayDistanceMiles,
+                roundTrip: calculation.roundTripDistanceMiles,
+                unit: t.units.miles,
+            };
+
+    const priceDifferenceValue =
+        measurementSystem === "metric"
+            ? {
+                value: calculation.priceDifferencePerLiter,
+                unit:
+                    currencySystem === "eur"
+                        ? "€/L"
+                        : "$/L",
+            }
+            : {
+                value: calculation.priceDifferencePerGallon,
+                unit:
+                    currencySystem === "eur"
+                        ? "€/gal"
+                        : "$/gal",
+            };
+
+    const breakEvenValue =
+        measurementSystem === "metric"
+            ? {
+                value: calculation.breakEvenDiffPerLiter * 100,
+                unit: t.units.centPerLiter,
+            }
+            : {
+                value: calculation.breakEvenDiffPerGallon * 100,
+                unit: t.units.centPerGallon,
+            };
+
+    const maxConsumptionValue =
+        measurementSystem === "metric"
+            ? {
+                value: calculation.maxConsumptionLPer100Km,
+                unit: t.units.litersPer100Km,
+            }
+            : {
+                value: calculation.maxConsumptionMpg,
+                unit: t.units.mpg,
+            };
+
     return (
         <section className="space-y-6">
             <div>
                 <h2 className="mb-3 text-xl font-bold">{t.result.importantMetrics}</h2>
-                <div className="grid gap-4 grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <StatCard
                         title={t.result.oneWayDistance}
-                        value={routeLoading ? t.status.loading : `${oneWayKm.toFixed(1)} km`}
+                        value={
+                            routeLoading
+                                ? t.status.loading
+                                : `${distanceValue.oneWay.toFixed(1)} ${distanceValue.unit}`
+                        }
                     />
                     <StatCard
                         title={t.result.roundTripDistance}
-                        value={routeLoading ? t.status.loading : `${roundTripKm.toFixed(1)} km`}
+                        value={
+                            routeLoading
+                                ? t.status.loading
+                                : `${distanceValue.roundTrip.toFixed(1)} ${distanceValue.unit}`
+                        }
                     />
                     <StatCard
                         title={t.pricing.priceDifference}
-                        value={`${priceDifference.toFixed(3)} €/L`}
+                        value={`${priceDifferenceValue.value.toFixed(3)} ${priceDifferenceValue.unit}`}
                     />
                     <StatCard
                         title={t.result.tripCost}
-                        value={formatCurrency(tripCost, language)}
+                        value={formatCurrency(calculation.tripCost, currencySystem)}
                     />
                     <StatCard
                         title={t.result.oneWayDuration}
                         value={
                             routeLoading
                                 ? t.status.loading
-                                : formatDuration(estimatedHoursOneWay, language)
+                                : formatDuration(calculation.estimatedHoursOneWay)
                         }
                     />
                     <StatCard
@@ -77,16 +122,16 @@ export default function ResultsPanel({
                         value={
                             routeLoading
                                 ? t.status.loading
-                                : formatDuration(estimatedHoursRoundTrip, language)
+                                : formatDuration(calculation.estimatedHoursRoundTrip)
                         }
                     />
                     <StatCard
                         title={t.result.fullTankSaving}
-                        value={formatCurrency(grossSavingFullTank, language)}
+                        value={formatCurrency(calculation.grossSavingFullTank, currencySystem)}
                     />
                     <StatCard
                         title={t.result.netSaving}
-                        value={formatCurrency(netSaving, language)}
+                        value={formatCurrency(calculation.netSaving, currencySystem)}
                         valueClassName={profit.colorClass}
                     />
                 </div>
@@ -97,11 +142,11 @@ export default function ResultsPanel({
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                     <StatCard
                         title={t.pricing.breakEvenDiff}
-                        value={`${(breakEvenDiff * 100).toFixed(1)} Cent/L`}
+                        value={`${breakEvenValue.value.toFixed(1)} ${breakEvenValue.unit}`}
                     />
                     <StatCard
                         title={t.vehicle.maxConsumption}
-                        value={`${maxConsumption.toFixed(1)} L / 100 km`}
+                        value={`${maxConsumptionValue.value.toFixed(1)} ${maxConsumptionValue.unit}`}
                     />
                 </div>
             </div>

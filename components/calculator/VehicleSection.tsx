@@ -1,8 +1,10 @@
 import { TranslationSchema } from "@/config/i18n";
+import { MeasurementSystem } from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
 
 type Props = {
     t: TranslationSchema;
+    measurementSystem: MeasurementSystem;
     consumption: number;
     setConsumption: (value: number) => void;
     tankSize: number;
@@ -13,6 +15,7 @@ type Props = {
 
 export default function VehicleSection({
                                            t,
+                                           measurementSystem,
                                            consumption,
                                            setConsumption,
                                            tankSize,
@@ -29,32 +32,36 @@ export default function VehicleSection({
 
             <SliderNumberField
                 label={t.vehicle.consumption}
-                min={3}
-                max={25}
+                min={measurementSystem === "metric" ? 3 : 5}
+                max={measurementSystem === "metric" ? 25 : 80}
                 step={0.1}
                 value={consumption}
                 onChange={setConsumption}
-                unit="L / 100 km"
+                unit={
+                    measurementSystem === "metric"
+                        ? t.units.litersPer100Km
+                        : t.units.mpg
+                }
             />
 
             <SliderNumberField
                 label={t.vehicle.tankSize}
-                min={20}
-                max={120}
+                min={measurementSystem === "metric" ? 20 : 5}
+                max={measurementSystem === "metric" ? 120 : 35}
                 step={1}
                 value={tankSize}
                 onChange={setTankSize}
-                unit="L"
+                unit={measurementSystem === "metric" ? t.units.liters : t.units.gallons}
             />
 
             <SliderNumberField
                 label={t.vehicle.avgSpeed}
-                min={30}
-                max={130}
+                min={measurementSystem === "metric" ? 30 : 20}
+                max={measurementSystem === "metric" ? 130 : 80}
                 step={1}
                 value={avgSpeed}
                 onChange={setAvgSpeed}
-                unit="km/h"
+                unit={measurementSystem === "metric" ? t.units.kmh : t.units.mph}
             />
         </section>
     );

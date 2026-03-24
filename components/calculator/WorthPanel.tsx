@@ -1,5 +1,5 @@
 import { TranslationSchema } from "@/config/i18n";
-import { Language } from "@/types/tankify";
+import { CurrencySystem } from "@/types/tankify";
 import { formatCurrency } from "@/lib/format";
 
 type ProfitLevel = {
@@ -11,14 +11,14 @@ type ProfitLevel = {
 
 type Props = {
     t: TranslationSchema;
-    language: Language;
+    currencySystem: CurrencySystem;
     profit: ProfitLevel;
     netSaving: number;
 };
 
 export default function WorthPanel({
                                        t,
-                                       language,
+                                       currencySystem,
                                        profit,
                                        netSaving,
                                    }: Props) {
@@ -33,7 +33,7 @@ export default function WorthPanel({
                 </div>
 
                 <div className={`mt-2 text-4xl font-bold ${profit.colorClass}`}>
-                    {formatCurrency(netSaving, language)}
+                    {formatCurrency(netSaving, currencySystem)}
                 </div>
 
                 <p className="mt-2 text-sm text-gray-600">

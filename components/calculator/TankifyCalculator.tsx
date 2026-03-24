@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import RouteSection from "./RouteSection";
 import PriceSection from "./PriceSection";
 import ResultsPanel from "./ResultsPanel";
@@ -13,7 +13,17 @@ import {calculateTankify, getProfitLevel} from "@/lib/calc";
 import {geocode} from "@/lib/geocode";
 import {useRoute} from "@/hooks/useRoute";
 import {useBottomSheet} from "@/hooks/useBottomSheet";
-import {FuelType, Language, MapPickMode, Point} from "@/types/tankify";
+import {
+    gallonsToLiters,
+    kmhToMph,
+    litersToGallons,
+    lPer100KmToMpg,
+    mpgToLPer100Km,
+    mphToKmh,
+    pricePerGallonToPerLiter,
+    pricePerLiterToPerGallon,
+} from "@/lib/units";
+import {CurrencySystem, FuelType, Language, MapPickMode, MeasurementSystem, Point,} from "@/types/tankify";
 import WorthPanel from "@/components/calculator/WorthPanel";
 
 const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
@@ -22,6 +32,11 @@ const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
 
 export default function TankifyCalculator() {
     const [language, setLanguage] = useState<Language>("de");
+    const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
+    const [measurementSystem, setMeasurementSystem] =
+        useState<MeasurementSystem>("metric");
+    const previousMeasurementSystem = useRef<MeasurementSystem>("metric");
+
     const [settingsOpen, setSettingsOpen] = useState(false);
 
     const [startText, setStartText] = useState("Linz");
@@ -31,6 +46,8 @@ export default function TankifyCalculator() {
     const [endPoint, setEndPoint] = useState<Point>(DEFAULT_END);
 
     const [fuelType, setFuelType] = useState<FuelType>("diesel");
+
+    // These are always stored in the CURRENT visible unit system.
     const [localPrice, setLocalPrice] = useState(2.142);
     const [destinationPrice, setDestinationPrice] = useState(1.585);
     const [consumption, setConsumption] = useState(6.0);
@@ -51,23 +68,66 @@ export default function TankifyCalculator() {
         onTouchMoveContent,
         onTouchEnd,
         minimizeBottomSheet,
-        setBottomSheet,
     } = useBottomSheet();
 
     const {routeData, routeLoading, routeError} = useRoute(startPoint, endPoint);
-
     const t = getTranslations(language);
 
     useEffect(() => {
-        const saved = window.localStorage.getItem("tankify-language");
-        if (saved === "de" || saved === "en") {
-            setLanguage(saved);
+        const savedLanguage = window.localStorage.getItem("tankify-language");
+        const savedCurrency = window.localStorage.getItem("tankify-currency");
+        const savedMeasurement = window.localStorage.getItem("tankify-measurement");
+
+        if (savedLanguage === "de" || savedLanguage === "en") {
+            setLanguage(savedLanguage);
+        }
+
+        if (savedCurrency === "eur" || savedCurrency === "usd") {
+            setCurrencySystem(savedCurrency);
+        }
+
+        if (savedMeasurement === "metric" || savedMeasurement === "imperial") {
+            setMeasurementSystem(savedMeasurement);
+            previousMeasurementSystem.current = savedMeasurement;
         }
     }, []);
 
     useEffect(() => {
         window.localStorage.setItem("tankify-language", language);
     }, [language]);
+
+    useEffect(() => {
+        window.localStorage.setItem("tankify-currency", currencySystem);
+    }, [currencySystem]);
+
+    useEffect(() => {
+        window.localStorage.setItem("tankify-measurement", measurementSystem);
+    }, [measurementSystem]);
+
+    // Convert current input values when switching unit system
+    useEffect(() => {
+        const prev = previousMeasurementSystem.current;
+
+        if (prev === measurementSystem) return;
+
+        if (prev === "metric" && measurementSystem === "imperial") {
+            setLocalPrice((prevValue) => pricePerLiterToPerGallon(prevValue));
+            setDestinationPrice((prevValue) => pricePerLiterToPerGallon(prevValue));
+            setConsumption((prevValue) => lPer100KmToMpg(prevValue));
+            setTankSize((prevValue) => litersToGallons(prevValue));
+            setAvgSpeed((prevValue) => kmhToMph(prevValue));
+        }
+
+        if (prev === "imperial" && measurementSystem === "metric") {
+            setLocalPrice((prevValue) => pricePerGallonToPerLiter(prevValue));
+            setDestinationPrice((prevValue) => pricePerGallonToPerLiter(prevValue));
+            setConsumption((prevValue) => mpgToLPer100Km(prevValue));
+            setTankSize((prevValue) => gallonsToLiters(prevValue));
+            setAvgSpeed((prevValue) => mphToKmh(prevValue));
+        }
+
+        previousMeasurementSystem.current = measurementSystem;
+    }, [measurementSystem]);
 
     useEffect(() => {
         if (routeError === "ROUTE_NOT_CALCULATED") {
@@ -116,23 +176,55 @@ export default function TankifyCalculator() {
         }
     }
 
+    // Normalize current input values into metric/base variables
+    const localPricePerLiter =
+        measurementSystem === "metric"
+            ? localPrice
+            : pricePerGallonToPerLiter(localPrice);
+
+    const localPricePerGallon = pricePerLiterToPerGallon(localPricePerLiter);
+
+    const destinationPricePerLiter =
+        measurementSystem === "metric"
+            ? destinationPrice
+            : pricePerGallonToPerLiter(destinationPrice);
+
+    const destinationPricePerGallon = pricePerLiterToPerGallon(
+        destinationPricePerLiter
+    );
+
+    const consumptionLPer100Km =
+        measurementSystem === "metric" ? consumption : mpgToLPer100Km(consumption);
+
+    const consumptionMpg = lPer100KmToMpg(consumptionLPer100Km);
+
+    const tankSizeLiters =
+        measurementSystem === "metric" ? tankSize : gallonsToLiters(tankSize);
+
+    const tankSizeGallons = litersToGallons(tankSizeLiters);
+
+    const avgSpeedKmh =
+        measurementSystem === "metric" ? avgSpeed : mphToKmh(avgSpeed);
+
+    const avgSpeedMph = kmhToMph(avgSpeedKmh);
+
     const calculation = useMemo(() => {
         return calculateTankify({
             oneWayKm: routeData?.distanceKm ?? 0,
             durationHours: routeData?.durationHours ?? 0,
-            localPrice,
-            destinationPrice,
-            consumption,
-            tankSize,
-            avgSpeed,
+            localPricePerLiter,
+            destinationPricePerLiter,
+            consumptionLPer100Km,
+            tankSizeLiters,
+            avgSpeedKmh,
         });
     }, [
         routeData,
-        localPrice,
-        destinationPrice,
-        consumption,
-        tankSize,
-        avgSpeed,
+        localPricePerLiter,
+        destinationPricePerLiter,
+        consumptionLPer100Km,
+        tankSizeLiters,
+        avgSpeedKmh,
     ]);
 
     const profit = useMemo(
@@ -163,12 +255,16 @@ export default function TankifyCalculator() {
 
             <PriceSection
                 t={t}
-                fuelType={fuelType}
-                setFuelType={setFuelType}
-                localPrice={localPrice}
+                localPrice={measurementSystem === "metric" ? localPricePerLiter : localPricePerGallon}
                 setLocalPrice={setLocalPrice}
-                destinationPrice={destinationPrice}
+                destinationPrice={
+                    measurementSystem === "metric"
+                        ? destinationPricePerLiter
+                        : destinationPricePerGallon
+                }
                 setDestinationPrice={setDestinationPrice}
+                currencySystem={currencySystem}
+                measurementSystem={measurementSystem}
             />
 
             {mapPickMode ? (
@@ -195,11 +291,15 @@ export default function TankifyCalculator() {
                 setLanguage={setLanguage}
                 fuelType={fuelType}
                 setFuelType={setFuelType}
-                consumption={consumption}
+                currencySystem={currencySystem}
+                setCurrencySystem={setCurrencySystem}
+                measurementSystem={measurementSystem}
+                setMeasurementSystem={setMeasurementSystem}
+                consumption={measurementSystem === "metric" ? consumptionLPer100Km : consumptionMpg}
                 setConsumption={setConsumption}
-                tankSize={tankSize}
+                tankSize={measurementSystem === "metric" ? tankSizeLiters : tankSizeGallons}
                 setTankSize={setTankSize}
-                avgSpeed={avgSpeed}
+                avgSpeed={measurementSystem === "metric" ? avgSpeedKmh : avgSpeedMph}
                 setAvgSpeed={setAvgSpeed}
             />
 
@@ -215,9 +315,8 @@ export default function TankifyCalculator() {
                             <button
                                 type="button"
                                 onClick={() => setSettingsOpen(true)}
-                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50 active:scale-95"
+                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
                                 aria-label="Open settings"
-                                title="Settings"
                             >
                                 ⚙️
                             </button>
@@ -250,16 +349,24 @@ export default function TankifyCalculator() {
                                         setStartPoint(point);
                                         setStartText(point.label);
 
-                                        if (price !== null && price !== undefined) {
-                                            setLocalPrice(price);
+                                        if (price != null) {
+                                            setLocalPrice(
+                                                measurementSystem === "metric"
+                                                    ? price
+                                                    : pricePerLiterToPerGallon(price)
+                                            );
                                         }
                                     }}
                                     onSelectStationAsDestination={({point, price}) => {
                                         setEndPoint(point);
                                         setEndText(point.label);
 
-                                        if (price !== null && price !== undefined) {
-                                            setDestinationPrice(price);
+                                        if (price != null) {
+                                            setDestinationPrice(
+                                                measurementSystem === "metric"
+                                                    ? price
+                                                    : pricePerLiterToPerGallon(price)
+                                            );
                                         }
                                     }}
                                 />
@@ -268,25 +375,18 @@ export default function TankifyCalculator() {
 
                         <WorthPanel
                             t={t}
-                            language={language}
+                            currencySystem={currencySystem}
                             profit={profit}
-                            netSaving={calculation.netSaving}/>
+                            netSaving={calculation.netSaving}
+                        />
 
                         <ResultsPanel
                             t={t}
-                            language={language}
+                            currencySystem={currencySystem}
+                            measurementSystem={measurementSystem}
                             profit={profit}
                             routeLoading={routeLoading}
-                            oneWayKm={routeData?.distanceKm ?? 0}
-                            roundTripKm={calculation.roundTripKm}
-                            priceDifference={calculation.priceDifference}
-                            tripCost={calculation.tripCost}
-                            estimatedHoursOneWay={calculation.estimatedHoursOneWay}
-                            estimatedHoursRoundTrip={calculation.estimatedHoursRoundTrip}
-                            grossSavingFullTank={calculation.grossSavingFullTank}
-                            netSaving={calculation.netSaving}
-                            breakEvenDiff={calculation.breakEvenDiff}
-                            maxConsumption={calculation.maxConsumption}
+                            calculation={calculation}
                         />
                     </section>
                 </div>
@@ -309,30 +409,35 @@ export default function TankifyCalculator() {
                                     setEndText(point.label);
                                 }
                                 setMapPickMode(null);
-                                setBottomSheet(window.innerHeight*0.2);
                             }}
                             onSelectStationAsStart={({point, price}) => {
                                 setStartPoint(point);
                                 setStartText(point.label);
 
-                                if (price !== null && price !== undefined) {
-                                    setLocalPrice(price);
+                                if (price != null) {
+                                    setLocalPrice(
+                                        measurementSystem === "metric"
+                                            ? price
+                                            : pricePerLiterToPerGallon(price)
+                                    );
                                 }
-                                setBottomSheet(window.innerHeight*0.2);
                             }}
                             onSelectStationAsDestination={({point, price}) => {
                                 setEndPoint(point);
                                 setEndText(point.label);
 
-                                if (price !== null && price !== undefined) {
-                                    setDestinationPrice(price);
+                                if (price != null) {
+                                    setDestinationPrice(
+                                        measurementSystem === "metric"
+                                            ? price
+                                            : pricePerLiterToPerGallon(price)
+                                    );
                                 }
-                                setBottomSheet(window.innerHeight*0.2);
                             }}
                         />
                     </div>
 
-                    <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
+                    <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
                         <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
                             <h1 className="text-lg font-bold">{t.app.title}</h1>
                         </div>
@@ -342,37 +447,28 @@ export default function TankifyCalculator() {
                             onClick={() => setSettingsOpen(true)}
                             className="rounded-full bg-white/90 px-3 py-2 text-lg shadow-md backdrop-blur"
                             aria-label="Open settings"
-                            title="Settings"
                         >
                             ⚙️
                         </button>
                     </div>
 
-                    { isSheetReady && !settingsOpen && (<MobileBottomSheet
+                    <MobileBottomSheet
                         t={t}
-                        language={language}
+                        currencySystem={currencySystem}
+                        measurementSystem={measurementSystem}
                         sheetContentRef={sheetContentRef}
                         sheetY={sheetY}
                         dragging={dragging}
+                        isSheetReady={isSheetReady}
                         onTouchStart={onTouchStart}
                         onTouchMoveHandle={onTouchMoveHandle}
                         onTouchMoveContent={onTouchMoveContent}
                         onTouchEnd={onTouchEnd}
                         controls={routeControls}
                         routeLoading={routeLoading}
-                        oneWayKm={routeData?.distanceKm ?? 0}
-                        roundTripKm={calculation.roundTripKm}
-                        priceDifference={calculation.priceDifference}
-                        tripCost={calculation.tripCost}
-                        estimatedHoursOneWay={calculation.estimatedHoursOneWay}
-                        estimatedHoursRoundTrip={calculation.estimatedHoursRoundTrip}
-                        grossSavingFullTank={calculation.grossSavingFullTank}
-                        netSaving={calculation.netSaving}
-                        breakEvenDiff={calculation.breakEvenDiff}
-                        maxConsumption={calculation.maxConsumption}
+                        calculation={calculation}
                         profit={profit}
-                        isSheetReady={isSheetReady}
-                    />)}
+                    />
                 </div>
             </main>
         </>

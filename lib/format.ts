@@ -1,21 +1,16 @@
-import { Language } from "@/types/tankify";
+import { CurrencySystem } from "@/types/tankify";
 
-export function formatCurrency(value: number, language: Language) {
-    return new Intl.NumberFormat(language === "de" ? "de-AT" : "en-US", {
+export function formatCurrency(value: number, currencySystem: CurrencySystem) {
+    return new Intl.NumberFormat(currencySystem === "eur" ? "de-AT" : "en-US", {
         style: "currency",
-        currency: "EUR",
+        currency: currencySystem === "eur" ? "EUR" : "USD",
     }).format(value);
 }
 
-export function formatDuration(hours: number, language: Language) {
+export function formatDuration(hours: number) {
     const totalMinutes = Math.round(hours * 60);
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
-
-    if (language === "de") {
-        if (h === 0) return `${m} min`;
-        return `${h} h ${m} min`;
-    }
 
     if (h === 0) return `${m} min`;
     return `${h} h ${m} min`;
@@ -31,7 +26,10 @@ export function formatInputValue(value: number, step: number) {
     return value.toFixed(3);
 }
 
-export function formatPrice(value?: number | null) {
+export function formatPrice(
+    value?: number | null,
+    currencySystem: CurrencySystem = "eur"
+) {
     if (value === null || value === undefined) return "—";
-    return `${value.toFixed(3)} €`;
+    return `${value.toFixed(3)} ${currencySystem === "eur" ? "€" : "$"}`;
 }

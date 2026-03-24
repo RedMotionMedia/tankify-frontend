@@ -1,15 +1,15 @@
 import {TranslationSchema} from "@/config/i18n";
-import {FuelType} from "@/types/tankify";
+import {CurrencySystem, MeasurementSystem,} from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
 
 type Props = {
     t: TranslationSchema;
-    fuelType: FuelType;
-    setFuelType: (value: FuelType) => void;
     localPrice: number;
     setLocalPrice: (value: number) => void;
     destinationPrice: number;
     setDestinationPrice: (value: number) => void;
+    currencySystem: CurrencySystem;
+    measurementSystem: MeasurementSystem;
 };
 
 export default function PriceSection({
@@ -18,7 +18,15 @@ export default function PriceSection({
                                          setLocalPrice,
                                          destinationPrice,
                                          setDestinationPrice,
+                                         currencySystem,
+                                         measurementSystem,
                                      }: Props) {
+    const currencySymbol = currencySystem === "eur" ? "€" : "$";
+    const unit =
+        measurementSystem === "metric"
+            ? `${currencySymbol}/L`
+            : `${currencySymbol}/gal`;
+
     return (
         <section className="space-y-4">
             <div>
@@ -29,21 +37,21 @@ export default function PriceSection({
             <SliderNumberField
                 label={t.pricing.localPrice}
                 min={1}
-                max={3}
+                max={measurementSystem === "metric" ? 5 : 20}
                 step={0.001}
                 value={localPrice}
                 onChange={setLocalPrice}
-                unit="€/L"
+                unit={unit}
             />
 
             <SliderNumberField
                 label={t.pricing.destinationPrice}
                 min={1}
-                max={3}
+                max={measurementSystem === "metric" ? 5 : 20}
                 step={0.001}
                 value={destinationPrice}
                 onChange={setDestinationPrice}
-                unit="€/L"
+                unit={unit}
             />
         </section>
     );

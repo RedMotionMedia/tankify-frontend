@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 import { TranslationSchema } from "@/config/i18n";
-import { FuelType, Language } from "@/types/tankify";
+import {
+    CurrencySystem,
+    FuelType,
+    Language,
+    MeasurementSystem,
+} from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
 
 type Props = {
@@ -13,6 +18,10 @@ type Props = {
     setLanguage: (language: Language) => void;
     fuelType: FuelType;
     setFuelType: (value: FuelType) => void;
+    currencySystem: CurrencySystem;
+    setCurrencySystem: (value: CurrencySystem) => void;
+    measurementSystem: MeasurementSystem;
+    setMeasurementSystem: (value: MeasurementSystem) => void;
     consumption: number;
     setConsumption: (value: number) => void;
     tankSize: number;
@@ -29,6 +38,10 @@ export default function SettingsModal({
                                           setLanguage,
                                           fuelType,
                                           setFuelType,
+                                          currencySystem,
+                                          setCurrencySystem,
+                                          measurementSystem,
+                                          setMeasurementSystem,
                                           consumption,
                                           setConsumption,
                                           tankSize,
@@ -61,7 +74,6 @@ export default function SettingsModal({
             document.body.style.width = originalBodyWidth;
             document.body.style.left = originalBodyLeft;
             document.body.style.right = originalBodyRight;
-
             window.scrollTo(0, scrollY);
         };
     }, [open]);
@@ -70,9 +82,7 @@ export default function SettingsModal({
         if (!open) return;
 
         function handleKeyDown(e: KeyboardEvent) {
-            if (e.key === "Escape") {
-                onClose();
-            }
+            if (e.key === "Escape") onClose();
         }
 
         window.addEventListener("keydown", handleKeyDown);
@@ -129,11 +139,10 @@ export default function SettingsModal({
                             <h3 className="text-lg font-bold">{t.settings.title}</h3>
                         </div>
 
-                        <div className="flex h-auto flex-row gap-3">
-                            <label className="block w-auto py-3 text-sm font-medium">
+                        <div className="flex flex-row gap-3">
+                            <label className="block py-3 text-sm font-medium">
                                 {t.settings.language}:
                             </label>
-
                             <select
                                 value={language}
                                 onChange={(e) => setLanguage(e.target.value as Language)}
@@ -144,8 +153,38 @@ export default function SettingsModal({
                             </select>
                         </div>
 
-                        <div className="flex h-auto flex-row gap-3">
-                            <label className="block w-auto py-3 text-sm font-medium">
+                        <div className="flex flex-row gap-3">
+                            <label className="block py-3 text-sm font-medium">
+                                {t.settings.currency}:
+                            </label>
+                            <select
+                                value={currencySystem}
+                                onChange={(e) => setCurrencySystem(e.target.value as CurrencySystem)}
+                                className="flex-auto rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                            >
+                                <option value="eur">{t.settings.currencyEuro}</option>
+                                <option value="usd">{t.settings.currencyDollar}</option>
+                            </select>
+                        </div>
+
+                        <div className="flex flex-row gap-3">
+                            <label className="block py-3 text-sm font-medium">
+                                {t.settings.measurement}:
+                            </label>
+                            <select
+                                value={measurementSystem}
+                                onChange={(e) =>
+                                    setMeasurementSystem(e.target.value as MeasurementSystem)
+                                }
+                                className="flex-auto rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                            >
+                                <option value="metric">{t.settings.metric}</option>
+                                <option value="imperial">{t.settings.imperial}</option>
+                            </select>
+                        </div>
+
+                        <div className="flex flex-row gap-3">
+                            <label className="block py-3 text-sm font-medium">
                                 {t.pricing.fuelType}:
                             </label>
                             <select
@@ -169,32 +208,40 @@ export default function SettingsModal({
 
                         <SliderNumberField
                             label={t.vehicle.consumption}
-                            min={3}
-                            max={25}
+                            min={measurementSystem === "metric" ? 3 : 5}
+                            max={measurementSystem === "metric" ? 25 : 80}
                             step={0.1}
                             value={consumption}
                             onChange={setConsumption}
-                            unit="L / 100 km"
+                            unit={
+                                measurementSystem === "metric"
+                                    ? t.units.litersPer100Km
+                                    : t.units.mpg
+                            }
                         />
 
                         <SliderNumberField
                             label={t.vehicle.tankSize}
-                            min={20}
-                            max={120}
+                            min={measurementSystem === "metric" ? 20 : 5}
+                            max={measurementSystem === "metric" ? 120 : 35}
                             step={1}
                             value={tankSize}
                             onChange={setTankSize}
-                            unit="L"
+                            unit={
+                                measurementSystem === "metric"
+                                    ? t.units.liters
+                                    : t.units.gallons
+                            }
                         />
 
                         <SliderNumberField
                             label={t.vehicle.avgSpeed}
-                            min={30}
-                            max={130}
+                            min={measurementSystem === "metric" ? 30 : 20}
+                            max={measurementSystem === "metric" ? 130 : 80}
                             step={1}
                             value={avgSpeed}
                             onChange={setAvgSpeed}
-                            unit="km/h"
+                            unit={measurementSystem === "metric" ? t.units.kmh : t.units.mph}
                         />
                     </section>
                 </div>

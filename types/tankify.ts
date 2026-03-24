@@ -1,5 +1,8 @@
 export type Language = "de" | "en";
 
+export type CurrencySystem = "eur" | "usd";
+export type MeasurementSystem = "metric" | "imperial";
+
 export type FuelType = "diesel" | "super95";
 
 export type Point = {

@@ -1,7 +1,8 @@
-import {TranslationSchema} from "@/config/i18n";
-import {Language} from "@/types/tankify";
+import { TranslationSchema } from "@/config/i18n";
+import { CurrencySystem, MeasurementSystem } from "@/types/tankify";
 import ResultsPanel from "./ResultsPanel";
 import WorthPanel from "@/components/calculator/WorthPanel";
+import { TankifyCalculation } from "@/lib/calc";
 
 type ProfitLevel = {
     labelKey: "notWorthIt" | "barelyWorthIt" | "worthIt" | "veryWorthIt";
@@ -12,54 +13,38 @@ type ProfitLevel = {
 
 type Props = {
     t: TranslationSchema;
-    language: Language;
+    currencySystem: CurrencySystem;
+    measurementSystem: MeasurementSystem;
     sheetContentRef: React.RefObject<HTMLDivElement | null>;
     sheetY: number;
     dragging: boolean;
+    isSheetReady: boolean;
     onTouchStart: (e: React.TouchEvent) => void;
     onTouchMoveHandle: (e: React.TouchEvent) => void;
     onTouchMoveContent: (e: React.TouchEvent) => void;
     onTouchEnd: () => void;
     controls: React.ReactNode;
     routeLoading: boolean;
-    oneWayKm: number;
-    roundTripKm: number;
-    priceDifference: number;
-    tripCost: number;
-    estimatedHoursOneWay: number;
-    estimatedHoursRoundTrip: number;
-    grossSavingFullTank: number;
-    netSaving: number;
-    breakEvenDiff: number;
-    maxConsumption: number;
+    calculation: TankifyCalculation;
     profit: ProfitLevel;
-    isSheetReady: boolean;
 };
 
 export default function MobileBottomSheet({
                                               t,
-                                              language,
+                                              currencySystem,
+                                              measurementSystem,
                                               sheetContentRef,
                                               sheetY,
                                               dragging,
+                                              isSheetReady,
                                               onTouchStart,
                                               onTouchMoveHandle,
                                               onTouchMoveContent,
                                               onTouchEnd,
                                               controls,
                                               routeLoading,
-                                              oneWayKm,
-                                              roundTripKm,
-                                              priceDifference,
-                                              tripCost,
-                                              estimatedHoursOneWay,
-                                              estimatedHoursRoundTrip,
-                                              grossSavingFullTank,
-                                              netSaving,
-                                              breakEvenDiff,
-                                              maxConsumption,
+                                              calculation,
                                               profit,
-                                              isSheetReady
                                           }: Props) {
     return (
         <div
@@ -82,7 +67,7 @@ export default function MobileBottomSheet({
                     onTouchMove={onTouchMoveHandle}
                     onTouchEnd={onTouchEnd}
                 >
-                    <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300"/>
+                    <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-gray-300" />
 
                     <p className="text-center text-sm font-medium text-gray-500">
                         {t.app.mobilePullUp}
@@ -98,12 +83,12 @@ export default function MobileBottomSheet({
                 </div>
 
                 <div className="mt-6 space-y-6 px-4">
-
                     <WorthPanel
                         t={t}
-                        language={language}
+                        currencySystem={currencySystem}
                         profit={profit}
-                        netSaving={netSaving}/>
+                        netSaving={calculation.netSaving}
+                    />
 
                     <div>
                         <h3 className="mb-3 text-lg font-bold">{t.app.adjustCalculator}</h3>
@@ -112,25 +97,14 @@ export default function MobileBottomSheet({
 
                     <ResultsPanel
                         t={t}
-                        language={language}
+                        currencySystem={currencySystem}
+                        measurementSystem={measurementSystem}
                         profit={profit}
                         routeLoading={routeLoading}
-                        oneWayKm={oneWayKm}
-                        roundTripKm={roundTripKm}
-                        priceDifference={priceDifference}
-                        tripCost={tripCost}
-                        estimatedHoursOneWay={estimatedHoursOneWay}
-                        estimatedHoursRoundTrip={estimatedHoursRoundTrip}
-                        grossSavingFullTank={grossSavingFullTank}
-                        netSaving={netSaving}
-                        breakEvenDiff={breakEvenDiff}
-                        maxConsumption={maxConsumption}
+                        calculation={calculation}
                     />
-
-
                 </div>
             </div>
         </div>
-    )
-        ;
+    );
 }

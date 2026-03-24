@@ -1,3 +1,36 @@
+import {
+    kmToMiles,
+    litersToGallons,
+    lPer100KmToMpg,
+    pricePerLiterToPerGallon,
+} from "@/lib/units";
+
+export type TankifyCalculation = {
+    oneWayDistanceKm: number;
+    oneWayDistanceMiles: number;
+    roundTripDistanceKm: number;
+    roundTripDistanceMiles: number;
+
+    estimatedHoursOneWay: number;
+    estimatedHoursRoundTrip: number;
+
+    tripLiters: number;
+    tripGallons: number;
+    tripCost: number;
+
+    priceDifferencePerLiter: number;
+    priceDifferencePerGallon: number;
+
+    grossSavingFullTank: number;
+    netSaving: number;
+
+    breakEvenDiffPerLiter: number;
+    breakEvenDiffPerGallon: number;
+
+    maxConsumptionLPer100Km: number;
+    maxConsumptionMpg: number;
+};
+
 export function getProfitLevel(netSaving: number) {
     if (netSaving < 0) {
         return {
@@ -34,53 +67,85 @@ export function getProfitLevel(netSaving: number) {
     };
 }
 
-export function calculateTankify(params: {
+type CalculateTankifyParams = {
     oneWayKm: number;
     durationHours: number;
-    localPrice: number;
-    destinationPrice: number;
-    consumption: number;
-    tankSize: number;
-    avgSpeed: number;
-}) {
-    const {
-        oneWayKm,
-        durationHours,
-        localPrice,
-        destinationPrice,
-        consumption,
-        tankSize,
-        avgSpeed,
-    } = params;
+    localPricePerLiter: number;
+    destinationPricePerLiter: number;
+    consumptionLPer100Km: number;
+    tankSizeLiters: number;
+    avgSpeedKmh: number;
+};
 
+export function calculateTankify({
+                                     oneWayKm,
+                                     durationHours,
+                                     localPricePerLiter,
+                                     destinationPricePerLiter,
+                                     consumptionLPer100Km,
+                                     tankSizeLiters,
+                                     avgSpeedKmh,
+                                 }: CalculateTankifyParams): TankifyCalculation {
     const roundTripKm = oneWayKm * 2;
+
     const estimatedHoursOneWay =
-        durationHours > 0 ? durationHours : avgSpeed > 0 ? oneWayKm / avgSpeed : 0;
+        durationHours > 0
+            ? durationHours
+            : avgSpeedKmh > 0
+                ? oneWayKm / avgSpeedKmh
+                : 0;
+
     const estimatedHoursRoundTrip = estimatedHoursOneWay * 2;
 
-    const tripLiters = (roundTripKm / 100) * consumption;
-    const tripCost = tripLiters * destinationPrice;
+    const tripLiters = (roundTripKm / 100) * consumptionLPer100Km;
+    const tripGallons = litersToGallons(tripLiters);
 
-    const priceDifference = localPrice - destinationPrice;
-    const grossSavingFullTank = tankSize * priceDifference;
+    const tripCost = tripLiters * destinationPricePerLiter;
+
+    const priceDifferencePerLiter = localPricePerLiter - destinationPricePerLiter;
+    const priceDifferencePerGallon =
+        pricePerLiterToPerGallon(priceDifferencePerLiter);
+
+    const grossSavingFullTank = tankSizeLiters * priceDifferencePerLiter;
     const netSaving = grossSavingFullTank - tripCost;
 
-    const breakEvenDiff = tankSize > 0 ? tripCost / tankSize : 0;
-    const maxConsumption =
-        roundTripKm > 0 && destinationPrice > 0
-            ? (tankSize * priceDifference) / ((roundTripKm / 100) * destinationPrice)
+    const breakEvenDiffPerLiter =
+        tankSizeLiters > 0 ? tripCost / tankSizeLiters : 0;
+
+    const breakEvenDiffPerGallon =
+        pricePerLiterToPerGallon(breakEvenDiffPerLiter);
+
+    const maxConsumptionLPer100Km =
+        roundTripKm > 0 && destinationPricePerLiter > 0
+            ? (tankSizeLiters * priceDifferencePerLiter) /
+            ((roundTripKm / 100) * destinationPricePerLiter)
             : 0;
 
+    const maxConsumptionMpg = lPer100KmToMpg(maxConsumptionLPer100Km);
+
     return {
-        roundTripKm,
+        oneWayDistanceKm: oneWayKm,
+        oneWayDistanceMiles: kmToMiles(oneWayKm),
+        roundTripDistanceKm: roundTripKm,
+        roundTripDistanceMiles: kmToMiles(roundTripKm),
+
         estimatedHoursOneWay,
         estimatedHoursRoundTrip,
+
         tripLiters,
+        tripGallons,
         tripCost,
-        priceDifference,
+
+        priceDifferencePerLiter,
+        priceDifferencePerGallon,
+
         grossSavingFullTank,
         netSaving,
-        breakEvenDiff,
-        maxConsumption,
+
+        breakEvenDiffPerLiter,
+        breakEvenDiffPerGallon,
+
+        maxConsumptionLPer100Km,
+        maxConsumptionMpg,
     };
 }
