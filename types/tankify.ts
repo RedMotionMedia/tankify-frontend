@@ -33,7 +33,7 @@ export type Station = {
     diesel?: number | null;
     super95?: number | null;
     open?: boolean | null;
-    source?: "overpass" | "econtrol-match";
+    source?: "econtrol";
 };
 
 export type MapPickMode = "start" | "end" | null;

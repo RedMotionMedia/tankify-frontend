@@ -357,7 +357,7 @@ function StationsLayer({
                     </span>
 
                                         <span className="text-gray-400">
-                      {station.source === "econtrol-match"
+                      {station.source === "econtrol"
                           ? t.pricing.sourceEcontrol
                           : t.pricing.sourceUnknown}
                     </span>

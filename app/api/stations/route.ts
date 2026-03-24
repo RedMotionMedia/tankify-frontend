@@ -10,7 +10,7 @@ type Station = {
     diesel?: number | null;
     super95?: number | null;
     open?: boolean | null;
-    source?: "overpass" | "econtrol-match";
+    source?: "econtrol";
 };
 
 type CacheEntry = {
@@ -35,18 +35,6 @@ type EControlStation = {
     diesel?: number | null;
     super95?: number | null;
     open?: boolean | null;
-};
-
-type OverpassElement = {
-    id: number | string;
-    type: string;
-    lat?: number;
-    lon?: number;
-    center?: {
-        lat?: number;
-        lon?: number;
-    };
-    tags?: Record<string, string | undefined>;
 };
 
 type EControlPrice = {
@@ -76,6 +64,21 @@ const ECONTROL_BASE_URL =
 
 function roundCoord(value: number, digits = 2): number {
     return Number(value.toFixed(digits));
+}
+
+function toRadians(value: number): number {
+    return (value * Math.PI) / 180;
+}
+
+function approxKmInBounds(bounds: Bounds): { widthKm: number; heightKm: number } {
+    const meanLat = (bounds.north + bounds.south) / 2;
+    const kmPerDegLat = 111.32;
+    const kmPerDegLon = 111.32 * Math.cos(toRadians(meanLat));
+
+    return {
+        widthKm: Math.abs(bounds.east - bounds.west) * kmPerDegLon,
+        heightKm: Math.abs(bounds.north - bounds.south) * kmPerDegLat,
+    };
 }
 
 function buildCacheKey(
@@ -142,108 +145,6 @@ function isValidBounds(
     );
 }
 
-function haversineMeters(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number
-): number {
-    const R = 6371000;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) ** 2;
-
-    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function normalizeName(value: string | undefined): string {
-    return (value ?? "")
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, " ")
-        .trim();
-}
-
-function normalizeStationName(value: string | undefined): string {
-    const normalized = normalizeName(value);
-    return normalized || "fuel station";
-}
-
-function getOverpassLatLon(el: OverpassElement): { lat: number; lon: number } | null {
-    const lat = el.lat ?? el.center?.lat;
-    const lon = el.lon ?? el.center?.lon;
-
-    if (typeof lat !== "number" || typeof lon !== "number") {
-        return null;
-    }
-
-    return { lat, lon };
-}
-
-function normalizeOverpassStations(elements: OverpassElement[]): Station[] {
-    return elements
-        .map((el): Station | null => {
-            const coords = getOverpassLatLon(el);
-            if (!coords) return null;
-
-            const tags = el.tags ?? {};
-            const parts = [
-                tags["addr:street"],
-                tags["addr:housenumber"],
-                tags["addr:postcode"],
-                tags["addr:city"],
-            ].filter(Boolean) as string[];
-
-            return {
-                id: `${el.type}-${el.id}`,
-                lat: coords.lat,
-                lon: coords.lon,
-                name: tags.name || tags.brand || tags.operator || "Fuel Station",
-                address: parts.join(", ") || undefined,
-                city: tags["addr:city"] || undefined,
-                diesel: null,
-                super95: null,
-                open: null,
-                source: "overpass",
-            };
-        })
-        .filter((station): station is Station => station !== null);
-}
-
-async function fetchOverpassStations(bounds: Bounds): Promise<Station[]> {
-    const query = `
-[out:json][timeout:25];
-(
-  node["amenity"="fuel"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
-  way["amenity"="fuel"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
-  relation["amenity"="fuel"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});
-);
-out center tags;
-`.trim();
-
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        headers: {
-            "Content-Type": "text/plain;charset=UTF-8",
-        },
-        body: query,
-    });
-
-    if (res.status === 429) return [];
-
-    if (!res.ok) {
-        console.error(`Overpass failed with status ${res.status}`);
-        return [];
-    }
-
-    const data = (await res.json()) as { elements?: OverpassElement[] };
-    return normalizeOverpassStations(data.elements ?? []);
-}
-
 function normalizeEControlItem(item: EControlApiItem): EControlStation | null {
     const lat = item.location?.latitude;
     const lon = item.location?.longitude;
@@ -308,9 +209,27 @@ async function fetchEControlByFuel(
 
     if (!Array.isArray(data)) return [];
 
+    console.log(data);
+
     return data
         .map((item) => normalizeEControlItem(item as EControlApiItem))
         .filter((station): station is EControlStation => station !== null);
+}
+
+async function mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>
+): Promise<R[]> {
+    const results: R[] = [];
+
+    for (let i = 0; i < items.length; i += limit) {
+        const chunk = items.slice(i, i + limit);
+        const chunkResults = await Promise.all(chunk.map(fn));
+        results.push(...chunkResults);
+    }
+
+    return results;
 }
 
 async function fetchEControlEnriched(
@@ -354,8 +273,8 @@ async function fetchEControlEnriched(
     return [...merged.values()];
 }
 
-function dedupeStations(stations: Station[]): Station[] {
-    const map = new Map<string, Station>();
+function dedupeEControlStations(stations: EControlStation[]): EControlStation[] {
+    const map = new Map<string, EControlStation>();
 
     for (const station of stations) {
         const key = `${roundCoord(station.lat, 5)}:${roundCoord(station.lon, 5)}`;
@@ -381,80 +300,75 @@ function dedupeStations(stations: Station[]): Station[] {
                     ? station.super95
                     : current.super95,
             open: station.open ?? current.open,
-            source:
-                current.source === "econtrol-match" || station.source === "econtrol-match"
-                    ? "econtrol-match"
-                    : "overpass",
         });
     }
 
     return [...map.values()];
 }
 
-function mergeStations(
-    overpassStations: Station[],
-    econtrolStations: EControlStation[]
-): Station[] {
-    const merged = overpassStations.map((station) => {
-        let bestMatch: EControlStation | null = null;
-        let bestScore = Number.POSITIVE_INFINITY;
+function toStationDto(station: EControlStation): Station {
+    return {
+        id: station.id,
+        lat: station.lat,
+        lon: station.lon,
+        name: station.name,
+        address: station.address,
+        city: station.city,
+        diesel: station.diesel ?? null,
+        super95: station.super95 ?? null,
+        open: station.open ?? null,
+        source: "econtrol",
+    };
+}
 
-        for (const candidate of econtrolStations) {
-            const distance = haversineMeters(
-                station.lat,
-                station.lon,
-                candidate.lat,
-                candidate.lon
-            );
+function isInBounds(station: { lat: number; lon: number }, bounds: Bounds): boolean {
+    return (
+        station.lat >= bounds.south &&
+        station.lat <= bounds.north &&
+        station.lon >= bounds.west &&
+        station.lon <= bounds.east
+    );
+}
 
-            const stationName = normalizeStationName(station.name);
-            const candidateName = normalizeStationName(candidate.name);
-            const sameName = stationName === candidateName;
+function buildSamplePoints(
+    bounds: Bounds,
+    centerLat: number,
+    centerLon: number
+): Array<{ lat: number; lon: number }> {
+    const midLat = (bounds.north + bounds.south) / 2;
+    const midLon = (bounds.east + bounds.west) / 2;
+    const { widthKm, heightKm } = approxKmInBounds(bounds);
+    const maxKm = Math.max(widthKm, heightKm);
 
-            const score = sameName ? distance * 0.5 : distance;
+    const points: Array<{ lat: number; lon: number }> = [
+        { lat: centerLat, lon: centerLon },
+    ];
 
-            if (score < bestScore) {
-                bestScore = score;
-                bestMatch = candidate;
-            }
-        }
-
-        if (!bestMatch) return station;
-
-        const realDistance = haversineMeters(
-            station.lat,
-            station.lon,
-            bestMatch.lat,
-            bestMatch.lon
+    if (maxKm > 2) {
+        points.push(
+            { lat: bounds.north, lon: midLon },
+            { lat: bounds.south, lon: midLon },
+            { lat: midLat, lon: bounds.east },
+            { lat: midLat, lon: bounds.west }
         );
+    }
 
-        if (realDistance > 120) return station;
+    if (maxKm > 10) {
+        points.push(
+            { lat: bounds.north, lon: bounds.west },
+            { lat: bounds.north, lon: bounds.east },
+            { lat: bounds.south, lon: bounds.west },
+            { lat: bounds.south, lon: bounds.east }
+        );
+    }
 
-        return {
-            ...station,
-            name: bestMatch.name || station.name,
-            address: bestMatch.address || station.address,
-            city: bestMatch.city || station.city,
-            diesel:
-                bestMatch.diesel !== null && bestMatch.diesel !== undefined
-                    ? bestMatch.diesel
-                    : station.diesel,
-            super95:
-                bestMatch.super95 !== null && bestMatch.super95 !== undefined
-                    ? bestMatch.super95
-                    : station.super95,
-            open: bestMatch.open ?? station.open,
-            source: "econtrol-match" as const,
-        };
-    });
+    const unique = new Map<string, { lat: number; lon: number }>();
+    for (const p of points) {
+        const key = `${roundCoord(p.lat, 4)}:${roundCoord(p.lon, 4)}`;
+        unique.set(key, p);
+    }
 
-    return dedupeStations(merged).sort((a, b) => {
-        const aHasPrice = a.diesel != null || a.super95 != null;
-        const bHasPrice = b.diesel != null || b.super95 != null;
-
-        if (aHasPrice !== bHasPrice) return aHasPrice ? -1 : 1;
-        return a.name.localeCompare(b.name, "de");
-    });
+    return [...unique.values()];
 }
 
 export async function GET(req: NextRequest) {
@@ -485,6 +399,7 @@ export async function GET(req: NextRequest) {
 
         cleanupCache();
 
+        const bounds: Bounds = { south, west, north, east };
         const cacheKey = buildCacheKey(
             south,
             west,
@@ -509,15 +424,28 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const [overpassStations, econtrolStations] = await Promise.all([
-            fetchOverpassStations({ south, west, north, east }),
-            fetchEControlEnriched(centerLat, centerLon),
-        ]);
+        const samplePoints = buildSamplePoints(bounds, centerLat, centerLon);
 
-        const merged = mergeStations(overpassStations, econtrolStations);
+        const perPoint = await mapWithConcurrency(
+            samplePoints,
+            3,
+            async (p) => fetchEControlEnriched(p.lat, p.lon)
+        );
+
+        const deduped = dedupeEControlStations(perPoint.flat())
+            .filter((s) => isInBounds(s, bounds))
+            .sort((a, b) => {
+                const aHasPrice = a.diesel != null || a.super95 != null;
+                const bHasPrice = b.diesel != null || b.super95 != null;
+
+                if (aHasPrice !== bHasPrice) return aHasPrice ? -1 : 1;
+                return a.name.localeCompare(b.name, "de");
+            });
+
+        const stations = deduped.map(toStationDto);
 
         cache.set(cacheKey, {
-            data: merged,
+            data: stations,
             expiresAt: now + CACHE_TTL_MS,
         });
 
@@ -525,9 +453,9 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json(
             {
-                stations: merged,
+                stations,
                 cached: false,
-                pricingSource: "E-Control by-address matching",
+                pricingSource: "E-Control",
             },
             {
                 headers: {
