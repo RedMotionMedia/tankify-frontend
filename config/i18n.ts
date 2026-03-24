@@ -24,7 +24,8 @@ export type TranslationSchema = {
         destination: string;
         pickStart: string;
         pickDestination: string;
-        pickHint: string;
+        pickHintStart: string;
+        pickHintDestination: string;
         setAsStart: string,
         setAsDestination: string;
         startPopup: string;
@@ -144,7 +145,8 @@ export const translations: Record<Language, TranslationSchema> = {
             destination: "Zielort",
             pickStart: "den Startort",
             pickDestination: "den Zielort",
-            pickHint: "Klicke jetzt auf die Karte, um",
+            pickHintStart: "Klicke jetzt auf die Karte, um den Startort auszuwählen",
+            pickHintDestination: "Klicke jetzt auf die Karte, um den Zielort auszuwählen",
             setAsStart: "Als Start wählen",
             setAsDestination: "Als Ziel wählen",
             startPopup: "Start",
@@ -265,7 +267,8 @@ export const translations: Record<Language, TranslationSchema> = {
             destination: "Destination",
             pickStart: "the start location",
             pickDestination: "the destination",
-            pickHint: "Click on the map now to set",
+            pickHintStart: "Click on the map to set the start location",
+            pickHintDestination: "Click on the map to set the destination",
             setAsStart: "Use as start",
             setAsDestination: "Use as destination",
             startPopup: "Start",

@@ -150,11 +150,11 @@ export default function TankifyCalculator() {
                 setEndText={setEndText}
                 onSearch={handleSearch}
                 onPickStart={() => {
-                    setMapPickMode("start");
+                    setMapPickMode((prev) => (prev === "start" ? null : "start"));
                     minimizeBottomSheet();
                 }}
                 onPickEnd={() => {
-                    setMapPickMode("end");
+                    setMapPickMode((prev) => (prev === "end" ? null : "end"));
                     minimizeBottomSheet();
                 }}
                 searchLoading={searchLoading}
@@ -173,8 +173,7 @@ export default function TankifyCalculator() {
 
             {mapPickMode ? (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-                    {t.route.pickHint}{" "}
-                    {mapPickMode === "start" ? t.route.pickStart : t.route.pickDestination}.
+                    {mapPickMode === "start" ? t.route.pickHintStart : t.route.pickHintDestination}.
                 </div>
             ) : null}
 

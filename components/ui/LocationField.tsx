@@ -37,15 +37,17 @@ export default function LocationField({
                 <button
                     type="button"
                     onClick={onSearch}
-                    className="rounded-2xl bg-black px-4 py-3 text-white"
+                    className="rounded-2xl bg-black px-4 py-3 text-white transition active:scale-95 hover:opacity-90"
                 >
                     {loading ? "..." : searchLabel}
                 </button>
                 <button
                     type="button"
                     onClick={onPickOnMap}
-                    className={`rounded-2xl px-4 py-3 text-white ${
-                        pickActive ? "bg-blue-600" : "bg-gray-700"
+                    className={`rounded-2xl px-4 py-3 text-white transition active:scale-95 ${
+                        pickActive
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-gray-700 hover:bg-gray-800"
                     }`}
                 >
                     {mapLabel}

@@ -163,7 +163,7 @@ function SearchHereControl({
                 <button
                     type="button"
                     onClick={handleSearchHere}
-                    className="pointer-events-auto rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700"
+                    className="pointer-events-auto rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
                 >
                     {loading ? t.route.loading : t.route.searchHere}
                 </button>
@@ -462,7 +462,7 @@ function RecenterControl({
             <button
                 type="button"
                 onClick={handleRecenter}
-                className="pointer-events-auto rounded-full bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-lg"
+                className="pointer-events-auto rounded-full bg-white px-3 py-2 text-sm font-medium transition text-gray-900 shadow-lg active:scale-95"
             >
                 {t.route.center}
             </button>

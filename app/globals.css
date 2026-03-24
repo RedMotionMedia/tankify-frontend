@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* =========================
+   Base Layout
+========================= */
+
 html,
 body {
   margin: 0;
@@ -13,6 +17,10 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* =========================
+   Selection Behavior
+========================= */
 
 .no-select,
 .no-select * {
@@ -34,10 +42,53 @@ button {
   user-select: none;
 }
 
+/* =========================
+   Cursor Fixes (GLOBAL)
+========================= */
+
+button,
+[role="button"],
+select,
+summary,
+a[href] {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+/* =========================
+   Leaflet Fixes
+========================= */
+
 .leaflet-container {
   height: 100%;
   width: 100%;
 }
+
+/* Force pointer inside popups */
+.leaflet-popup-content button,
+.leaflet-popup-content select {
+  cursor: pointer !important;
+}
+
+/* Prevent map from overriding cursor */
+.leaflet-container button {
+  cursor: pointer !important;
+}
+
+/* =========================
+   Price Badge Marker
+========================= */
 
 .price-badge-marker {
   background: transparent !important;
@@ -61,6 +112,10 @@ button {
   white-space: nowrap;
 }
 
+/* =========================
+   Resizable Map (Desktop)
+========================= */
+
 .map-resizable {
   resize: vertical;
   overflow: auto;
@@ -68,6 +123,10 @@ button {
   min-height: 420px;
   max-height: 85vh;
 }
+
+/* =========================
+   Mobile Bottom Sheet
+========================= */
 
 .mobile-sheet {
   width: 100vw;
@@ -79,7 +138,41 @@ button {
   overscroll-behavior: contain;
 }
 
+/* Drag Handle */
 .sheet-handle {
   touch-action: none;
   cursor: grab;
+}
+
+/* Optional nicer UX */
+.sheet-handle:active {
+  cursor: grabbing;
+}
+
+/* =========================
+   Optional UI Polish
+========================= */
+
+/* Hover Feedback */
+button:hover {
+  filter: brightness(0.96);
+}
+
+/* Smooth interactions */
+button,
+select,
+input {
+  transition: all 0.15s ease;
+}
+
+.btn {
+  @apply rounded-2xl px-4 py-3 text-white transition cursor-pointer active:scale-95;
+}
+
+.btn-primary {
+  @apply bg-black hover:bg-gray-800;
+}
+
+.btn-secondary {
+  @apply bg-gray-700 hover:bg-gray-800;
 }
