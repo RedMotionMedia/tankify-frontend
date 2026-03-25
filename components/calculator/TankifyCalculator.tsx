@@ -691,12 +691,11 @@ export default function TankifyCalculator() {
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
                 <div
                     className={
-                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-[1920px] h-full min-w-0 gap-6"
+                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-480 h-full min-w-0 gap-6"
                     }
                 >
-                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 h-full">
-                        <div className="h-full overflow-auto">
-                            <div className="flex items-start justify-between gap-3">
+                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
+                        <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <h1 className="text-3xl font-bold">{t.app.title}</h1>
                                     <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
@@ -712,8 +711,7 @@ export default function TankifyCalculator() {
                                 </button>
                             </div>
 
-                            <div className="mt-6">{routeControls}</div>
-                        </div>
+                        <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
 
                     <section className="flex-1 min-w-0 h-full flex flex-col gap-4">

@@ -248,7 +248,7 @@ export default function StationPopupContent({
                             ▶
                         </span>
                         <span className="flex-auto">{t.station.openingHours}</span>
-                        <span className="text-[11px] font-medium text-gray-500">
+                        <span className="text-[11px] font-medium inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 ring-1 ring-green-200 text-green-500">
                             {station.open === true
                                 ? t.station.open
                                 : station.open === false
@@ -274,12 +274,12 @@ export default function StationPopupContent({
 
                                 return (
                                     <React.Fragment key={code}>
-                                        <div className={isToday ? "font-bold text-gray-800" : "text-gray-600"}>
+                                        <div className={isToday ? "font-bold text-gray-900" : "text-gray-600"}>
                                             {weekdayLabel(code, language)}
                                         </div>
                                         <div
                                             className={
-                                                "text-right font-medium tabular-nums " +
+                                                "text-right tabular-nums " +
                                                 (isToday ? "font-bold text-gray-900" : "")
                                             }
                                         >
