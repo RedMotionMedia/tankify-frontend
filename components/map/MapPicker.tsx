@@ -8,7 +8,6 @@ import {
     Marker,
     Polyline,
     Popup,
-    TileLayer,
     useMap,
     useMapEvents,
 } from "react-leaflet";
@@ -59,10 +58,106 @@ const markerIcon = new L.Icon({
 
 const stationIconCache = new Map<string, L.DivIcon>();
 
+const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 9 };
+
+function isFiniteNumber(v: unknown): v is number {
+    return typeof v === "number" && Number.isFinite(v);
+}
+
+function sanitizeLatLng(center: [number, number]): [number, number] {
+    return isFiniteNumber(center[0]) && isFiniteNumber(center[1]) ? center : FALLBACK_VIEW.center;
+}
+
 function withCacheBuster(url: string, cacheBust: number): string {
     if (!url) return url;
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}v=${cacheBust}`;
+}
+
+let openFreeMapDepsPromise: Promise<void> | null = null;
+type LeafletMapLibreFactory = (options: { style: string }) => L.Layer;
+type MapLibreStyleImageMissingEvent = { id: string };
+type MapLibreMapLike = {
+    on: (type: "styleimagemissing", listener: (ev: MapLibreStyleImageMissingEvent) => void) => void;
+    off: (
+        type: "styleimagemissing",
+        listener: (ev: MapLibreStyleImageMissingEvent) => void
+    ) => void;
+    hasImage: (id: string) => boolean;
+    addImage: (
+        id: string,
+        image: { width: number; height: number; data: Uint8Array }
+    ) => void;
+};
+type LeafletMapLibreLayerLike = L.Layer & { getMaplibreMap?: () => MapLibreMapLike };
+
+function whenLeafletReady(map: L.Map): Promise<void> {
+    if ((map as unknown as { _loaded?: boolean })._loaded) return Promise.resolve();
+    return new Promise<void>((resolve) => map.whenReady(() => resolve()));
+}
+
+function isLeafletSizeAndCenterValid(map: L.Map): boolean {
+    try {
+        const size = map.getSize();
+        if (!(size.x > 0 && size.y > 0)) return false;
+        const c = map.getCenter(); // can throw while Leaflet is mid-init
+        return Number.isFinite(c.lat) && Number.isFinite(c.lng);
+    } catch {
+        return false;
+    }
+}
+
+function loadScriptOnce(id: string, src: string): Promise<void> {
+    if (typeof document === "undefined") {
+        return Promise.reject(new Error("loadScriptOnce called without document"));
+    }
+
+    const existing = document.getElementById(id) as HTMLScriptElement | null;
+    if (existing?.dataset.loaded === "1") return Promise.resolve();
+
+    if (existing) {
+        return new Promise<void>((resolve, reject) => {
+            existing.addEventListener("load", () => resolve(), { once: true });
+            existing.addEventListener("error", () => reject(new Error(`script failed: ${src}`)), {
+                once: true,
+            });
+        });
+    }
+
+    return new Promise<void>((resolve, reject) => {
+        const s = document.createElement("script");
+        s.id = id;
+        s.src = src;
+        s.async = true;
+        s.addEventListener("load", () => {
+            s.dataset.loaded = "1";
+            resolve();
+        });
+        s.addEventListener("error", () => reject(new Error(`script failed: ${src}`)));
+        document.head.appendChild(s);
+    });
+}
+
+function ensureOpenFreeMapDeps(): Promise<void> {
+    if (openFreeMapDepsPromise) return openFreeMapDepsPromise;
+
+    openFreeMapDepsPromise = (async () => {
+        // The UMD bundle of leaflet-maplibre-gl expects globals.
+        (window as unknown as { L?: unknown }).L = L;
+
+        // Order matters: the Leaflet binding expects `maplibregl` to exist.
+        await loadScriptOnce(
+            "tankify-maplibre-gl",
+            "https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"
+        );
+        await loadScriptOnce(
+            "tankify-maplibre-gl-leaflet",
+            "https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"
+        );
+    })();
+
+    return openFreeMapDepsPromise;
 }
 
 function getStationInitials(name: string | undefined): string {
@@ -206,10 +301,10 @@ function ClickHandler({
 }
 
 function FitBounds({
-                       start,
-                       end,
-                       routeGeometry,
-                   }: {
+                        start,
+                        end,
+                        routeGeometry,
+                    }: {
     start: Point;
     end: Point;
     routeGeometry: [number, number][];
@@ -217,12 +312,15 @@ function FitBounds({
     const map = useMap();
 
     useEffect(() => {
+        const validRoute = routeGeometry.filter(
+            (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
+        );
         const points =
-            routeGeometry.length > 0
-                ? routeGeometry
+            validRoute.length > 0
+                ? validRoute
                 : [
-                    [start.lat, start.lon],
-                    [end.lat, end.lon],
+                    sanitizeLatLng([start.lat, start.lon]),
+                    sanitizeLatLng([end.lat, end.lon]),
                 ];
 
         map.fitBounds(points as [number, number][], { padding: [30, 30] });
@@ -864,11 +962,174 @@ function StationsLayer({
     );
 }
 
+function OpenFreeMapBaseLayer({
+    styleUrl,
+    fallbackCenter,
+    fallbackZoom,
+}: {
+    styleUrl: string;
+    fallbackCenter: [number, number];
+    fallbackZoom: number;
+}) {
+    const map = useMap();
+
+    useEffect(() => {
+        let cancelled = false;
+        let layer: L.Layer | null = null;
+        let styleImageMissingCleanup: (() => void) | null = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let startedAt = 0;
+        let lastWarnAt = 0;
+
+        (async () => {
+            try {
+                await ensureOpenFreeMapDeps();
+                if (cancelled) return;
+
+                await whenLeafletReady(map);
+                if (cancelled) return;
+
+                const factory = (L as unknown as { maplibreGL?: LeafletMapLibreFactory }).maplibreGL;
+                if (typeof factory !== "function") {
+                    throw new Error("Leaflet MapLibre binding not available (L.maplibreGL)");
+                }
+
+                startedAt = Date.now();
+
+                const attachIfReady = () => {
+                    if (cancelled) return;
+                    if (layer) return;
+
+                    // Nudge Leaflet: if the container is mid-resize/hidden, it may report invalid center temporarily.
+                    try {
+                        map.invalidateSize();
+                    } catch {
+                        // ignore
+                    }
+
+                    // If Leaflet got into a bad state (NaN center), force-set a known good view once.
+                    if (!isLeafletSizeAndCenterValid(map)) {
+                        try {
+                            map.setView(
+                                fallbackCenter,
+                                Number.isFinite(map.getZoom()) ? map.getZoom() : fallbackZoom,
+                                { animate: false }
+                            );
+                        } catch {
+                            try {
+                                map.setView(fallbackCenter, fallbackZoom, { animate: false });
+                            } catch {
+                                // ignore
+                            }
+                        }
+                    }
+
+                    try {
+                        // Don't pre-gate on Leaflet center/size: the binding itself may be the first thing that
+                        // forces Leaflet to fully compute it (especially after resizes / hidden containers).
+                        const tmpLayer = factory({ style: styleUrl }) as LeafletMapLibreLayerLike;
+                        tmpLayer.addTo(map);
+                        layer = tmpLayer;
+
+                        const maplibreMap = (layer as LeafletMapLibreLayerLike).getMaplibreMap?.();
+                        if (maplibreMap) {
+                            // Some styles reference icons that may not exist in the sprite (or sprite fetch might be blocked).
+                            // Add a 1x1 transparent fallback so the map renders without noisy console warnings.
+                            const transparent = new Uint8Array([0, 0, 0, 0]);
+                            const onMissing = (ev: MapLibreStyleImageMissingEvent) => {
+                                if (!ev?.id) return;
+                                if (maplibreMap.hasImage(ev.id)) return;
+                                try {
+                                    maplibreMap.addImage(ev.id, {
+                                        width: 1,
+                                        height: 1,
+                                        data: transparent,
+                                    });
+                                } catch {
+                                    // ignore
+                                }
+                            };
+
+                            maplibreMap.on("styleimagemissing", onMissing);
+                            styleImageMissingCleanup = () =>
+                                maplibreMap.off("styleimagemissing", onMissing);
+                        }
+
+                        map.attributionControl?.setPrefix(false);
+                    } catch (e) {
+                        const now = Date.now();
+                        if (now - lastWarnAt > 2000) {
+                            lastWarnAt = now;
+                            const size = (() => {
+                                try {
+                                    const s = map.getSize();
+                                    return `${s.x}x${s.y}`;
+                                } catch {
+                                    return "unknown";
+                                }
+                            })();
+                            const rect = (() => {
+                                try {
+                                    const r = map.getContainer().getBoundingClientRect();
+                                    return `${Math.round(r.width)}x${Math.round(r.height)}`;
+                                } catch {
+                                    return "unknown";
+                                }
+                            })();
+                            const centerOk = isLeafletSizeAndCenterValid(map);
+                            console.warn(
+                                `OpenFreeMap layer attach failed (size=${size}, rect=${rect}, centerOk=${centerOk})`,
+                                e
+                            );
+                        }
+                        // Keep retrying for a while; don't hard-fail, because the map may become visible later.
+                        const elapsed = Date.now() - startedAt;
+                        if (elapsed > 15000) {
+                            console.warn(
+                                "OpenFreeMap layer not attached (Leaflet never became attachable after 15s)"
+                            );
+                            return;
+                        }
+
+                        // If a partial layer was added before throwing, try to remove it.
+                        try {
+                            if (layer) map.removeLayer(layer);
+                        } catch {
+                            // ignore
+                        }
+                        layer = null;
+                        timer = setTimeout(attachIfReady, 250);
+                    }
+                };
+
+                attachIfReady();
+            } catch (e) {
+                console.warn("OpenFreeMap layer failed to load", e);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+            styleImageMissingCleanup?.();
+            if (layer) {
+                try {
+                    map.removeLayer(layer);
+                } catch {
+                    // ignore
+                }
+            }
+        };
+    }, [map, styleUrl, fallbackCenter, fallbackZoom]);
+
+    return null;
+}
+
 export default function MapPicker({
-                                      start,
-                                      end,
-                                      routeGeometry,
-                                      pickMode,
+                                       start,
+                                       end,
+                                       routeGeometry,
+                                       pickMode,
                                       fuelType,
                                       measurementSystem,
                                       currencySystem,
@@ -882,8 +1143,10 @@ export default function MapPicker({
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
 
-    const center = useMemo<[number, number]>(() => {
-        return [(start.lat + end.lat) / 2, (start.lon + end.lon) / 2];
+    const safeCenter = useMemo<[number, number]>(() => {
+        const lat = (start.lat + end.lat) / 2;
+        const lon = (start.lon + end.lon) / 2;
+        return sanitizeLatLng([lat, lon]);
     }, [start, end]);
 
     useEffect(() => {
@@ -899,10 +1162,16 @@ export default function MapPicker({
 
     return (
         <div className="relative h-full w-full">
-            <MapContainer center={center} zoom={9} scrollWheelZoom className="h-full w-full">
-                <TileLayer
-                    attribution="&copy; OpenStreetMap contributors"
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            <MapContainer
+                center={safeCenter}
+                zoom={FALLBACK_VIEW.zoom}
+                scrollWheelZoom
+                className="h-full w-full"
+            >
+                <OpenFreeMapBaseLayer
+                    styleUrl={OPENFREE_MAP_STYLE_URL}
+                    fallbackCenter={safeCenter}
+                    fallbackZoom={FALLBACK_VIEW.zoom}
                 />
 
                 <ResizeFix />
@@ -958,12 +1227,15 @@ function RecenterControl({
     const map = useMap();
 
     function handleRecenter() {
+        const validRoute = routeGeometry.filter(
+            (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
+        );
         const points =
-            routeGeometry.length > 0
-                ? routeGeometry
+            validRoute.length > 0
+                ? validRoute
                 : [
-                    [start.lat, start.lon],
-                    [end.lat, end.lon],
+                    sanitizeLatLng([start.lat, start.lon]),
+                    sanitizeLatLng([end.lat, end.lon]),
                 ];
 
         map.fitBounds(points as [number, number][], { padding: [30, 30] });
