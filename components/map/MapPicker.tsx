@@ -80,8 +80,6 @@ const endPointIcon = L.divIcon({
 const stationIconCache = new Map<string, L.DivIcon>();
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
-const OPENFREE_MAP_ATTRIBUTION =
-    '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 9 };
 
 const userLocationIcon = L.divIcon({
@@ -1124,7 +1122,6 @@ function OpenFreeMapBaseLayer({
                         }
 
                         map.attributionControl?.setPrefix(false);
-                        map.attributionControl?.addAttribution(OPENFREE_MAP_ATTRIBUTION);
                     } catch (e) {
                         const now = Date.now();
                         if (now - lastWarnAt > 2000) {
@@ -1188,7 +1185,6 @@ function OpenFreeMapBaseLayer({
                     // ignore
                 }
             }
-            map.attributionControl?.removeAttribution(OPENFREE_MAP_ATTRIBUTION);
         };
     }, [map, styleUrl, fallbackCenter, fallbackZoom]);
 
