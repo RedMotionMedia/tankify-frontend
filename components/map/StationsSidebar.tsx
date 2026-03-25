@@ -107,7 +107,7 @@ export default function StationsSidebar({
                         aria-label={t.actions.close}
                         title={t.actions.close}
                     >
-                        ×
+                        X
                     </button>
                 ) : null}
             </div>

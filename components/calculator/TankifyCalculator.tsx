@@ -40,6 +40,7 @@ const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
 });
 
 export default function TankifyCalculator() {
+    const PANEL_ANIM_MS = 300;
     const [language, setLanguage] = useState<Language>("de");
     const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
     const [measurementSystem, setMeasurementSystem] =
@@ -83,7 +84,11 @@ export default function TankifyCalculator() {
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [stationsQueried, setStationsQueried] = useState(false);
     const [desktopStationsOpen, setDesktopStationsOpen] = useState(true);
+    const [desktopStationsMounted, setDesktopStationsMounted] = useState(false);
+    const [desktopStationsEntering, setDesktopStationsEntering] = useState(false);
     const [desktopResultsOpen, setDesktopResultsOpen] = useState(true);
+    const [desktopResultsMounted, setDesktopResultsMounted] = useState(false);
+    const [desktopResultsEntering, setDesktopResultsEntering] = useState(false);
 
     const {
         sheetContentRef,
@@ -478,7 +483,7 @@ export default function TankifyCalculator() {
     function handleStationsChange(stations: Station[]) {
         setStationsQueried(true);
         setVisibleStations(stations);
-        setDesktopStationsOpen(true);
+        openDesktopStationsPanel();
     }
 
     function handleSelectStationAsStart({
@@ -556,12 +561,53 @@ export default function TankifyCalculator() {
         routeRequestId > 0 && !isDirty && calcStartPoint && calcEndPoint
     );
 
+    function openDesktopStationsPanel() {
+        if (!desktopStationsMounted) {
+            setDesktopStationsMounted(true);
+            setDesktopStationsOpen(true);
+            setDesktopStationsEntering(true);
+            window.requestAnimationFrame(() => setDesktopStationsEntering(false));
+            return;
+        }
+        setDesktopStationsOpen(true);
+    }
+
+    function openDesktopResultsPanel() {
+        if (!desktopResultsMounted) {
+            setDesktopResultsMounted(true);
+            setDesktopResultsOpen(true);
+            setDesktopResultsEntering(true);
+            window.requestAnimationFrame(() => setDesktopResultsEntering(false));
+            return;
+        }
+        setDesktopResultsOpen(true);
+    }
+
+    useEffect(() => {
+        if (!stationsQueried) return;
+        if (desktopStationsOpen) return;
+        if (!desktopStationsMounted) return;
+        const timer = window.setTimeout(() => setDesktopStationsMounted(false), PANEL_ANIM_MS);
+        return () => window.clearTimeout(timer);
+    }, [stationsQueried, desktopStationsOpen, desktopStationsMounted, PANEL_ANIM_MS]);
+
+    useEffect(() => {
+        if (!hasCommittedRoute) {
+            setDesktopResultsMounted(false);
+            return;
+        }
+        if (desktopResultsOpen) return;
+        if (!desktopResultsMounted) return;
+        const timer = window.setTimeout(() => setDesktopResultsMounted(false), PANEL_ANIM_MS);
+        return () => window.clearTimeout(timer);
+    }, [hasCommittedRoute, desktopResultsOpen, desktopResultsMounted, PANEL_ANIM_MS]);
+
     function commitRoute(nextStart: Point, nextEnd: Point) {
         setCalcStartPoint(nextStart);
         setCalcEndPoint(nextEnd);
         setRouteRequestId((v) => v + 1);
         setMapPickMode(null);
-        setDesktopResultsOpen(true);
+        openDesktopResultsPanel();
     }
 
     function handleCalculateRoute() {
@@ -733,7 +779,7 @@ export default function TankifyCalculator() {
                         <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
 
-                    <section className="flex-1 min-w-0 h-full flex flex-col gap-4">
+                    <section className="flex-1 min-w-0 h-full flex flex-col">
                         <div
                             className={
                                 "rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
@@ -767,7 +813,15 @@ export default function TankifyCalculator() {
                              </div>
                          </div>
 
-                        {hasCommittedRoute && desktopResultsOpen ? (
+                        {desktopResultsMounted ? (
+                        <div
+                            className={
+                                "mt-4 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out " +
+                                (desktopResultsOpen && !desktopResultsEntering
+                                    ? "max-h-[1000px] opacity-100 translate-y-0"
+                                    : "max-h-0 opacity-0 translate-y-2 pointer-events-none")
+                            }
+                        >
                         <div className="relative rounded-3xl bg-white p-5 shadow-sm h-auto max-h-full">
                             <button
                                 type="button"
@@ -776,7 +830,7 @@ export default function TankifyCalculator() {
                                 aria-label={t.actions.close}
                                 title={t.actions.close}
                             >
-                                ×
+                                X
                             </button>
                             <div className="h-full overflow-auto">
                                 <div className="flex flex-col gap-6">
@@ -801,25 +855,35 @@ export default function TankifyCalculator() {
                             </div>
 
                         </div>
+                        </div>
                         ) : null}
                     </section>
 
-                            {stationsQueried && desktopStationsOpen ? (
-                                    <StationsSidebar
-                                        stations={visibleStations}
-                                        selectedStationId={selectedStationId}
-                                        onToggleStation={handleToggleStation}
-                                        fuelType={fuelType}
-                                        measurementSystem={measurementSystem}
-                                        currencySystem={currencySystem}
-                                        language={language}
-                                        debugMode={debugMode}
-                                        userLocation={userLocation}
-                                        t={t}
-                                        onSelectStationAsStart={handleSelectStationAsStart}
-                                        onSelectStationAsDestination={handleSelectStationAsDestination}
-                                        onClose={() => setDesktopStationsOpen(false)}
-                                    />
+                            {stationsQueried && desktopStationsMounted ? (
+                                    <div
+                                        className={
+                                            "self-start overflow-hidden transition-[width,opacity,transform] duration-300 ease-out " +
+                                            (desktopStationsOpen && !desktopStationsEntering
+                                                ? "w-105 opacity-100 translate-x-0"
+                                                : "w-0 opacity-0 translate-x-6 pointer-events-none")
+                                        }
+                                    >
+                                        <StationsSidebar
+                                            stations={visibleStations}
+                                            selectedStationId={selectedStationId}
+                                            onToggleStation={handleToggleStation}
+                                            fuelType={fuelType}
+                                            measurementSystem={measurementSystem}
+                                            currencySystem={currencySystem}
+                                            language={language}
+                                            debugMode={debugMode}
+                                            userLocation={userLocation}
+                                            t={t}
+                                            onSelectStationAsStart={handleSelectStationAsStart}
+                                            onSelectStationAsDestination={handleSelectStationAsDestination}
+                                            onClose={() => setDesktopStationsOpen(false)}
+                                        />
+                                    </div>
 
                             ) : null}
                 </div>
