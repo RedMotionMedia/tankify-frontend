@@ -2,7 +2,7 @@
 
 import L, { type LeafletMouseEvent } from "leaflet";
 import Image from "next/image";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     MapContainer,
     Marker,
@@ -59,7 +59,21 @@ const markerIcon = new L.Icon({
 const stationIconCache = new Map<string, L.DivIcon>();
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREE_MAP_ATTRIBUTION =
+    '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 9 };
+
+const userLocationIcon = L.divIcon({
+    className: "user-location-marker",
+    html: `
+<div class="user-location" aria-hidden="true">
+  <div class="user-location__pulse"></div>
+  <div class="user-location__dot"></div>
+</div>
+`.trim(),
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+});
 
 function isFiniteNumber(v: unknown): v is number {
     return typeof v === "number" && Number.isFinite(v);
@@ -1056,6 +1070,7 @@ function OpenFreeMapBaseLayer({
                         }
 
                         map.attributionControl?.setPrefix(false);
+                        map.attributionControl?.addAttribution(OPENFREE_MAP_ATTRIBUTION);
                     } catch (e) {
                         const now = Date.now();
                         if (now - lastWarnAt > 2000) {
@@ -1119,6 +1134,7 @@ function OpenFreeMapBaseLayer({
                     // ignore
                 }
             }
+            map.attributionControl?.removeAttribution(OPENFREE_MAP_ATTRIBUTION);
         };
     }, [map, styleUrl, fallbackCenter, fallbackZoom]);
 
@@ -1225,6 +1241,23 @@ function RecenterControl({
     t: TranslationSchema;
 }) {
     const map = useMap();
+    const [locationEnabled, setLocationEnabled] = useState(false);
+    const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+    const [locationError, setLocationError] = useState<string | null>(null);
+    const didCenterOnEnableRef = useRef(false);
+    const watchIdRef = useRef<number | null>(null);
+
+    const canUseGeolocation =
+        typeof navigator !== "undefined" && !!navigator.geolocation;
+
+    useEffect(() => {
+        const paneName = "user-location-pane";
+        if (map.getPane(paneName)) return;
+        const pane = map.createPane(paneName);
+        // Keep it above anything (including the MapLibre canvas layer).
+        pane.style.zIndex = "10000";
+        pane.style.pointerEvents = "none";
+    }, [map]);
 
     function handleRecenter() {
         const validRoute = routeGeometry.filter(
@@ -1245,16 +1278,147 @@ function RecenterControl({
         }, 50);
     }
 
+    function handleToggleLocation() {
+        if (!canUseGeolocation) return;
+        if (locationEnabled) {
+            if (watchIdRef.current != null) {
+                try {
+                    navigator.geolocation.clearWatch(watchIdRef.current);
+                } catch {
+                    // ignore
+                }
+            }
+            watchIdRef.current = null;
+            setUserLocation(null);
+            setLocationError(null);
+            setLocationEnabled(false);
+            return;
+        }
+
+        setLocationError(null);
+        didCenterOnEnableRef.current = false;
+        setLocationEnabled(true);
+    }
+
+    useEffect(() => {
+        if (!locationEnabled) return;
+        if (!canUseGeolocation) return;
+
+        const commonOptions: PositionOptions = {
+            enableHighAccuracy: true,
+            maximumAge: 10_000,
+            timeout: 12_000,
+        };
+
+        // Get an initial fix ASAP so the user sees a marker even if watchPosition takes longer.
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+                setUserLocation({ lat, lon });
+                setLocationError(null);
+
+                if (!didCenterOnEnableRef.current) {
+                    didCenterOnEnableRef.current = true;
+                    try {
+                        map.setView([lat, lon], Math.max(map.getZoom(), 14), { animate: true });
+                    } catch {
+                        // ignore
+                    }
+                }
+            },
+            () => {
+                // ignore; watchPosition will still handle errors
+            },
+            commonOptions
+        );
+
+        const id = navigator.geolocation.watchPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+                setUserLocation({ lat, lon });
+                setLocationError(null);
+
+                if (!didCenterOnEnableRef.current) {
+                    didCenterOnEnableRef.current = true;
+                    try {
+                        map.flyTo([lat, lon], Math.max(map.getZoom(), 14), { animate: true });
+                    } catch {
+                        // ignore
+                    }
+                }
+            },
+            (err) => {
+                setLocationError(err.message || "Location error");
+                setLocationEnabled(false);
+            },
+            commonOptions
+        );
+
+        watchIdRef.current = id;
+
+        return () => {
+            if (watchIdRef.current != null) {
+                try {
+                    navigator.geolocation.clearWatch(watchIdRef.current);
+                } catch {
+                    // ignore
+                }
+            }
+            watchIdRef.current = null;
+        };
+    }, [locationEnabled, canUseGeolocation, map]);
+
     return (
-        <div className="pointer-events-none absolute right-3 top-3 z-1000">
-            <button
-                type="button"
-                onClick={handleRecenter}
-                className="pointer-events-auto rounded-full bg-white px-3 py-2 text-sm font-medium transition text-gray-900 shadow-lg active:scale-95"
-            >
-                {t.route.center}
-            </button>
-        </div>
+        <>
+            {locationEnabled && userLocation ? (
+                <Marker
+                    position={[userLocation.lat, userLocation.lon]}
+                    icon={userLocationIcon}
+                    interactive={false}
+                    pane="user-location-pane"
+                />
+            ) : null}
+
+            <div className="pointer-events-none absolute right-3 top-3 z-1000 flex flex-col gap-2">
+                <button
+                    type="button"
+                    onClick={handleRecenter}
+                    className="pointer-events-auto rounded-full bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-lg transition active:scale-95"
+                >
+                    {t.route.center}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={handleToggleLocation}
+                    disabled={!canUseGeolocation}
+                    title={
+                        !canUseGeolocation
+                            ? "Geolocation not available"
+                            : locationError
+                                ? locationError
+                                : locationEnabled
+                                    ? "Standort ausschalten"
+                                    : "Standort einschalten"
+                    }
+                    aria-pressed={locationEnabled}
+                    className={
+                        "pointer-events-auto rounded-full px-3 py-2 text-sm font-medium shadow-lg transition active:scale-95 " +
+                        (locationEnabled
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : "bg-white text-gray-900 hover:bg-gray-50") +
+                        (!canUseGeolocation ? " opacity-60" : "")
+                    }
+                >
+                    {t.route.myLocation}
+                </button>
+            </div>
+        </>
     );
 }
 

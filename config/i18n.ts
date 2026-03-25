@@ -41,6 +41,7 @@ export type TranslationSchema = {
         startPopup: string;
         destinationPopup: string;
         center: string;
+        myLocation: string;
         searchHere: string;
         loading: string;
         tapSearchHere: string;
@@ -195,6 +196,7 @@ export const translations: Record<Language, TranslationSchema> = {
             startPopup: "Start",
             destinationPopup: "Ziel",
             center: "Zentrieren",
+            myLocation: "Standort",
             searchHere: "Hier suchen",
             loading: "Lädt ...",
             tapSearchHere: "Tippe auf „Hier suchen“ für Tankstellen.",
@@ -349,6 +351,7 @@ export const translations: Record<Language, TranslationSchema> = {
             startPopup: "Start",
             destinationPopup: "Destination",
             center: "Center",
+            myLocation: "My location",
             searchHere: "Search here",
             loading: "Loading ...",
             tapSearchHere: 'Tap "Search here" for gas stations.',

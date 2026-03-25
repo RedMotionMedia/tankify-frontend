@@ -207,6 +207,62 @@ textarea:disabled {
 }
 
 /* =========================
+   User Location (Leaflet)
+========================= */
+
+.user-location-marker {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none;
+  z-index: 10000 !important;
+}
+
+.user-location {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.user-location__dot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #2563eb;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.user-location__pulse {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.22);
+  animation: user-location-pulse 1.6s ease-out infinite;
+}
+
+@keyframes user-location-pulse {
+  0% {
+    transform: scale(0.65);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(1.65);
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+/* =========================
    Resizable Map (Desktop)
 ========================= */
 
