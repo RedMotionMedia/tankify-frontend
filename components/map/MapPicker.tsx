@@ -1241,6 +1241,9 @@ export default function MapPicker({
                 center={safeCenter}
                 zoom={FALLBACK_VIEW.zoom}
                 scrollWheelZoom
+                // Allow fractional zoom to avoid "snapping" to integer zoom levels.
+                zoomSnap={0}
+                zoomDelta={0.25}
                 className="h-full w-full"
             >
                 <OpenFreeMapBaseLayer
