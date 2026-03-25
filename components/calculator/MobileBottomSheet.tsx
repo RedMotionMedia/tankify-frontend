@@ -25,6 +25,7 @@ type Props = {
     onTouchEnd: () => void;
     controls: React.ReactNode;
     routeLoading: boolean;
+    showResults: boolean;
     calculation: TankifyCalculation;
     profit: ProfitLevel;
 };
@@ -43,6 +44,7 @@ export default function MobileBottomSheet({
                                               onTouchEnd,
                                               controls,
                                               routeLoading,
+                                              showResults,
                                               calculation,
                                               profit,
                                           }: Props) {
@@ -83,26 +85,30 @@ export default function MobileBottomSheet({
                 </div>
 
                 <div className="mt-6 space-y-6 px-4">
-                    <WorthPanel
-                        t={t}
-                        currencySystem={currencySystem}
-                        profit={profit}
-                        netSaving={calculation.netSaving}
-                    />
+                    {showResults ? (
+                        <WorthPanel
+                            t={t}
+                            currencySystem={currencySystem}
+                            profit={profit}
+                            netSaving={calculation.netSaving}
+                        />
+                    ) : null}
 
                     <div>
                         <h3 className="mb-3 text-lg font-bold">{t.app.adjustCalculator}</h3>
                         {controls}
                     </div>
 
-                    <ResultsPanel
-                        t={t}
-                        currencySystem={currencySystem}
-                        measurementSystem={measurementSystem}
-                        profit={profit}
-                        routeLoading={routeLoading}
-                        calculation={calculation}
-                    />
+                    {showResults ? (
+                        <ResultsPanel
+                            t={t}
+                            currencySystem={currencySystem}
+                            measurementSystem={measurementSystem}
+                            profit={profit}
+                            routeLoading={routeLoading}
+                            calculation={calculation}
+                        />
+                    ) : null}
                 </div>
             </div>
         </div>

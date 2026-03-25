@@ -26,8 +26,8 @@ import {
 } from "@/components/map/maplibre/ensureMapLibre";
 
 type Props = {
-    start: Point;
-    end: Point;
+    start: Point | null;
+    end: Point | null;
     routeGeometry: [number, number][];
     pickMode: MapPickMode;
     fuelType: FuelType;
@@ -47,12 +47,16 @@ type Props = {
         price?: number | null;
         station: Station;
     }) => void;
+    defaultLocationEnabled?: boolean;
 };
 
 type UserLocation = { lat: number; lon: number };
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
-const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 9 };
+// Default view when we don't yet have a user location or any route points.
+// Keep this reasonably wide; when geolocation is enabled we pan to the user location,
+// but we avoid starting overly zoomed-in.
+const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 12 };
 
 function isFiniteNumber(v: unknown): v is number {
     return typeof v === "number" && Number.isFinite(v);
@@ -227,6 +231,7 @@ export default function MapPicker({
     onMapPick,
     onSelectStationAsDestination,
     onSelectStationAsStart,
+    defaultLocationEnabled,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -235,7 +240,9 @@ export default function MapPicker({
     const [searchLoading, setSearchLoading] = useState(false);
     const [searchHint, setSearchHint] = useState<string>(t.route.tapSearchHere);
 
-    const [locationEnabled, setLocationEnabled] = useState(false);
+    const [locationEnabled, setLocationEnabled] = useState(
+        Boolean(defaultLocationEnabled)
+    );
     const [locationError, setLocationError] = useState<string | null>(null);
     const [locationAttempt, setLocationAttempt] = useState(0);
 
@@ -272,16 +279,21 @@ export default function MapPicker({
     }>({ start: null, end: null, user: null, stations: [] });
 
     const safeCenter = useMemo<[number, number]>(() => {
-        const lat = (start.lat + end.lat) / 2;
-        const lon = (start.lon + end.lon) / 2;
-        return sanitizeLatLng([lat, lon]);
+        if (start && end) {
+            return sanitizeLatLng([(start.lat + end.lat) / 2, (start.lon + end.lon) / 2]);
+        }
+        if (start) return sanitizeLatLng([start.lat, start.lon]);
+        if (end) return sanitizeLatLng([end.lat, end.lon]);
+        return FALLBACK_VIEW.center;
     }, [start, end]);
 
     const hideStartMarker =
+        !start ||
         (userLocation != null && isNearKm(userLocation, start, 0.03)) ||
         isPointAtAnyStation(start, stations, 0.03);
 
     const hideEndMarker =
+        !end ||
         (userLocation != null && isNearKm(userLocation, end, 0.03)) ||
         isPointAtAnyStation(end, stations, 0.03);
 
@@ -461,11 +473,27 @@ export default function MapPicker({
         if (!map) return;
         const maplibre = getMapLibre();
 
-        const validRoute = routeGeometry.filter((p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1]));
+        const validRoute = routeGeometry.filter(
+            (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
+        );
         const points =
             validRoute.length > 0
                 ? validRoute
-                : [sanitizeLatLng([start.lat, start.lon]), sanitizeLatLng([end.lat, end.lon])];
+                : [
+                    ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
+                    ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
+                ];
+        if (points.length === 0) return;
+
+        // With only one point (start OR end), fitBounds zooms in aggressively.
+        // Keep the current zoom and just pan to the point.
+        if (points.length === 1) {
+            const [lat, lon] = points[0];
+            try {
+                map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
+            } catch {}
+            return;
+        }
 
         try {
             const bounds = buildBoundsFromPoints(maplibre, points);
@@ -582,7 +610,7 @@ export default function MapPicker({
         bucket.start = null;
         bucket.end = null;
 
-        if (!hideStartMarker) {
+        if (!hideStartMarker && start) {
             const el = createRoutePointElement("start");
             el.addEventListener("click", (ev) => ev.stopPropagation());
             bucket.start = new maplibre.Marker({ element: el, anchor: "bottom" })
@@ -590,7 +618,7 @@ export default function MapPicker({
                 .addTo(map);
         }
 
-        if (!hideEndMarker) {
+        if (!hideEndMarker && end) {
             const el = createRoutePointElement("end");
             el.addEventListener("click", (ev) => ev.stopPropagation());
             bucket.end = new maplibre.Marker({ element: el, anchor: "bottom" })
@@ -663,6 +691,11 @@ export default function MapPicker({
                 setUserLocation({ lat, lon });
                 setLocationError(null);
                 try {
+                    window.dispatchEvent(
+                        new CustomEvent("tankify:user-location", { detail: { lat, lon } })
+                    );
+                } catch {}
+                try {
                     window.localStorage.setItem(
                         "tankify-last-location",
                         JSON.stringify({ lat, lon, ts: Date.now() })
@@ -674,7 +707,8 @@ export default function MapPicker({
                     try {
                         map.easeTo({
                             center: [lon, lat],
-                            zoom: Math.max(map.getZoom(), 14),
+                            // Don't zoom in on enable; keep whatever zoom the map currently has.
+                            zoom: map.getZoom(),
                             duration: 750,
                         });
                     } catch {}
@@ -700,6 +734,11 @@ export default function MapPicker({
                 setUserLocation({ lat, lon });
                 setLocationError(null);
                 try {
+                    window.dispatchEvent(
+                        new CustomEvent("tankify:user-location", { detail: { lat, lon } })
+                    );
+                } catch {}
+                try {
                     window.localStorage.setItem(
                         "tankify-last-location",
                         JSON.stringify({ lat, lon, ts: Date.now() })
@@ -711,7 +750,8 @@ export default function MapPicker({
                     try {
                         map.easeTo({
                             center: [lon, lat],
-                            zoom: Math.max(map.getZoom(), 14),
+                            // Don't zoom in on enable; keep whatever zoom the map currently has.
+                            zoom: map.getZoom(),
                             duration: 750,
                         });
                     } catch {}
@@ -750,7 +790,7 @@ export default function MapPicker({
         if (!map) return;
 
         const currentZoom = Number(map.getZoom?.() ?? 0);
-        if (currentZoom < 13) {
+        if (currentZoom < 12) {
             setSearchHint(t.route.zoomInMore);
             setStations([]);
             return;
@@ -801,12 +841,25 @@ export default function MapPicker({
         if (!map) return;
         const maplibre = getMapLibre();
 
-        const validRoute = routeGeometry.filter((p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1]));
+        const validRoute = routeGeometry.filter(
+            (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
+        );
         const points =
             validRoute.length > 0
                 ? validRoute
-                : [sanitizeLatLng([start.lat, start.lon]), sanitizeLatLng([end.lat, end.lon])];
+                : [
+                    ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
+                    ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
+                ];
+        if (points.length === 0) return;
         try {
+            // With only one point (start OR end), fitBounds zooms in aggressively.
+            // Keep the current zoom and just pan to the point.
+            if (points.length === 1) {
+                const [lat, lon] = points[0];
+                map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
+                return;
+            }
             const bounds = buildBoundsFromPoints(maplibre, points);
             map.fitBounds(bounds, { padding: 30, duration: 650 });
         } catch {}

@@ -126,6 +126,8 @@ export type TranslationSchema = {
         search: string;
         map: string;
         swap: string;
+        calculate: string;
+        confirm: string;
         cancel: string;
     };
     status: {
@@ -286,6 +288,8 @@ export const translations: Record<Language, TranslationSchema> = {
             search: "Suchen",
             map: "Karte",
             swap: "Tauschen",
+            calculate: "Berechnen",
+            confirm: "Best\u00e4tigen",
             cancel: "Abbrechen",
         },
         status: {
@@ -443,6 +447,8 @@ export const translations: Record<Language, TranslationSchema> = {
             search: "Search",
             map: "Map",
             swap: "Swap",
+            calculate: "Calculate",
+            confirm: "Confirm",
             cancel: "Cancel",
         },
         status: {
