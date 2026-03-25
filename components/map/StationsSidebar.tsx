@@ -86,7 +86,7 @@ export default function StationsSidebar({
     }, [stations]);
 
     return (
-        <aside className="h-[calc(100vh-64px)] rounded-3xl bg-white shadow-sm">
+        <div className="flex flex-col h-full rounded-3xl bg-white shadow-sm w-105">
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
                 <div>
                     <div className="text-sm font-semibold text-gray-900">Tankstellen</div>
@@ -98,84 +98,90 @@ export default function StationsSidebar({
                 </div>
             </div>
 
-            <div ref={scrollRef} className="h-[calc(100%-80px)] overflow-auto px-4 py-3 pr-5">
-                {sortedStations.map((station) => {
-                    const isOpen = station.id === selectedStationId;
-                    const price = fuelType === "diesel" ? station.diesel : station.super95;
+            <div className="grow h-auto max-h-full p-5">
+                <div className="h-full overflow-auto">
+                    <div ref={scrollRef} className="h-full ">
+                        {sortedStations.map((station) => {
+                            const isOpen = station.id === selectedStationId;
+                            const price = fuelType === "diesel" ? station.diesel : station.super95;
 
-                    return (
-                        <div
-                            key={station.id}
-                            id={`station-row-${station.id}`}
-                            className={
-                                "rounded-2xl border p-4 transition " +
-                                (isOpen
-                                    ? "border-blue-200 bg-blue-50/30"
-                                    : "border-gray-100 bg-white hover:bg-gray-50")
-                            }
-                        >
-                            <button
-                                type="button"
-                                className="flex w-full items-center gap-3 text-left"
-                                onClick={() => onToggleStation(station.id)}
-                            >
-                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
-                                    {station.logoUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={station.logoUrl}
-                                            alt=""
-                                            referrerPolicy="no-referrer"
-                                            className="h-full w-full object-contain p-1"
-                                            onError={(e) => {
-                                                (e.currentTarget as HTMLImageElement).style.display =
-                                                    "none";
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="grid h-full w-full place-items-center text-xs font-bold text-gray-600">
-                                            {station.name.slice(0, 2).toUpperCase()}
+                            return (
+                                <div
+                                    key={station.id}
+                                    id={`station-row-${station.id}`}
+                                    className={
+                                        "rounded-2xl border p-4 transition " +
+                                        (isOpen
+                                            ? "border-blue-200 bg-blue-50/30"
+                                            : "border-gray-100 bg-white hover:bg-gray-50")
+                                    }
+                                >
+                                    <button
+                                        type="button"
+                                        className="flex w-full items-center gap-3 text-left"
+                                        onClick={() => onToggleStation(station.id)}
+                                    >
+                                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
+                                            {station.logoUrl ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img
+                                                    src={station.logoUrl}
+                                                    alt=""
+                                                    referrerPolicy="no-referrer"
+                                                    className="h-full w-full object-contain p-1"
+                                                    onError={(e) => {
+                                                        (e.currentTarget as HTMLImageElement).style.display =
+                                                            "none";
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div className="grid h-full w-full place-items-center text-xs font-bold text-gray-600">
+                                                    {station.name.slice(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
 
-                                <div className="min-w-0 flex-1">
-                                    <div className="truncate text-sm font-semibold text-gray-900">
-                                        {station.name}
-                                    </div>
-                                    <div className="truncate text-xs text-gray-500">
-                                        {[station.postalCode, station.city].filter(Boolean).join(" ")}
-                                    </div>
-                                </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-sm font-semibold text-gray-900">
+                                                {station.name}
+                                            </div>
+                                            <div className="truncate text-xs text-gray-500">
+                                                {[station.postalCode, station.city].filter(Boolean).join(" ")}
+                                            </div>
+                                        </div>
 
-                                <div className="shrink-0 text-right">
-                                    <div className="text-sm font-semibold text-gray-900">
-                                        {formatPrice(price, measurementSystem, currencySystem)}
-                                    </div>
-                                </div>
-                            </button>
+                                        <div className="shrink-0 text-right">
+                                            <div className="text-sm font-semibold text-gray-900">
+                                                {formatPrice(price, measurementSystem, currencySystem)}
+                                            </div>
+                                        </div>
+                                    </button>
 
-                            {isOpen ? (
-                                <div className="mt-3 border-t border-blue-100 pt-3">
-                                    <StationPopupContent
-                                        station={station}
-                                        selectedPrice={price}
-                                        measurementSystem={measurementSystem}
-                                        currencySystem={currencySystem}
-                                        language={language}
-                                        debugMode={debugMode}
-                                        logoCacheBust={logoCacheBust}
-                                        userLocation={userLocation}
-                                        t={t}
-                                        onSelectStationAsStart={onSelectStationAsStart}
-                                        onSelectStationAsDestination={onSelectStationAsDestination}
-                                    />
+                                    {isOpen ? (
+                                        <div className="mt-3 border-t border-blue-100 pt-3">
+                                            <StationPopupContent
+                                                station={station}
+                                                selectedPrice={price}
+                                                measurementSystem={measurementSystem}
+                                                currencySystem={currencySystem}
+                                                language={language}
+                                                debugMode={debugMode}
+                                                logoCacheBust={logoCacheBust}
+                                                userLocation={userLocation}
+                                                t={t}
+                                                onSelectStationAsStart={onSelectStationAsStart}
+                                                onSelectStationAsDestination={onSelectStationAsDestination}
+                                            />
+                                        </div>
+                                    ) : null}
                                 </div>
-                            ) : null}
-                        </div>
-                    );
-                })}
+                            );
+                        })}
+                    </div>
+                </div>
+
             </div>
-        </aside>
+
+        </div>
     );
 }

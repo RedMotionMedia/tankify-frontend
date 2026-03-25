@@ -379,18 +379,6 @@ textarea:disabled {
 }
 
 /* =========================
-   Resizable Map (Desktop)
-========================= */
-
-.map-resizable {
-  resize: vertical;
-  overflow: auto;
-  height: 550px;
-  min-height: 420px;
-  max-height: 85vh;
-}
-
-/* =========================
    Mobile Bottom Sheet
 ========================= */
 

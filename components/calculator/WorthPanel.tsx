@@ -23,13 +23,13 @@ export default function WorthPanel({
                                        netSaving,
                                    }: Props) {
     return (
-        <div className="space-y-6">
+        <div className="flex flex-row gap-4">
             <div className={`rounded-3xl p-6 shadow-sm ${profit.bgClass}`}>
                 <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{t.result.worthTrip}</span>
                     <span className={`text-sm font-semibold ${profit.colorClass}`}>
-            {t.profit[profit.labelKey]}
-          </span>
+                    {t.profit[profit.labelKey]}
+                  </span>
                 </div>
 
                 <div className={`mt-2 text-4xl font-bold ${profit.colorClass}`}>
@@ -41,12 +41,12 @@ export default function WorthPanel({
                 </p>
             </div>
 
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
+            <div className="rounded-3xl bg-white p-5 shadow-sm flex-auto">
                 <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm text-gray-500">{t.result.estimate}</span>
                     <span className={`text-sm font-semibold ${profit.colorClass}`}>
-            {t.profit[profit.labelKey]}
-          </span>
+                    {t.profit[profit.labelKey]}
+                  </span>
                 </div>
 
                 <div className="relative pt-2 pb-8">

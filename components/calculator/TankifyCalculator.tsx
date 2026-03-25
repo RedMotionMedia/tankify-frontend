@@ -688,30 +688,40 @@ export default function TankifyCalculator() {
                 setAvgSpeed={setAvgSpeed}
             />
 
-            <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
-                <div className="mx-auto hidden max-w-screen-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_minmax(0,1fr)_420px] lg:items-start">
-                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h1 className="text-3xl font-bold">{t.app.title}</h1>
-                                <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
+            <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
+                <div
+                    className={
+                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-[1920px] h-full min-w-0 gap-6"
+                    }
+                >
+                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 h-full">
+                        <div className="h-full overflow-auto">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h1 className="text-3xl font-bold">{t.app.title}</h1>
+                                    <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setSettingsOpen(true)}
+                                    className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
+                                    aria-label="Open settings"
+                                >
+                                    ⚙️
+                                </button>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setSettingsOpen(true)}
-                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
-                                aria-label="Open settings"
-                            >
-                                ⚙️
-                            </button>
+                            <div className="mt-6">{routeControls}</div>
                         </div>
-
-                        <div className="mt-6">{routeControls}</div>
                     </section>
 
-                    <section className="space-y-6">
-                        <div className="map-resizable rounded-3xl bg-white shadow-sm">
+                    <section className="flex-1 min-w-0 h-full flex flex-col gap-4">
+                        <div
+                            className={
+                                "rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
+                            }
+                        >
                             <div className="h-full overflow-hidden rounded-3xl">
                                  <MapPicker
                                      start={draftStartPoint}
@@ -723,7 +733,7 @@ export default function TankifyCalculator() {
                                      debugMode={debugMode}
                                      t={t}
                                      defaultLocationEnabled
-                                     onStationsChange={setVisibleStations}
+                                     onStationsChange={handleStationsChange}
                                      selectedStationId={selectedStationId}
                                      onStationSelect={(station) => setSelectedStationId(station.id)}
                                      onMapPick={(type, point) => {
@@ -741,43 +751,50 @@ export default function TankifyCalculator() {
                          </div>
 
                         {hasCommittedRoute ? (
-                            <WorthPanel
-                                t={t}
-                                currencySystem={currencySystem}
-                                profit={profit}
-                                netSaving={calculation.netSaving}
-                            />
-                        ) : null}
+                        <div className="rounded-3xl bg-white p-5 shadow-sm h-auto max-h-full">
+                            <div className="h-full overflow-auto">
+                                <div className="flex flex-col gap-6">
 
-                        {hasCommittedRoute ? (
-                            <ResultsPanel
-                                t={t}
-                                currencySystem={currencySystem}
-                                measurementSystem={measurementSystem}
-                                profit={profit}
-                                routeLoading={routeLoading}
-                                calculation={calculation}
-                            />
+                                    <WorthPanel
+                                        t={t}
+                                        currencySystem={currencySystem}
+                                        profit={profit}
+                                        netSaving={calculation.netSaving}
+                                    />
+                                    <div className="h-full rounded-2xl border border-gray-100 p-4">
+                                        <ResultsPanel
+                                            t={t}
+                                            currencySystem={currencySystem}
+                                            measurementSystem={measurementSystem}
+                                            profit={profit}
+                                            routeLoading={routeLoading}
+                                            calculation={calculation}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
                         ) : null}
                     </section>
 
-                    {/*Hier soll der Teil für die PC Ansicht herkommen*/}
-                    <section className="sticky top-8 self-start">
-                        <StationsSidebar
-                            stations={visibleStations}
-                            selectedStationId={selectedStationId}
-                            onToggleStation={handleToggleStation}
-                            fuelType={fuelType}
-                            measurementSystem={measurementSystem}
-                            currencySystem={currencySystem}
-                            language={language}
-                            debugMode={debugMode}
-                            userLocation={userLocation}
-                            t={t}
-                            onSelectStationAsStart={handleSelectStationAsStart}
-                            onSelectStationAsDestination={handleSelectStationAsDestination}
-                        />
-                    </section>
+                            {stationsQueried ? (
+                                    <StationsSidebar
+                                        stations={visibleStations}
+                                        selectedStationId={selectedStationId}
+                                        onToggleStation={handleToggleStation}
+                                        fuelType={fuelType}
+                                        measurementSystem={measurementSystem}
+                                        currencySystem={currencySystem}
+                                        language={language}
+                                        debugMode={debugMode}
+                                        userLocation={userLocation}
+                                        t={t}
+                                        onSelectStationAsStart={handleSelectStationAsStart}
+                                        onSelectStationAsDestination={handleSelectStationAsDestination}
+                                    />
+
+                            ) : null}
                 </div>
 
                 <div className="lg:hidden">
