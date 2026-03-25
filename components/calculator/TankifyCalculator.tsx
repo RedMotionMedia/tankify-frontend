@@ -292,6 +292,41 @@ export default function TankifyCalculator() {
         }
     }
 
+    function getCurrentPosition(): Promise<{ lat: number; lon: number }> {
+        if (typeof window === "undefined") return Promise.reject(new Error("NO_WINDOW"));
+        if (!window.isSecureContext) return Promise.reject(new Error("NOT_SECURE_CONTEXT"));
+        if (!navigator.geolocation) return Promise.reject(new Error("NO_GEOLOCATION"));
+
+        const tryOnce = (opts: PositionOptions) =>
+            new Promise<{ lat: number; lon: number }>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+                    (err) => reject(err),
+                    opts
+                );
+            });
+
+        // Some devices/timeouts are flaky with high accuracy; fall back to a more permissive request.
+        return tryOnce({ enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }).catch(() =>
+            tryOnce({ enableHighAccuracy: false, timeout: 25000, maximumAge: 30000 })
+        );
+    }
+
+    async function handleUseMyLocationAsStart() {
+        try {
+            setError("");
+            const { lat, lon } = await getCurrentPosition();
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
+
+            const label = t.route.currentLocation;
+            setStartPoint({ lat, lon, label });
+            setStartText(label);
+            setMapPickMode(null);
+        } catch {
+            setError(t.errors.locationFailed);
+        }
+    }
+
     const calculation = useMemo(() => {
         return calculateTankify({
             oneWayKm: routeData?.distanceKm ?? 0,
@@ -333,6 +368,7 @@ export default function TankifyCalculator() {
                     setMapPickMode((prev) => (prev === "end" ? null : "end"));
                     minimizeBottomSheet();
                 }}
+                onUseMyLocationAsStart={handleUseMyLocationAsStart}
                 searchLoading={searchLoading}
                 mapPickMode={mapPickMode}
             />

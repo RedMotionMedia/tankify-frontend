@@ -4,10 +4,12 @@ type Props = {
     onChange: (value: string) => void;
     onSearch: () => void;
     onPickOnMap: () => void;
+    onUseMyLocation?: () => void;
     loading: boolean;
     pickActive: boolean;
     searchLabel: string;
     mapLabel: string;
+    myLocationLabel?: string;
 };
 
 export default function LocationField({
@@ -16,10 +18,12 @@ export default function LocationField({
                                           onChange,
                                           onSearch,
                                           onPickOnMap,
+                                          onUseMyLocation,
                                           loading,
                                           pickActive,
                                           searchLabel,
                                           mapLabel,
+                                          myLocationLabel,
                                       }: Props) {
     return (
         <div>
@@ -52,6 +56,17 @@ export default function LocationField({
                 >
                     {mapLabel}
                 </button>
+                {onUseMyLocation && myLocationLabel ? (
+                    <button
+                        type="button"
+                        onClick={onUseMyLocation}
+                        className="rounded-2xl bg-blue-600 px-4 py-3 text-white transition active:scale-95 hover:bg-blue-700"
+                        title={myLocationLabel}
+                        aria-label={myLocationLabel}
+                    >
+                        {myLocationLabel}
+                    </button>
+                ) : null}
             </div>
         </div>
     );

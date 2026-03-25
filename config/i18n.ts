@@ -42,6 +42,7 @@ export type TranslationSchema = {
         destinationPopup: string;
         center: string;
         myLocation: string;
+        currentLocation: string;
         searchHere: string;
         loading: string;
         tapSearchHere: string;
@@ -148,6 +149,7 @@ export type TranslationSchema = {
         routeNotCalculated: string;
         routeLoadFailed: string;
         geocodeFailed: string;
+        locationFailed: string;
     };
 };
 
@@ -197,6 +199,7 @@ export const translations: Record<Language, TranslationSchema> = {
             destinationPopup: "Ziel",
             center: "Zentrieren",
             myLocation: "Standort",
+            currentLocation: "Aktueller Standort",
             searchHere: "Hier suchen",
             loading: "Lädt ...",
             tapSearchHere: "Tippe auf „Hier suchen“ für Tankstellen.",
@@ -305,6 +308,7 @@ export const translations: Record<Language, TranslationSchema> = {
             routeNotCalculated: "Route konnte nicht berechnet werden.",
             routeLoadFailed: "Route konnte nicht geladen werden.",
             geocodeFailed: "Adresssuche fehlgeschlagen.",
+            locationFailed: "Standort konnte nicht ermittelt werden.",
         },
     },
     en: {
@@ -352,6 +356,7 @@ export const translations: Record<Language, TranslationSchema> = {
             destinationPopup: "Destination",
             center: "Center",
             myLocation: "My location",
+            currentLocation: "Current location",
             searchHere: "Search here",
             loading: "Loading ...",
             tapSearchHere: 'Tap "Search here" for gas stations.',
@@ -459,6 +464,7 @@ export const translations: Record<Language, TranslationSchema> = {
             routeNotCalculated: "Route could not be calculated.",
             routeLoadFailed: "Route could not be loaded.",
             geocodeFailed: "Address search failed.",
+            locationFailed: "Could not determine location.",
         },
     },
 };

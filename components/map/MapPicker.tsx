@@ -49,11 +49,32 @@ type Props = {
     }) => void;
 };
 
-const markerIcon = new L.Icon({
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
+type UserLocation = { lat: number; lon: number };
+
+function isNearKm(
+    a: { lat: number; lon: number },
+    b: { lat: number; lon: number },
+    km: number
+) {
+    if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) return false;
+    if (!Number.isFinite(b.lat) || !Number.isFinite(b.lon)) return false;
+    return haversineKm({ lat: a.lat, lon: a.lon }, b) <= km;
+}
+
+const startPointIcon = L.divIcon({
+    className: "route-point-marker route-point-marker--start",
+    html: `<div class="route-point"><span class="route-point__label">S</span></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 22],
+    popupAnchor: [0, -18],
+});
+
+const endPointIcon = L.divIcon({
+    className: "route-point-marker route-point-marker--end",
+    html: `<div class="route-point"><span class="route-point__label">Z</span></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 22],
+    popupAnchor: [0, -18],
 });
 
 const stationIconCache = new Map<string, L.DivIcon>();
@@ -87,6 +108,31 @@ function withCacheBuster(url: string, cacheBust: number): string {
     if (!url) return url;
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}v=${cacheBust}`;
+}
+
+function haversineKm(a: UserLocation, b: { lat: number; lon: number }): number {
+    // Haversine distance in km.
+    const R = 6371;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLon = Math.sin(dLon / 2);
+    const h =
+        sinDLat * sinDLat +
+        Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function isPointAtAnyStation(
+    point: { lat: number; lon: number },
+    stations: Station[],
+    km = 0.03
+): boolean {
+    return stations.some((s) => isNearKm(point, s, km));
 }
 
 let openFreeMapDepsPromise: Promise<void> | null = null;
@@ -892,17 +938,18 @@ function StationPopupContent({
 }
 
 function StationsLayer({
-    stations,
-    fuelType,
-    measurementSystem,
-    currencySystem,
-    language,
-    debugMode,
-    logoCacheBust,
-    onSelectStationAsDestination,
-    onSelectStationAsStart,
-    t,
-}: {
+                            stations,
+                            fuelType,
+                            measurementSystem,
+                            currencySystem,
+                            language,
+                            debugMode,
+                            logoCacheBust,
+                            userLocation,
+                            onSelectStationAsDestination,
+                            onSelectStationAsStart,
+                            t,
+                        }: {
     stations: Station[];
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
@@ -910,6 +957,7 @@ function StationsLayer({
     language: Language;
     debugMode: boolean;
     logoCacheBust: number;
+    userLocation: UserLocation | null;
     onSelectStationAsDestination: (payload: {
         point: Point;
         price?: number | null;
@@ -927,21 +975,27 @@ function StationsLayer({
     return (
         <>
             {stations.map((station) => {
+                const distanceKm =
+                    userLocation != null
+                        ? haversineKm(userLocation, station)
+                        : null;
                 const selectedPrice =
                     fuelType === "diesel" ? station.diesel : station.super95;
 
                 const hasPrice =
                     selectedPrice !== null && selectedPrice !== undefined;
 
+                const stationUi: Station = { ...station, distanceKm };
+
                 return (
                     <React.Fragment key={station.id}>
                         <Marker
-                            position={[station.lat, station.lon]}
-                            icon={getStationDivIcon(station, hasPrice, logoCacheBust)}
+                            position={[stationUi.lat, stationUi.lon]}
+                            icon={getStationDivIcon(stationUi, hasPrice, logoCacheBust)}
                         >
                             <Popup maxWidth={420} className="station-popup">
                                 <StationPopupContent
-                                    station={station}
+                                    station={stationUi}
                                     selectedPrice={selectedPrice}
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
@@ -1158,12 +1212,21 @@ export default function MapPicker({
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
+    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
 
     const safeCenter = useMemo<[number, number]>(() => {
         const lat = (start.lat + end.lat) / 2;
         const lon = (start.lon + end.lon) / 2;
         return sanitizeLatLng([lat, lon]);
     }, [start, end]);
+
+    const hideStartMarker =
+        (userLocation != null && isNearKm(userLocation, start, 0.03)) ||
+        isPointAtAnyStation(start, stations, 0.03);
+
+    const hideEndMarker =
+        (userLocation != null && isNearKm(userLocation, end, 0.03)) ||
+        isPointAtAnyStation(end, stations, 0.03);
 
     useEffect(() => {
         function handleLogoCacheCleared() {
@@ -1191,7 +1254,13 @@ export default function MapPicker({
                 />
 
                 <ResizeFix />
-                <RecenterControl start={start} end={end} routeGeometry={routeGeometry} t={t} />
+                <RecenterControl
+                    start={start}
+                    end={end}
+                    routeGeometry={routeGeometry}
+                    t={t}
+                    onUserLocationChange={setUserLocation}
+                />
                 <SearchHereControl onStationsLoaded={setStations} debugMode={debugMode} t={t} />
                 <FitBounds start={start} end={end} routeGeometry={routeGeometry} />
                 <ClickHandler pickMode={pickMode} onMapPick={onMapPick} />
@@ -1208,22 +1277,27 @@ export default function MapPicker({
                     language={language}
                     debugMode={debugMode}
                     logoCacheBust={logoCacheBust}
+                    userLocation={userLocation}
                     onSelectStationAsDestination={onSelectStationAsDestination}
                     onSelectStationAsStart={onSelectStationAsStart}
                     t={t}
                 />
 
-                <Marker position={[start.lat, start.lon]} icon={markerIcon}>
-                    <Popup>
-                        {t.route.startPopup}: {start.label}
-                    </Popup>
-                </Marker>
+                {!hideStartMarker ? (
+                    <Marker position={[start.lat, start.lon]} icon={startPointIcon}>
+                        <Popup>
+                            {t.route.startPopup}: {start.label}
+                        </Popup>
+                    </Marker>
+                ) : null}
 
-                <Marker position={[end.lat, end.lon]} icon={markerIcon}>
-                    <Popup>
-                        {t.route.destinationPopup}: {end.label}
-                    </Popup>
-                </Marker>
+                {!hideEndMarker ? (
+                    <Marker position={[end.lat, end.lon]} icon={endPointIcon}>
+                        <Popup>
+                            {t.route.destinationPopup}: {end.label}
+                        </Popup>
+                    </Marker>
+                ) : null}
             </MapContainer>
         </div>
     );
@@ -1234,18 +1308,22 @@ function RecenterControl({
                              end,
                              routeGeometry,
                              t,
+                             onUserLocationChange,
                          }: {
     start: Point;
     end: Point;
     routeGeometry: [number, number][];
     t: TranslationSchema;
+    onUserLocationChange?: (loc: UserLocation | null) => void;
 }) {
     const map = useMap();
     const [locationEnabled, setLocationEnabled] = useState(false);
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [locationError, setLocationError] = useState<string | null>(null);
+    const [locationAttempt, setLocationAttempt] = useState(0);
     const didCenterOnEnableRef = useRef(false);
     const watchIdRef = useRef<number | null>(null);
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const canUseGeolocation =
         typeof navigator !== "undefined" && !!navigator.geolocation;
@@ -1254,8 +1332,8 @@ function RecenterControl({
         const paneName = "user-location-pane";
         if (map.getPane(paneName)) return;
         const pane = map.createPane(paneName);
-        // Keep it above anything (including the MapLibre canvas layer).
-        pane.style.zIndex = "10000";
+        // Above tiles/overlays, but below popups (Leaflet popupPane is 700).
+        pane.style.zIndex = "650";
         pane.style.pointerEvents = "none";
     }, [map]);
 
@@ -1281,6 +1359,10 @@ function RecenterControl({
     function handleToggleLocation() {
         if (!canUseGeolocation) return;
         if (locationEnabled) {
+            if (retryTimerRef.current) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
             if (watchIdRef.current != null) {
                 try {
                     navigator.geolocation.clearWatch(watchIdRef.current);
@@ -1290,6 +1372,7 @@ function RecenterControl({
             }
             watchIdRef.current = null;
             setUserLocation(null);
+            onUserLocationChange?.(null);
             setLocationError(null);
             setLocationEnabled(false);
             return;
@@ -1317,6 +1400,7 @@ function RecenterControl({
                 const lon = pos.coords.longitude;
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
                 setUserLocation({ lat, lon });
+                onUserLocationChange?.({ lat, lon });
                 setLocationError(null);
 
                 if (!didCenterOnEnableRef.current) {
@@ -1341,6 +1425,7 @@ function RecenterControl({
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
                 setUserLocation({ lat, lon });
+                onUserLocationChange?.({ lat, lon });
                 setLocationError(null);
 
                 if (!didCenterOnEnableRef.current) {
@@ -1354,7 +1439,15 @@ function RecenterControl({
             },
             (err) => {
                 setLocationError(err.message || "Location error");
-                setLocationEnabled(false);
+
+                // Retry on transient failures (e.g. "position unavailable"), but don't spam.
+                if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+                // Permission denied (1) will not recover without user action.
+                if ((err as GeolocationPositionError).code !== 1) {
+                    retryTimerRef.current = setTimeout(() => {
+                        setLocationAttempt((v) => v + 1);
+                    }, 3000);
+                }
             },
             commonOptions
         );
@@ -1362,6 +1455,10 @@ function RecenterControl({
         watchIdRef.current = id;
 
         return () => {
+            if (retryTimerRef.current) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
             if (watchIdRef.current != null) {
                 try {
                     navigator.geolocation.clearWatch(watchIdRef.current);
@@ -1371,7 +1468,7 @@ function RecenterControl({
             }
             watchIdRef.current = null;
         };
-    }, [locationEnabled, canUseGeolocation, map]);
+    }, [locationEnabled, canUseGeolocation, map, onUserLocationChange, locationAttempt]);
 
     return (
         <>

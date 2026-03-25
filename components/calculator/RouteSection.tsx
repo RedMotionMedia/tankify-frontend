@@ -11,6 +11,7 @@ type Props = {
     onSearch: (type: "start" | "end") => void;
     onPickStart: () => void;
     onPickEnd: () => void;
+    onUseMyLocationAsStart: () => void;
     searchLoading: "start" | "end" | null;
     mapPickMode: MapPickMode;
 };
@@ -24,6 +25,7 @@ export default function RouteSection({
                                          onSearch,
                                          onPickStart,
                                          onPickEnd,
+                                         onUseMyLocationAsStart,
                                          searchLoading,
                                          mapPickMode,
                                      }: Props) {
@@ -40,10 +42,12 @@ export default function RouteSection({
                 onChange={setStartText}
                 onSearch={() => onSearch("start")}
                 onPickOnMap={onPickStart}
+                onUseMyLocation={onUseMyLocationAsStart}
                 loading={searchLoading === "start"}
                 pickActive={mapPickMode === "start"}
                 searchLabel={t.actions.search}
                 mapLabel={t.actions.map}
+                myLocationLabel={t.route.myLocation}
             />
 
             <LocationField
