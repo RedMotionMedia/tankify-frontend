@@ -27,6 +27,8 @@ export type MapLibreMarker = {
     remove: () => void;
     setLngLat: (lngLat: [number, number]) => MapLibreMarker;
     addTo: (map: MapLibreMap) => MapLibreMarker;
+    // MapLibre GL JS Marker API.
+    getElement?: () => HTMLElement;
 };
 
 export type MapLibrePopup = {

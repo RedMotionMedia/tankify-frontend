@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { TranslationSchema } from "@/config/i18n";
 import {
@@ -53,6 +53,7 @@ type Props = {
 type UserLocation = { lat: number; lon: number };
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM = 12;
 // Default view when we don't yet have a user location or any route points.
 // Keep this reasonably wide; when geolocation is enabled we pan to the user location,
 // but we avoid starting overly zoomed-in.
@@ -271,12 +272,76 @@ export default function MapPicker({
         node: HTMLElement;
     } | null>(null);
 
+    const closeActivePopup = useCallback(() => {
+        const active = activePopupRef.current;
+        if (!active) return;
+        activePopupRef.current = null;
+        try {
+            active.root.unmount();
+        } catch {}
+        try {
+            active.popup.remove();
+        } catch {}
+    }, []);
+
     const markerBucketRef = useRef<{
         start: MapLibreMarker | null;
         end: MapLibreMarker | null;
         user: MapLibreMarker | null;
         stations: MapLibreMarker[];
     }>({ start: null, end: null, user: null, stations: [] });
+
+    // If start/end are represented by a station marker (route point markers hidden),
+    // keep those station markers visible even when we hide non-essential markers at low zoom.
+    const protectedStationIdsRef = useRef<Set<string>>(new Set());
+
+    const hiddenStationsRef = useRef<boolean | null>(null);
+    const applyStationMarkerVisibility = useCallback((hideStations: boolean, force = false) => {
+        if (!force && hiddenStationsRef.current === hideStations) return;
+        hiddenStationsRef.current = hideStations;
+
+        if (hideStations) closeActivePopup();
+
+        const keepIds = protectedStationIdsRef.current;
+        const bucket = markerBucketRef.current;
+        for (const m of bucket.stations) {
+            try {
+                const el = typeof m.getElement === "function" ? m.getElement() : null;
+                if (!el) continue;
+                const id = el.dataset.stationId;
+                const keep = id ? keepIds.has(id) : false;
+                el.style.display = hideStations && !keep ? "none" : "";
+            } catch {
+                // ignore
+            }
+        }
+    }, [closeActivePopup]);
+
+    useEffect(() => {
+        const ids = new Set<string>();
+        const km = 0.03;
+        if (start) {
+            for (const s of stations) {
+                if (isNearKm(start, s, km)) ids.add(s.id);
+            }
+        }
+        if (end) {
+            for (const s of stations) {
+                if (isNearKm(end, s, km)) ids.add(s.id);
+            }
+        }
+        protectedStationIdsRef.current = ids;
+
+        // If we're currently zoomed out (stations hidden), re-apply visibility so
+        // start/end station markers become visible immediately.
+        const map = mapRef.current;
+        if (map) {
+            applyStationMarkerVisibility(
+                map.getZoom() < HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM,
+                true
+            );
+        }
+    }, [start, end, stations, applyStationMarkerVisibility]);
 
     const safeCenter = useMemo<[number, number]>(() => {
         if (start && end) {
@@ -296,18 +361,6 @@ export default function MapPicker({
         !end ||
         (userLocation != null && isNearKm(userLocation, end, 0.03)) ||
         isPointAtAnyStation(end, stations, 0.03);
-
-    function closeActivePopup() {
-        const active = activePopupRef.current;
-        if (!active) return;
-        activePopupRef.current = null;
-        try {
-            active.root.unmount();
-        } catch {}
-        try {
-            active.popup.remove();
-        } catch {}
-    }
 
     // Logo cache clear event from SettingsModal.
     useEffect(() => {
@@ -351,6 +404,13 @@ export default function MapPicker({
                 map.on("movestart", onMoveStart);
                 map.on("zoomstart", onMoveStart);
 
+                const onZoomVisibility = () => {
+                    applyStationMarkerVisibility(
+                        map.getZoom() < HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM
+                    );
+                };
+                map.on("zoom", onZoomVisibility);
+
                 map.on("click", async (e: unknown) => {
                     const mode = pickModeRef.current;
                     if (!mode) return;
@@ -393,6 +453,7 @@ export default function MapPicker({
                     ro.disconnect();
                     map.off("movestart", onMoveStart);
                     map.off("zoomstart", onMoveStart);
+                    map.off("zoom", onZoomVisibility);
                 };
             } catch (e) {
                 console.warn("MapLibre failed to load", e);
@@ -524,6 +585,7 @@ export default function MapPicker({
             const badgeText = hasPrice ? formatBadgePrice(selectedPrice, measurementSystem) : null;
 
             const el = createStationMarkerElement({ station, hasPrice, badgeText, logoCacheBust });
+            el.dataset.stationId = station.id;
             el.addEventListener("click", (ev) => {
                 ev.stopPropagation();
                 closeActivePopup();
@@ -577,6 +639,12 @@ export default function MapPicker({
             bucket.stations.push(m);
         }
 
+        // Ensure current zoom-based visibility is applied to newly created markers.
+        applyStationMarkerVisibility(
+            map.getZoom() < HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM,
+            true
+        );
+
         return () => {
             closeActivePopup();
         };
@@ -591,6 +659,8 @@ export default function MapPicker({
         t,
         onSelectStationAsDestination,
         onSelectStationAsStart,
+        applyStationMarkerVisibility,
+        closeActivePopup,
     ]);
 
     // Start/end markers.
@@ -878,7 +948,7 @@ export default function MapPicker({
     // When UI-meaningful options change, close popups (avoids stale text/units in already-open popups).
     useEffect(() => {
         closeActivePopup();
-    }, [fuelType, measurementSystem, currencySystem, language, t, logoCacheBust]);
+    }, [fuelType, measurementSystem, currencySystem, language, t, logoCacheBust, closeActivePopup]);
 
     return (
         <div className="relative h-full w-full">
