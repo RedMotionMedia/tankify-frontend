@@ -504,11 +504,14 @@ export default function TankifyCalculator() {
         point,
         price,
         station,
+        autoCalculate,
     }: {
         point: Point;
         price?: number | null;
         station: Station;
+        autoCalculate?: boolean;
     }) {
+        setError("");
         setDraftEndPoint(point);
         setEndText(point.label);
 
@@ -517,6 +520,14 @@ export default function TankifyCalculator() {
         }
 
         setSelectedStationId(station.id);
+
+        if (autoCalculate) {
+            if (!draftStartPoint) {
+                setError(t.errors.noStartFound);
+                return;
+            }
+            commitRoute(draftStartPoint, point);
+        }
     }
 
     function pointsEqual(a: Point | null, b: Point | null): boolean {
@@ -545,6 +556,14 @@ export default function TankifyCalculator() {
         routeRequestId > 0 && !isDirty && calcStartPoint && calcEndPoint
     );
 
+    function commitRoute(nextStart: Point, nextEnd: Point) {
+        setCalcStartPoint(nextStart);
+        setCalcEndPoint(nextEnd);
+        setRouteRequestId((v) => v + 1);
+        setMapPickMode(null);
+        setDesktopResultsOpen(true);
+    }
+
     function handleCalculateRoute() {
         setError("");
         if (!draftStartPoint) {
@@ -556,11 +575,7 @@ export default function TankifyCalculator() {
             return;
         }
 
-        setCalcStartPoint(draftStartPoint);
-        setCalcEndPoint(draftEndPoint);
-        setRouteRequestId((v) => v + 1);
-        setMapPickMode(null);
-        setDesktopResultsOpen(true);
+        commitRoute(draftStartPoint, draftEndPoint);
     }
 
     const calculation = useMemo(() => {

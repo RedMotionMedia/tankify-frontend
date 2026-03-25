@@ -58,6 +58,7 @@ export default function StationsSidebar({
         point: Point;
         price?: number | null;
         station: Station;
+        autoCalculate?: boolean;
     }) => void;
     onClose?: () => void;
 }) {

@@ -127,6 +127,7 @@ export default function StationPopupContent({
         point: Point;
         price?: number | null;
         station: Station;
+        autoCalculate?: boolean;
     }) => void;
 }) {
     const initials = getStationInitials(station.brandName ?? station.name);
@@ -405,6 +406,7 @@ export default function StationPopupContent({
                             point: { lat: station.lat, lon: station.lon, label: station.name },
                             price: selectedPrice,
                             station,
+                            autoCalculate: true,
                         })
                     }
                     className="w-full rounded-2xl bg-black px-3 py-2.5 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"
