@@ -1,12 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { TranslationSchema } from "@/config/i18n";
 import {
-    CurrencySystem,
     FuelType,
-    Language,
     MapPickMode,
     MeasurementSystem,
     Point,
@@ -15,14 +12,12 @@ import {
 import { reverseGeocode } from "@/lib/geocode";
 import { fetchStationsForVisibleMap } from "@/lib/route";
 import { pricePerLiterToPerGallon } from "@/lib/units";
-import StationPopupContent from "@/components/map/StationPopupContent";
 import {
     ensureMapLibreDeps,
     getMapLibre,
     type MapLibreGlobal,
     type MapLibreMap,
     type MapLibreMarker,
-    type MapLibrePopup,
 } from "@/components/map/maplibre/ensureMapLibre";
 
 type Props = {
@@ -32,21 +27,12 @@ type Props = {
     pickMode: MapPickMode;
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
-    currencySystem: CurrencySystem;
-    language: Language;
     debugMode: boolean;
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
-    onSelectStationAsDestination: (payload: {
-        point: Point;
-        price?: number | null;
-        station: Station;
-    }) => void;
-    onSelectStationAsStart: (payload: {
-        point: Point;
-        price?: number | null;
-        station: Station;
-    }) => void;
+    onStationsChange?: (stations: Station[]) => void;
+    selectedStationId?: string | null;
+    onStationSelect?: (station: Station) => void;
     defaultLocationEnabled?: boolean;
 };
 
@@ -225,13 +211,12 @@ export default function MapPicker({
     pickMode,
     fuelType,
     measurementSystem,
-    currencySystem,
-    language,
     debugMode,
     t,
     onMapPick,
-    onSelectStationAsDestination,
-    onSelectStationAsStart,
+    onStationsChange,
+    selectedStationId,
+    onStationSelect,
     defaultLocationEnabled,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
@@ -266,24 +251,6 @@ export default function MapPicker({
     const watchIdRef = useRef<number | null>(null);
     const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const activePopupRef = useRef<{
-        popup: MapLibrePopup;
-        root: Root;
-        node: HTMLElement;
-    } | null>(null);
-
-    const closeActivePopup = useCallback(() => {
-        const active = activePopupRef.current;
-        if (!active) return;
-        activePopupRef.current = null;
-        try {
-            active.root.unmount();
-        } catch {}
-        try {
-            active.popup.remove();
-        } catch {}
-    }, []);
-
     const markerBucketRef = useRef<{
         start: MapLibreMarker | null;
         end: MapLibreMarker | null;
@@ -300,8 +267,6 @@ export default function MapPicker({
         if (!force && hiddenStationsRef.current === hideStations) return;
         hiddenStationsRef.current = hideStations;
 
-        if (hideStations) closeActivePopup();
-
         const keepIds = protectedStationIdsRef.current;
         const bucket = markerBucketRef.current;
         for (const m of bucket.stations) {
@@ -315,7 +280,7 @@ export default function MapPicker({
                 // ignore
             }
         }
-    }, [closeActivePopup]);
+    }, []);
 
     useEffect(() => {
         const ids = new Set<string>();
@@ -330,6 +295,7 @@ export default function MapPicker({
                 if (isNearKm(end, s, km)) ids.add(s.id);
             }
         }
+        if (selectedStationId) ids.add(selectedStationId);
         protectedStationIdsRef.current = ids;
 
         // If we're currently zoomed out (stations hidden), re-apply visibility so
@@ -341,7 +307,7 @@ export default function MapPicker({
                 true
             );
         }
-    }, [start, end, stations, applyStationMarkerVisibility]);
+    }, [start, end, stations, selectedStationId, applyStationMarkerVisibility]);
 
     const safeCenter = useMemo<[number, number]>(() => {
         if (start && end) {
@@ -463,7 +429,6 @@ export default function MapPicker({
         const bucketAtMount = markerBucketRef.current;
         return () => {
             cancelled = true;
-            closeActivePopup();
 
             const bucket = bucketAtMount;
             for (const m of bucket.stations) {
@@ -569,8 +534,6 @@ export default function MapPicker({
         if (!map) return;
         const maplibre = getMapLibre();
 
-        closeActivePopup();
-
         const bucket = markerBucketRef.current;
         for (const m of bucket.stations) {
             try {
@@ -588,49 +551,7 @@ export default function MapPicker({
             el.dataset.stationId = station.id;
             el.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                closeActivePopup();
-
-                const node = document.createElement("div");
-                const root = createRoot(node);
-                root.render(
-                    <StationPopupContent
-                        station={station}
-                        selectedPrice={selectedPrice}
-                        measurementSystem={measurementSystem}
-                        currencySystem={currencySystem}
-                        language={language}
-                        debugMode={debugMode}
-                        logoCacheBust={logoCacheBust}
-                        userLocation={userLocationRef.current}
-                        t={t}
-                        onSelectStationAsStart={(payload) => {
-                            onSelectStationAsStart(payload);
-                            closeActivePopup();
-                        }}
-                        onSelectStationAsDestination={(payload) => {
-                            onSelectStationAsDestination(payload);
-                            closeActivePopup();
-                        }}
-                    />
-                );
-
-                const popup = new maplibre.Popup({
-                    closeButton: true,
-                    closeOnClick: true,
-                    maxWidth: "420px",
-                    className: "station-popup",
-                })
-                    .setLngLat([station.lon, station.lat])
-                    .setDOMContent(node)
-                    .addTo(map);
-
-                popup.on("close", () => {
-                    try {
-                        root.unmount();
-                    } catch {}
-                });
-
-                activePopupRef.current = { popup, root, node };
+                onStationSelect?.(station);
             });
 
             const m = new maplibre.Marker({ element: el, anchor: "center" })
@@ -644,24 +565,45 @@ export default function MapPicker({
             map.getZoom() < HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM,
             true
         );
-
-        return () => {
-            closeActivePopup();
-        };
     }, [
         stations,
         fuelType,
         measurementSystem,
-        currencySystem,
-        language,
-        debugMode,
         logoCacheBust,
-        t,
-        onSelectStationAsDestination,
-        onSelectStationAsStart,
+        onStationSelect,
         applyStationMarkerVisibility,
-        closeActivePopup,
     ]);
+
+    // Highlight and center the selected station (no popups; selection is shown in the UI list).
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        const bucket = markerBucketRef.current;
+        for (const m of bucket.stations) {
+            try {
+                const el = typeof m.getElement === "function" ? m.getElement() : null;
+                if (!el) continue;
+                const id = el.dataset.stationId;
+                const isSelected = !!selectedStationId && id === selectedStationId;
+                el.classList.toggle("station-marker--selected", isSelected);
+                el.style.zIndex = isSelected ? "10" : "";
+            } catch {
+                // ignore
+            }
+        }
+
+        if (!selectedStationId) return;
+        const station = stations.find((s) => s.id === selectedStationId);
+        if (!station) return;
+        try {
+            map.easeTo({
+                center: [station.lon, station.lat],
+                zoom: map.getZoom(),
+                duration: 650,
+            });
+        } catch {}
+    }, [selectedStationId, stations]);
 
     // Start/end markers.
     useEffect(() => {
@@ -863,6 +805,7 @@ export default function MapPicker({
         if (currentZoom < 12) {
             setSearchHint(t.route.zoomInMore);
             setStations([]);
+            onStationsChange?.([]);
             return;
         }
 
@@ -888,6 +831,7 @@ export default function MapPicker({
             );
 
             setStations(result.stations as Station[]);
+            onStationsChange?.(result.stations as Station[]);
 
             if (result.error) {
                 setSearchHint(result.error);
@@ -900,6 +844,7 @@ export default function MapPicker({
             }
         } catch {
             setStations([]);
+            onStationsChange?.([]);
             setSearchHint(t.route.stationsLoadFailed);
         } finally {
             setSearchLoading(false);
@@ -944,11 +889,6 @@ export default function MapPicker({
     useEffect(() => {
         setSearchHint(t.route.tapSearchHere);
     }, [t]);
-
-    // When UI-meaningful options change, close popups (avoids stale text/units in already-open popups).
-    useEffect(() => {
-        closeActivePopup();
-    }, [fuelType, measurementSystem, currencySystem, language, t, logoCacheBust, closeActivePopup]);
 
     return (
         <div className="relative h-full w-full">

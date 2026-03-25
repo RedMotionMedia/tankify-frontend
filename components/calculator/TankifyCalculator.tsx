@@ -23,8 +23,17 @@ import {
     pricePerGallonToPerLiter,
     pricePerLiterToPerGallon,
 } from "@/lib/units";
-import {CurrencySystem, FuelType, Language, MapPickMode, MeasurementSystem, Point,} from "@/types/tankify";
+import {
+    CurrencySystem,
+    FuelType,
+    Language,
+    MapPickMode,
+    MeasurementSystem,
+    Point,
+    Station,
+} from "@/types/tankify";
 import WorthPanel from "@/components/calculator/WorthPanel";
+import StationsSidebar from "@/components/map/StationsSidebar";
 
 const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
     ssr: false,
@@ -68,6 +77,11 @@ export default function TankifyCalculator() {
     const [searchLoading, setSearchLoading] = useState<"start" | "end" | null>(null);
     const [error, setError] = useState("");
     const [mapPickMode, setMapPickMode] = useState<MapPickMode>(null);
+
+    const [visibleStations, setVisibleStations] = useState<Station[]>([]);
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+    const [stationsQueried, setStationsQueried] = useState(false);
 
     const {
         sheetContentRef,
@@ -421,11 +435,13 @@ export default function TankifyCalculator() {
 
     useEffect(() => {
         function handleUserLocation(ev: Event) {
-            if (draftStartPoint) return;
             const detail = (ev as CustomEvent<Partial<{ lat: unknown; lon: unknown }>>).detail;
             const lat = typeof detail?.lat === "number" ? detail.lat : Number.NaN;
             const lon = typeof detail?.lon === "number" ? detail.lon : Number.NaN;
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+            setUserLocation({ lat, lon });
+            if (draftStartPoint) return;
 
             const label = t.route.currentLocation;
             setDraftStartPoint({ lat, lon, label });
@@ -453,6 +469,53 @@ export default function TankifyCalculator() {
         setMapPickMode((prev) => (prev === "start" ? "end" : prev === "end" ? "start" : null));
     }
 
+    function handleToggleStation(stationId: string) {
+        setSelectedStationId((prev) => (prev === stationId ? null : stationId));
+    }
+
+    function handleStationsChange(stations: Station[]) {
+        setStationsQueried(true);
+        setVisibleStations(stations);
+    }
+
+    function handleSelectStationAsStart({
+        point,
+        price,
+        station,
+    }: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) {
+        setDraftStartPoint(point);
+        setStartText(point.label);
+
+        if (price != null) {
+            setLocalPricePerLiter(price);
+        }
+
+        setSelectedStationId(station.id);
+    }
+
+    function handleSelectStationAsDestination({
+        point,
+        price,
+        station,
+    }: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) {
+        setDraftEndPoint(point);
+        setEndText(point.label);
+
+        if (price != null) {
+            setDestinationPricePerLiter(price);
+        }
+
+        setSelectedStationId(station.id);
+    }
+
     function pointsEqual(a: Point | null, b: Point | null): boolean {
         if (a === b) return true;
         if (!a || !b) return false;
@@ -468,6 +531,12 @@ export default function TankifyCalculator() {
             !pointsEqual(draftEndPoint, calcEndPoint)
         );
     }, [draftStartPoint, draftEndPoint, calcStartPoint, calcEndPoint]);
+
+    useEffect(() => {
+        if (!selectedStationId) return;
+        if (visibleStations.some((s) => s.id === selectedStationId)) return;
+        setSelectedStationId(null);
+    }, [visibleStations, selectedStationId]);
 
     const hasCommittedRoute = Boolean(
         routeRequestId > 0 && !isDirty && calcStartPoint && calcEndPoint
@@ -620,7 +689,7 @@ export default function TankifyCalculator() {
             />
 
             <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
-                <div className="mx-auto hidden max-w-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
+                <div className="mx-auto hidden max-w-screen-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_minmax(0,1fr)_430px] lg:items-start">
                     <section className="self-start rounded-3xl bg-white p-6 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                             <div>
@@ -644,47 +713,32 @@ export default function TankifyCalculator() {
                     <section className="space-y-6">
                         <div className="map-resizable rounded-3xl bg-white shadow-sm">
                             <div className="h-full overflow-hidden rounded-3xl">
-                                <MapPicker
-                                    start={draftStartPoint}
-                                    end={draftEndPoint}
-                                    routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
-                                    pickMode={mapPickMode}
-                                    fuelType={fuelType}
-                                    measurementSystem={measurementSystem}
-                                    currencySystem={currencySystem}
-                                    language={language}
-                                    debugMode={debugMode}
-                                    t={t}
-                                    defaultLocationEnabled
-                                    onMapPick={(type, point) => {
-                                        if (type === "start") {
-                                            setDraftStartPoint(point);
-                                            setStartText(point.label);
-                                        } else {
-                                            setDraftEndPoint(point);
-                                            setEndText(point.label);
-                                        }
-                                        setMapPickMode(null);
-                                    }}
-                                    onSelectStationAsStart={({point, price}) => {
-                                        setDraftStartPoint(point);
-                                        setStartText(point.label);
-
-                                        if (price != null) {
-                                            setLocalPricePerLiter(price);
-                                        }
-                                    }}
-                                    onSelectStationAsDestination={({point, price}) => {
-                                        setDraftEndPoint(point);
-                                        setEndText(point.label);
-
-                                        if (price != null) {
-                                            setDestinationPricePerLiter(price);
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
+                                 <MapPicker
+                                     start={draftStartPoint}
+                                     end={draftEndPoint}
+                                     routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                                     pickMode={mapPickMode}
+                                     fuelType={fuelType}
+                                     measurementSystem={measurementSystem}
+                                     debugMode={debugMode}
+                                     t={t}
+                                     defaultLocationEnabled
+                                     onStationsChange={setVisibleStations}
+                                     selectedStationId={selectedStationId}
+                                     onStationSelect={(station) => setSelectedStationId(station.id)}
+                                     onMapPick={(type, point) => {
+                                         if (type === "start") {
+                                             setDraftStartPoint(point);
+                                             setStartText(point.label);
+                                         } else {
+                                             setDraftEndPoint(point);
+                                             setEndText(point.label);
+                                         }
+                                         setMapPickMode(null);
+                                     }}
+                                 />
+                             </div>
+                         </div>
 
                         {hasCommittedRoute ? (
                             <WorthPanel
@@ -706,53 +760,56 @@ export default function TankifyCalculator() {
                             />
                         ) : null}
                     </section>
-                </div>
 
-                <div className="lg:hidden">
-                    <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
-                        <MapPicker
-                            start={draftStartPoint}
-                            end={draftEndPoint}
-                            routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
-                            pickMode={mapPickMode}
+                    {/*Hier soll der Teil für die PC Ansicht herkommen*/}
+                    <section className="sticky top-8 self-start">
+                        <StationsSidebar
+                            stations={visibleStations}
+                            selectedStationId={selectedStationId}
+                            onToggleStation={handleToggleStation}
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
                             currencySystem={currencySystem}
                             language={language}
                             debugMode={debugMode}
+                            userLocation={userLocation}
                             t={t}
-                            defaultLocationEnabled
-                            onMapPick={(type, point) => {
-                                if (type === "start") {
-                                    setDraftStartPoint(point);
-                                    setStartText(point.label);
+                            onSelectStationAsStart={handleSelectStationAsStart}
+                            onSelectStationAsDestination={handleSelectStationAsDestination}
+                        />
+                    </section>
+                </div>
+
+                <div className="lg:hidden">
+                    <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
+                        <MapPicker
+                             start={draftStartPoint}
+                             end={draftEndPoint}
+                             routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                             pickMode={mapPickMode}
+                             fuelType={fuelType}
+                             measurementSystem={measurementSystem}
+                             debugMode={debugMode}
+                             t={t}
+                             defaultLocationEnabled
+                             selectedStationId={selectedStationId}
+                             onStationSelect={(station) => {
+                                 setSelectedStationId(station.id);
+                                 setBottomSheet(window.innerHeight * snapWorthMultiplicator);
+                             }}
+                             onMapPick={(type, point) => {
+                                 if (type === "start") {
+                                     setDraftStartPoint(point);
+                                     setStartText(point.label);
                                 } else {
                                     setDraftEndPoint(point);
                                     setEndText(point.label);
-                                }
-                                setMapPickMode(null);
-                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
-                            }}
-                            onSelectStationAsStart={({point, price}) => {
-                                setDraftStartPoint(point);
-                                setStartText(point.label);
-
-                                if (price != null) {
-                                    setLocalPricePerLiter(price);
-                                }
-                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
-                            }}
-                            onSelectStationAsDestination={({point, price}) => {
-                                setDraftEndPoint(point);
-                                setEndText(point.label);
-
-                                if (price != null) {
-                                    setDestinationPricePerLiter(price);
-                                }
-                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
-                            }}
-                        />
-                    </div>
+                                 }
+                                 setMapPickMode(null);
+                                 setBottomSheet(window.innerHeight*snapWorthMultiplicator);
+                             }}
+                         />
+                     </div>
 
                     <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
                         <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">

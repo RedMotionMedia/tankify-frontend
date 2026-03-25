@@ -118,6 +118,17 @@ textarea:disabled {
 
 .station-marker {
   position: relative;
+  transform-origin: center center;
+}
+
+.station-marker--selected {
+  /* Intentionally do not scale/transform the marker to avoid anchor jumps. */
+}
+
+.station-marker--selected .station-logo {
+  border-color: #1d4ed8;
+  /* Add a ring instead of extra shadow to avoid the "floating" feel while panning. */
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(37, 99, 235, 0.55);
 }
 
 /* Price badge sits above the logo marker */
