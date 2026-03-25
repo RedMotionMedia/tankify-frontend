@@ -14,6 +14,12 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="de">
+        <head>
+            <link
+                rel="stylesheet"
+                href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css"
+            />
+        </head>
         {/* Browser extensions sometimes inject attributes into <body>, which can trigger hydration mismatch warnings. */}
         <body suppressHydrationWarning>{children}</body>
         </html>

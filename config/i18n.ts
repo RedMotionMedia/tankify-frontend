@@ -41,6 +41,8 @@ export type TranslationSchema = {
         startPopup: string;
         destinationPopup: string;
         center: string;
+        myLocation: string;
+        currentLocation: string;
         searchHere: string;
         loading: string;
         tapSearchHere: string;
@@ -123,6 +125,9 @@ export type TranslationSchema = {
     actions: {
         search: string;
         map: string;
+        swap: string;
+        calculate: string;
+        confirm: string;
         cancel: string;
     };
     status: {
@@ -147,6 +152,7 @@ export type TranslationSchema = {
         routeNotCalculated: string;
         routeLoadFailed: string;
         geocodeFailed: string;
+        locationFailed: string;
     };
 };
 
@@ -195,6 +201,8 @@ export const translations: Record<Language, TranslationSchema> = {
             startPopup: "Start",
             destinationPopup: "Ziel",
             center: "Zentrieren",
+            myLocation: "Standort",
+            currentLocation: "Aktueller Standort",
             searchHere: "Hier suchen",
             loading: "Lädt ...",
             tapSearchHere: "Tippe auf „Hier suchen“ für Tankstellen.",
@@ -279,6 +287,9 @@ export const translations: Record<Language, TranslationSchema> = {
         actions: {
             search: "Suchen",
             map: "Karte",
+            swap: "Tauschen",
+            calculate: "Berechnen",
+            confirm: "Best\u00e4tigen",
             cancel: "Abbrechen",
         },
         status: {
@@ -303,6 +314,7 @@ export const translations: Record<Language, TranslationSchema> = {
             routeNotCalculated: "Route konnte nicht berechnet werden.",
             routeLoadFailed: "Route konnte nicht geladen werden.",
             geocodeFailed: "Adresssuche fehlgeschlagen.",
+            locationFailed: "Standort konnte nicht ermittelt werden.",
         },
     },
     en: {
@@ -349,6 +361,8 @@ export const translations: Record<Language, TranslationSchema> = {
             startPopup: "Start",
             destinationPopup: "Destination",
             center: "Center",
+            myLocation: "My location",
+            currentLocation: "Current location",
             searchHere: "Search here",
             loading: "Loading ...",
             tapSearchHere: 'Tap "Search here" for gas stations.',
@@ -432,6 +446,9 @@ export const translations: Record<Language, TranslationSchema> = {
         actions: {
             search: "Search",
             map: "Map",
+            swap: "Swap",
+            calculate: "Calculate",
+            confirm: "Confirm",
             cancel: "Cancel",
         },
         status: {
@@ -456,6 +473,7 @@ export const translations: Record<Language, TranslationSchema> = {
             routeNotCalculated: "Route could not be calculated.",
             routeLoadFailed: "Route could not be loaded.",
             geocodeFailed: "Address search failed.",
+            locationFailed: "Could not determine location.",
         },
     },
 };
