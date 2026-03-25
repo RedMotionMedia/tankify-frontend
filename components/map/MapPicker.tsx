@@ -59,6 +59,12 @@ const markerIcon = new L.Icon({
 
 const stationIconCache = new Map<string, L.DivIcon>();
 
+function withCacheBuster(url: string, cacheBust: number): string {
+    if (!url) return url;
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}v=${cacheBust}`;
+}
+
 function getStationInitials(name: string | undefined): string {
     const value = (name ?? "").trim();
     if (!value) return "?";
@@ -77,9 +83,13 @@ function escapeHtmlAttr(value: string): string {
         .replaceAll(">", "&gt;");
 }
 
-function getStationDivIcon(station: Station, hasPrice: boolean): L.DivIcon {
+function getStationDivIcon(
+    station: Station,
+    hasPrice: boolean,
+    logoCacheBust: number
+): L.DivIcon {
     const size = 34;
-    const logoUrl = station.logoUrl ?? "";
+    const logoUrl = station.logoUrl ? withCacheBuster(station.logoUrl, logoCacheBust) : "";
     const initials = getStationInitials(station.brandName ?? station.name);
     const key = `${hasPrice ? "p1" : "p0"}|${logoUrl || initials}`;
 
@@ -350,6 +360,7 @@ function StationPopupContent({
     currencySystem,
     language,
     debugMode,
+    logoCacheBust,
     t,
     onSelectStationAsStart,
     onSelectStationAsDestination,
@@ -361,6 +372,7 @@ function StationPopupContent({
     currencySystem: CurrencySystem;
     language: Language;
     debugMode: boolean;
+    logoCacheBust: number;
     t: TranslationSchema;
     onSelectStationAsStart: (payload: {
         point: Point;
@@ -375,6 +387,7 @@ function StationPopupContent({
 }) {
     const initials = getStationInitials(station.brandName ?? station.name);
     const openingHours = Array.isArray(station.openingHours) ? station.openingHours : [];
+    const logoUrl = station.logoUrl ? withCacheBuster(station.logoUrl, logoCacheBust) : null;
 
     const openingHoursByDay = new Map<string, Array<{ from: string | null; to: string | null }>>();
     for (const h of openingHours) {
@@ -397,20 +410,21 @@ function StationPopupContent({
             <div className="flex items-start gap-3">
                 <div
                     className={
-                        "relative h-11 w-11 shrink-0 overflow-hidden rounded-full border bg-white shadow-sm" +
-                        (selectedPrice != null ? "border-blue-200" : "border-red-200")
+                        `relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 bg-white shadow-sm ${
+                            selectedPrice != null ? "station-logo--ok" : "station-logo--missing"
+                        }`
                     }
                 >
                     <div className="absolute inset-0 grid place-items-center text-xs font-extrabold tracking-tight text-gray-700">
                         {initials}
                     </div>
-                    {station.logoUrl ? (
+                    {logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                            src={station.logoUrl}
+                            src={logoUrl}
                             alt=""
                             referrerPolicy="no-referrer"
-                            className="absolute inset-0 h-full w-full object-contain p-1"
+                            className="absolute inset-0 h-full w-full rounded-full object-contain"
                             onError={(e) => {
                                 (e.currentTarget as HTMLImageElement).style.display = "none";
                             }}
@@ -752,22 +766,24 @@ function StationPopupContent({
 }
 
 function StationsLayer({
-                           stations,
-                           fuelType,
-                           measurementSystem,
-                           currencySystem,
-                           language,
-                           debugMode,
-                           onSelectStationAsDestination,
-                           onSelectStationAsStart,
-                           t,
-                       }: {
+    stations,
+    fuelType,
+    measurementSystem,
+    currencySystem,
+    language,
+    debugMode,
+    logoCacheBust,
+    onSelectStationAsDestination,
+    onSelectStationAsStart,
+    t,
+}: {
     stations: Station[];
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
     language: Language;
     debugMode: boolean;
+    logoCacheBust: number;
     onSelectStationAsDestination: (payload: {
         point: Point;
         price?: number | null;
@@ -795,7 +811,7 @@ function StationsLayer({
                     <React.Fragment key={station.id}>
                         <Marker
                             position={[station.lat, station.lon]}
-                            icon={getStationDivIcon(station, hasPrice)}
+                            icon={getStationDivIcon(station, hasPrice, logoCacheBust)}
                         >
                             <Popup maxWidth={420} className="station-popup">
                                 <StationPopupContent
@@ -806,6 +822,7 @@ function StationsLayer({
                                     currencySystem={currencySystem}
                                     language={language}
                                     debugMode={debugMode}
+                                    logoCacheBust={logoCacheBust}
                                     t={t}
                                     onSelectStationAsStart={(payload) => {
                                         onSelectStationAsStart(payload);
@@ -847,12 +864,24 @@ export default function MapPicker({
                                       onMapPick,
                                       onSelectStationAsDestination,
                                       onSelectStationAsStart,
-                                  }: Props) {
+}: Props) {
     const [stations, setStations] = useState<Station[]>([]);
+    const [logoCacheBust, setLogoCacheBust] = useState(0);
 
     const center = useMemo<[number, number]>(() => {
         return [(start.lat + end.lat) / 2, (start.lon + end.lon) / 2];
     }, [start, end]);
+
+    useEffect(() => {
+        function handleLogoCacheCleared() {
+            stationIconCache.clear();
+            setLogoCacheBust((v) => v + 1);
+        }
+
+        window.addEventListener("tankify:logo-cache-cleared", handleLogoCacheCleared);
+        return () =>
+            window.removeEventListener("tankify:logo-cache-cleared", handleLogoCacheCleared);
+    }, []);
 
     return (
         <div className="relative h-full w-full">
@@ -879,6 +908,7 @@ export default function MapPicker({
                     currencySystem={currencySystem}
                     language={language}
                     debugMode={debugMode}
+                    logoCacheBust={logoCacheBust}
                     onSelectStationAsDestination={onSelectStationAsDestination}
                     onSelectStationAsStart={onSelectStationAsStart}
                     t={t}

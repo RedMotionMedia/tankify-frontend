@@ -14,7 +14,8 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="de">
-        <body>{children}</body>
+        {/* Browser extensions sometimes inject attributes into <body>, which can trigger hydration mismatch warnings. */}
+        <body suppressHydrationWarning>{children}</body>
         </html>
     );
 }

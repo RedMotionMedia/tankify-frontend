@@ -14,9 +14,69 @@ type CacheEntry = {
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 const MAX_ENTRIES = 300;
+const DEFAULT_MAX_LOGO_BYTES = 512 * 1024; // 512 KiB
+const MAX_LOGO_BYTES = (() => {
+    const raw = (process.env.LOGO_MAX_BYTES ?? "").trim();
+    const n = raw ? Number(raw) : NaN;
+    // Clamp to a sane upper bound to avoid misconfiguration blowing up memory.
+    if (Number.isFinite(n) && n > 0) return Math.min(n, 5 * 1024 * 1024);
+    return DEFAULT_MAX_LOGO_BYTES;
+})();
 
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<CacheEntry>>();
+
+async function readArrayBufferWithLimit(
+    res: Response,
+    maxBytes: number
+): Promise<ArrayBuffer> {
+    const contentLength = res.headers.get("content-length");
+    if (contentLength) {
+        const n = Number(contentLength);
+        if (Number.isFinite(n) && n > maxBytes) {
+            throw new Error(`logo too large: content-length=${n} max=${maxBytes}`);
+        }
+    }
+
+    // Some responses don't expose a body stream (should be rare); fall back but still validate size.
+    if (!res.body) {
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength > maxBytes) {
+            throw new Error(`logo too large: bytes=${buf.byteLength} max=${maxBytes}`);
+        }
+        return buf;
+    }
+
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+
+        total += value.byteLength;
+        if (total > maxBytes) {
+            // Stop downloading more; keep memory bounded.
+            try {
+                await reader.cancel();
+            } catch {
+                // ignore
+            }
+            throw new Error(`logo too large: bytes>${maxBytes}`);
+        }
+        chunks.push(value);
+    }
+
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const c of chunks) {
+        out.set(c, offset);
+        offset += c.byteLength;
+    }
+    return out.buffer;
+}
 
 function normalizeKey(raw: string | null): string | null {
     if (!raw) return null;
@@ -158,7 +218,10 @@ async function fetchAndCache(domain: string): Promise<CacheEntry> {
     }
 
     const contentType = res.headers.get("content-type") ?? "image/png";
-    const buf = await res.arrayBuffer();
+    if (!contentType.toLowerCase().startsWith("image/")) {
+        throw new Error(`logo fetch failed: non-image content-type=${contentType}`);
+    }
+    const buf = await readArrayBufferWithLimit(res, MAX_LOGO_BYTES);
 
     return {
         body: buf,
@@ -181,7 +244,10 @@ async function fetchByUrlAndCache(url: string): Promise<CacheEntry> {
     }
 
     const contentType = res.headers.get("content-type") ?? "image/png";
-    const buf = await res.arrayBuffer();
+    if (!contentType.toLowerCase().startsWith("image/")) {
+        throw new Error(`logo fetch failed: non-image content-type=${contentType}`);
+    }
+    const buf = await readArrayBufferWithLimit(res, MAX_LOGO_BYTES);
 
     return {
         body: buf,
