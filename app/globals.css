@@ -173,6 +173,39 @@ textarea:disabled {
   margin: 12px 14px;
 }
 
+/* Make the Leaflet close button match the app's rounded button language */
+.station-popup .leaflet-popup-close-button {
+  margin: 7px;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9999px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.station-popup .leaflet-popup-close-button:hover {
+  background: #0b1220;
+}
+
+.station-popup .leaflet-popup-close-button:active {
+  transform: scale(0.96);
+}
+
+.station-popup .leaflet-popup-close-button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
 /* =========================
    Resizable Map (Desktop)
 ========================= */

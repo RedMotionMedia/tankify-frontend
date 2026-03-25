@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { EControlGasStation } from "@/types/econtrol";
+import type { EControlGasStation, EControlOpeningHour } from "@/types/econtrol";
 import { extractPriceAmount, fetchStationsForBounds } from "@/lib/econtrol/sprit";
 import type { Station } from "@/types/tankify";
 import { resolveStationBrandAndLogo } from "@/lib/branding/stationLogo";
@@ -65,6 +65,35 @@ function parseBoolean(value: string | null): boolean | null {
     return null;
 }
 
+function asString(value: unknown): string | null {
+    return typeof value === "string" && value.trim() ? value : null;
+}
+
+function asBool(value: unknown): boolean | null {
+    return typeof value === "boolean" ? value : null;
+}
+
+function normalizeOpeningHours(value: unknown): Station["openingHours"] {
+    if (!Array.isArray(value)) return undefined;
+
+    const out = value
+        .map((entry): NonNullable<Station["openingHours"]>[number] | null => {
+            const e = entry as EControlOpeningHour;
+            const day = asString(e?.day);
+            if (!day) return null;
+
+            const from = asString(e?.from);
+            const to = asString(e?.to);
+            const label = asString(e?.label);
+            const order = typeof e?.order === "number" ? e.order : null;
+
+            return { day, from, to, label, order };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    return out.length ? out : undefined;
+}
+
 function isValidBounds(south: number, west: number, north: number, east: number): boolean {
     return (
         south >= -90 &&
@@ -80,7 +109,7 @@ function isValidBounds(south: number, west: number, north: number, east: number)
     );
 }
 
-function toStationDto(station: EControlGasStation): Station | null {
+function toStationDto(station: EControlGasStation, includeEcontrol: boolean): Station | null {
     const lat = station.location?.latitude;
     const lon = station.location?.longitude;
     if (typeof lat !== "number" || typeof lon !== "number") return null;
@@ -96,7 +125,7 @@ function toStationDto(station: EControlGasStation): Station | null {
         email: typeof station.contact?.mail === "string" ? station.contact.mail : null,
     });
 
-    return {
+    const dto: Station = {
         id,
         lat,
         lon,
@@ -111,8 +140,31 @@ function toStationDto(station: EControlGasStation): Station | null {
         source: "econtrol",
         brandName: logo.brandName,
         logoUrl: logo.logoUrl,
-        econtrol: station, // pass-through: frontend can display everything (raw)
+        openingHours: normalizeOpeningHours(station.openingHours),
+        contact: station.contact
+            ? {
+                telephone: asString(station.contact.telephone),
+                fax: asString(station.contact.fax),
+                mail: asString(station.contact.mail),
+                website: asString(station.contact.website),
+            }
+            : undefined,
+        paymentMethods: station.paymentMethods
+            ? {
+                cash: asBool(station.paymentMethods.cash),
+                debitCard: asBool(station.paymentMethods.debitCard),
+                creditCard: asBool(station.paymentMethods.creditCard),
+                others: asString(station.paymentMethods.others),
+            }
+            : undefined,
+        otherServiceOffers: asString(station.otherServiceOffers),
     };
+
+    if (includeEcontrol) {
+        dto.econtrol = station; // pass-through: frontend can display everything (raw)
+    }
+
+    return dto;
 }
 
 export async function GET(req: NextRequest) {
@@ -127,6 +179,11 @@ export async function GET(req: NextRequest) {
         const centerLon = parseNumber(searchParams.get("centerLon"));
         const includeClosedRaw = parseBoolean(searchParams.get("includeClosed"));
         const includeClosed = includeClosedRaw ?? false;
+
+        const debugRaw = parseBoolean(searchParams.get("debug"));
+        const debugRequested = debugRaw ?? false;
+        const debugAllowed = process.env.NODE_ENV !== "production" || (process.env.ENABLE_DEBUG_MODE ?? "").trim() === "1";
+        const includeEcontrol = debugRequested && debugAllowed;
 
         if (
             south === null ||
@@ -143,31 +200,35 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        cleanupCache();
-
-        const cacheKey = buildCacheKey({
-            south,
-            west,
-            north,
-            east,
-            centerLat,
-            centerLon,
-            includeClosed,
-        });
-
         const now = Date.now();
-        const cached = cache.get(cacheKey);
 
-        if (cached && cached.expiresAt > now) {
-            return NextResponse.json(
-                { stations: cached.data, cached: true },
-                {
-                    headers: {
-                        "Cache-Control":
-                            "public, max-age=300, stale-while-revalidate=900",
-                    },
-                }
-            );
+        // Cache only the lean payload (no raw E-Control data) to keep memory usage down.
+        let cached: CacheEntry | undefined;
+        let cacheKey: string | null = null;
+        if (!includeEcontrol) {
+            cleanupCache();
+            cacheKey = buildCacheKey({
+                south,
+                west,
+                north,
+                east,
+                centerLat,
+                centerLon,
+                includeClosed,
+            });
+            cached = cache.get(cacheKey);
+
+            if (cached && cached.expiresAt > now) {
+                return NextResponse.json(
+                    { stations: cached.data, cached: true },
+                    {
+                        headers: {
+                            "Cache-Control":
+                                "public, max-age=300, stale-while-revalidate=900",
+                        },
+                    }
+                );
+            }
         }
 
         const econtrolStations = await fetchStationsForBounds({
@@ -177,15 +238,16 @@ export async function GET(req: NextRequest) {
         });
 
         const stations = econtrolStations
-            .map(toStationDto)
+            .map((s) => toStationDto(s, includeEcontrol))
             .filter((s): s is Station => s !== null);
 
-        cache.set(cacheKey, {
-            data: stations,
-            expiresAt: now + CACHE_TTL_MS,
-        });
-
-        cleanupCache();
+        if (!includeEcontrol && cacheKey) {
+            cache.set(cacheKey, {
+                data: stations,
+                expiresAt: now + CACHE_TTL_MS,
+            });
+            cleanupCache();
+        }
 
         return NextResponse.json(
             {
@@ -196,8 +258,10 @@ export async function GET(req: NextRequest) {
             },
             {
                 headers: {
-                    "Cache-Control":
-                        "public, max-age=300, stale-while-revalidate=900",
+                    // Debug payload contains raw upstream data; never allow caching in browsers/CDNs.
+                    "Cache-Control": includeEcontrol
+                        ? "no-store"
+                        : "public, max-age=300, stale-while-revalidate=900",
                 },
             }
         );

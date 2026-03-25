@@ -6,6 +6,15 @@ export type EControlPrice = {
     [key: string]: unknown;
 };
 
+export type EControlOpeningHour = {
+    day?: string;
+    label?: string;
+    order?: number;
+    from?: string;
+    to?: string;
+    [key: string]: unknown;
+};
+
 export type EControlLocation = {
     address?: string;
     postalCode?: string;
@@ -42,6 +51,7 @@ export type EControlPaymentArrangements = {
     cooperative?: boolean;
     clubCard?: boolean;
     clubCardText?: string;
+    accessMod?: string;
     [key: string]: unknown;
 };
 
@@ -50,7 +60,7 @@ export type EControlGasStation = {
     name?: string;
     location?: EControlLocation;
     contact?: EControlContact;
-    openingHours?: unknown[];
+    openingHours?: EControlOpeningHour[];
     offerInformation?: EControlOfferInformation;
     paymentMethods?: EControlPaymentMethods;
     paymentArrangements?: EControlPaymentArrangements;

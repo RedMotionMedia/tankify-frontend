@@ -59,6 +59,7 @@ export type TranslationSchema = {
         destinationPrice: string;
         priceDifference: string;
         breakEvenDiff: string;
+        dataSource: string;
         sourcePrice: string;
         sourceEcontrol: string;
         sourceUnknown: string;
@@ -110,8 +111,13 @@ export type TranslationSchema = {
         website: string;
         services: string;
         payment: string;
+        paymentCash: string;
+        paymentDebitCard: string;
+        paymentCreditCard: string;
+        paymentOther: string;
         otherOffers: string;
         openingHours: string;
+        open24Hours: string;
         rawData: string;
     };
     actions: {
@@ -207,6 +213,7 @@ export const translations: Record<Language, TranslationSchema> = {
             destinationPrice: "Preis am Ziel",
             priceDifference: "Preisunterschied",
             breakEvenDiff: "Break-even Preisunterschied",
+            dataSource: "Datenquelle",
             sourcePrice: "Preis",
             sourceEcontrol: "Preis: E-Control",
             sourceUnknown: "Preis: —",
@@ -260,8 +267,13 @@ export const translations: Record<Language, TranslationSchema> = {
             website: "Website",
             services: "Services",
             payment: "Zahlung",
+            paymentCash: "Bar",
+            paymentDebitCard: "Bankomatkarte",
+            paymentCreditCard: "Kreditkarte",
+            paymentOther: "Andere",
             otherOffers: "Sonstiges",
             openingHours: "Öffnungszeiten",
+            open24Hours: "24 Stunden geöffnet",
             rawData: "Rohdaten (E-Control)",
         },
         actions: {
@@ -355,6 +367,7 @@ export const translations: Record<Language, TranslationSchema> = {
             destinationPrice: "Destination price",
             priceDifference: "Price difference",
             breakEvenDiff: "Break-even price difference",
+            dataSource: "Data source",
             sourcePrice: "Price",
             sourceEcontrol: "Price: E-Control",
             sourceUnknown: "Price: —",
@@ -407,8 +420,13 @@ export const translations: Record<Language, TranslationSchema> = {
             website: "Website",
             services: "Services",
             payment: "Payment",
+            paymentCash: "Cash",
+            paymentDebitCard: "Debit card",
+            paymentCreditCard: "Credit card",
+            paymentOther: "Other",
             otherOffers: "Other offers",
             openingHours: "Opening hours",
+            open24Hours: "Open 24 hours",
             rawData: "Raw data (E-Control)",
         },
         actions: {

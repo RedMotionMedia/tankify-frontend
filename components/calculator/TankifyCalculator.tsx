@@ -105,7 +105,7 @@ export default function TankifyCalculator() {
             setFuelType(savedFuelType);
         }
 
-        if (savedDebugMode === "1") {
+        if (savedDebugMode === "1" && debugAllowed) {
             setDebugMode(true);
         }
 
@@ -140,7 +140,15 @@ export default function TankifyCalculator() {
         }
 
         setStorageReady(true);
-    }, []);
+    }, [debugAllowed]);
+
+    useEffect(() => {
+        if (debugAllowed) return;
+        setDebugMode(false);
+        try {
+            window.localStorage.removeItem("tankify-debug-mode");
+        } catch {}
+    }, [debugAllowed]);
 
     useEffect(() => {
         if (!storageReady) return;
@@ -411,6 +419,7 @@ export default function TankifyCalculator() {
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
                                     currencySystem={currencySystem}
+                                    language={language}
                                     debugMode={debugMode}
                                     t={t}
                                     onMapPick={(type, point) => {
@@ -471,6 +480,7 @@ export default function TankifyCalculator() {
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
                             currencySystem={currencySystem}
+                            language={language}
                             debugMode={debugMode}
                             t={t}
                             onMapPick={(type, point) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import L, { type LeafletMouseEvent } from "leaflet";
+import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     MapContainer,
@@ -15,6 +16,7 @@ import { TranslationSchema } from "@/config/i18n";
 import {
     CurrencySystem,
     FuelType,
+    Language,
     MapPickMode,
     MeasurementSystem,
     Point,
@@ -22,7 +24,7 @@ import {
 } from "@/types/tankify";
 import { reverseGeocode } from "@/lib/geocode";
 import { fetchStationsForVisibleMap } from "@/lib/route";
-import { pricePerLiterToPerGallon } from "@/lib/units";
+import { kmToMiles, pricePerLiterToPerGallon } from "@/lib/units";
 
 type Props = {
     start: Point;
@@ -32,6 +34,7 @@ type Props = {
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    language: Language;
     debugMode: boolean;
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
@@ -137,6 +140,39 @@ function formatBadgePrice(
     return converted.toFixed(3);
 }
 
+const WEEKDAY_ORDER = ["MO", "DI", "MI", "DO", "FR", "SA", "SO"] as const;
+
+function jsDayToEcontrolCode(jsDay: number): (typeof WEEKDAY_ORDER)[number] {
+    // JS: 0=Sun ... 6=Sat
+    if (jsDay === 0) return "SO";
+    if (jsDay === 1) return "MO";
+    if (jsDay === 2) return "DI";
+    if (jsDay === 3) return "MI";
+    if (jsDay === 4) return "DO";
+    if (jsDay === 5) return "FR";
+    return "SA";
+}
+
+function weekdayLabel(code: string, language: Language): string {
+    const idx = WEEKDAY_ORDER.indexOf(code as (typeof WEEKDAY_ORDER)[number]);
+    if (idx === -1) return code;
+
+    // 2020-01-06 was a Monday; use UTC to avoid timezone drift.
+    const d = new Date(Date.UTC(2020, 0, 6 + idx));
+    const locale = language === "de" ? "de-AT" : "en-US";
+    return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(d);
+}
+
+function normalizeWebsiteUrl(url: string): string {
+    return url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`;
+}
+
+function is24Hours(from: string | null, to: string | null): boolean {
+    if (!from || !to) return false;
+    if (from !== "00:00") return false;
+    return to === "24:00" || to === "00:00";
+}
+
 function ClickHandler({
                           pickMode,
                           onMapPick,
@@ -186,10 +222,12 @@ function FitBounds({
 }
 
 function SearchHereControl({
-                               onStationsLoaded,
-                               t,
-                           }: {
+                                onStationsLoaded,
+                                debugMode,
+                                t,
+                            }: {
     onStationsLoaded: (stations: Station[]) => void;
+    debugMode: boolean;
     t: TranslationSchema;
 }) {
     const map = useMap();
@@ -237,7 +275,7 @@ function SearchHereControl({
                 east: bounds.getEast(),
                 centerLat: center.lat,
                 centerLon: center.lng,
-            });
+            }, { debug: debugMode });
 
             onStationsLoaded(result.stations as Station[]);
 
@@ -310,6 +348,7 @@ function StationPopupContent({
     fuelType,
     measurementSystem,
     currencySystem,
+    language,
     debugMode,
     t,
     onSelectStationAsStart,
@@ -320,6 +359,7 @@ function StationPopupContent({
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    language: Language;
     debugMode: boolean;
     t: TranslationSchema;
     onSelectStationAsStart: (payload: {
@@ -334,13 +374,30 @@ function StationPopupContent({
     }) => void;
 }) {
     const initials = getStationInitials(station.brandName ?? station.name);
+    const openingHours = Array.isArray(station.openingHours) ? station.openingHours : [];
+
+    const openingHoursByDay = new Map<string, Array<{ from: string | null; to: string | null }>>();
+    for (const h of openingHours) {
+        const day = String(h.day ?? "").trim();
+        if (!day) continue;
+        const list = openingHoursByDay.get(day) ?? [];
+        list.push({ from: h.from ?? null, to: h.to ?? null });
+        openingHoursByDay.set(day, list);
+    }
+
+    const today = jsDayToEcontrolCode(new Date().getDay());
+    const todayIdx = WEEKDAY_ORDER.indexOf(today);
+    const rotatedWeekdays =
+        todayIdx === -1
+            ? [...WEEKDAY_ORDER]
+            : [...WEEKDAY_ORDER.slice(todayIdx), ...WEEKDAY_ORDER.slice(0, todayIdx)];
 
     return (
-        <div className="w-[340px] max-w-[70vw] select-text">
+        <div className="w-85 max-w-[70vw] select-text">
             <div className="flex items-start gap-3">
                 <div
                     className={
-                        "relative h-11 w-11 shrink-0 overflow-hidden rounded-full border bg-white shadow-sm " +
+                        "relative h-11 w-11 shrink-0 overflow-hidden rounded-full border bg-white shadow-sm" +
                         (selectedPrice != null ? "border-blue-200" : "border-red-200")
                     }
                 >
@@ -375,40 +432,44 @@ function StationPopupContent({
                             </div>
                         ) : null}
                     </div>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span
-                            className={
-                                "rounded-full px-2 py-0.5 font-semibold " +
-                                (station.open === true
-                                    ? "bg-green-50 text-green-700 ring-1 ring-green-200"
-                                    : station.open === false
-                                        ? "bg-red-50 text-red-700 ring-1 ring-red-200"
-                                        : "bg-gray-50 text-gray-600 ring-1 ring-gray-200")
-                            }
-                        >
-                            {station.open === true
-                                ? t.station.open
-                                : station.open === false
-                                    ? t.station.closed
-                                    : t.station.unknown}
-                        </span>
-
-                        {station.distanceKm != null ? (
-                            <span className="rounded-full bg-gray-50 px-2 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
-                                {t.station.distance}: {station.distanceKm.toFixed(2)} km
-                            </span>
-                        ) : null}
-
-                        <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 ring-1 ring-blue-200">
-                            {t.pricing.sourceEcontrol}
-                        </span>
-                    </div>
                 </div>
             </div>
 
+
+            <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px]">
+
+                {station.distanceKm != null ? (
+                    <span className=" rounded-full bg-gray-50 px-2 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
+                                {t.station.distance}:{" "}
+                        {(measurementSystem === "imperial"
+                                ? kmToMiles(station.distanceKm)
+                                : station.distanceKm
+                        ).toFixed(2)}{" "}
+                        {measurementSystem === "imperial" ? t.units.miles : t.units.km}
+                            </span>
+                ) : null}
+
+                <div className="flex-auto">
+
+                </div>
+                <span className="font-medium text-gray-500">
+                            {t.pricing.dataSource}
+                        </span>
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 ring-1 ring-blue-200">
+                            <Image
+                                src="/resources/logos/econtrol.svg"
+                                alt="E-Control"
+                                width={47}
+                                height={14}
+                                className="h-3.5 w-auto"
+                                loading="lazy"
+                                unoptimized
+                            />
+                        </span>
+            </div>
+
             <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white p-3">
+                <div className="rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
                     <div className="text-[11px] font-semibold text-gray-600">
                         {t.pricing.diesel}
                     </div>
@@ -421,8 +482,8 @@ function StationPopupContent({
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white p-3">
-                    <div className="text-[11px] font-semibold text-gray-600">Super 95</div>
+                <div className="rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
+                    <div className="text-[11px] font-semibold text-gray-600">{t.pricing.super95}</div>
                     <div className="mt-0.5 text-sm font-extrabold text-gray-900">
                         {formatDisplayPrice(
                             station.super95,
@@ -451,73 +512,199 @@ function StationPopupContent({
             </div>
 
             <div className="mt-3 grid gap-2">
-                {station.econtrol?.contact ? (
-                    <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
-                        <summary className="text-xs font-semibold text-gray-700">
-                            {t.station.contact}
-                        </summary>
+                <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                    <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                        <span
+                            aria-hidden="true"
+                            className="text-gray-500 transition-transform group-open:rotate-90"
+                        >
+                            ▶
+                        </span>
+                        <span className="flex-auto">{t.station.openingHours}</span>
+                        <span
+                            className={
+                                "rounded-full px-2 py-0.5 font-semibold " +
+                                (station.open === true
+                                    ? "bg-green-50 text-green-700 ring-1 ring-green-200"
+                                    : station.open === false
+                                        ? "bg-red-50 text-red-700 ring-1 ring-red-200"
+                                        : "bg-gray-50 text-gray-600 ring-1 ring-gray-200")
+                            }
+                        >
+                            {station.open === true
+                                ? t.station.open
+                                : station.open === false
+                                    ? t.station.closed
+                                    : t.station.unknown}
+                        </span>
+                    </summary>
+
+                    {openingHours.length ? (
+                        <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs text-gray-700">
+                            {rotatedWeekdays.map((code) => {
+                                const intervals = openingHoursByDay.get(code) ?? [];
+                                const has24 = intervals.some((x) => is24Hours(x.from, x.to));
+                                const value = has24
+                                    ? t.station.open24Hours
+                                    : intervals.length
+                                        ? intervals
+                                            .map((x) =>
+                                                x.from && x.to ? `${x.from}\u2013${x.to}` : "—"
+                                            )
+                                            .join(", ")
+                                        : "—";
+
+                                return (
+                                    <React.Fragment key={code}>
+                                        <div className="text-gray-600">
+                                            {weekdayLabel(code, language)}
+                                        </div>
+                                        <div className="text-right font-medium tabular-nums">
+                                            {value}
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="mt-2 text-xs text-gray-500">—</div>
+                    )}
+                </details>
+
+                <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                    <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                        <span
+                            aria-hidden="true"
+                            className="text-gray-500 transition-transform group-open:rotate-90"
+                        >
+                            ▶
+                        </span>
+                        <span className="flex-auto">{t.station.payment}</span>
+                    </summary>
+                    {station.paymentMethods?.cash ||
+                    station.paymentMethods?.debitCard ||
+                    station.paymentMethods?.creditCard ||
+                    (station.paymentMethods?.others ?? "").trim() ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                            {station.paymentMethods?.cash ? (
+                                <span className="rounded-full bg-gray-50 px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-gray-200">
+                                    {t.station.paymentCash}
+                                </span>
+                            ) : null}
+                            {station.paymentMethods?.debitCard ? (
+                                <span className="rounded-full bg-gray-50 px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-gray-200">
+                                    {t.station.paymentDebitCard}
+                                </span>
+                            ) : null}
+                            {station.paymentMethods?.creditCard ? (
+                                <span className="rounded-full bg-gray-50 px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-gray-200">
+                                    {t.station.paymentCreditCard}
+                                </span>
+                            ) : null}
+                            {(station.paymentMethods?.others ?? "")
+                                .split(",")
+                                .map((x) => x.trim())
+                                .filter(Boolean)
+                                .map((method, idx) => (
+                                    <span
+                                        key={`${method}-${idx}`}
+                                        className="rounded-full bg-gray-50 px-2 py-0.5 font-semibold text-gray-700 ring-1 ring-gray-200"
+                                    >
+                                        {method}
+                                    </span>
+                                ))}
+                        </div>
+                    ) : (
+                        <div className="mt-2 text-xs text-gray-500">—</div>
+                    )}
+                </details>
+
+                <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                    <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                        <span
+                            aria-hidden="true"
+                            className="text-gray-500 transition-transform group-open:rotate-90"
+                        >
+                            ▶
+                        </span>
+                        <span className="flex-auto">{t.station.contact}</span>
+                    </summary>
+                    {station.contact?.telephone ||
+                    station.contact?.fax ||
+                    station.contact?.mail ||
+                    station.contact?.website ? (
                         <div className="mt-2 space-y-1 text-xs text-gray-700">
-                            {station.econtrol.contact.telephone ? (
+                            {station.contact?.telephone ? (
                                 <div>
                                     <span className="font-medium">{t.station.phone}:</span>{" "}
-                                    <a
-                                        href={`tel:${station.econtrol.contact.telephone}`}
-                                        className="underline"
-                                    >
-                                        {station.econtrol.contact.telephone}
+                                    <a href={`tel:${station.contact.telephone}`} className="underline">
+                                        {station.contact.telephone}
                                     </a>
                                 </div>
                             ) : null}
-                            {station.econtrol.contact.mail ? (
+                            {station.contact?.fax ? (
+                                <div>
+                                    <span className="font-medium">{t.station.fax}:</span>{" "}
+                                    <span className="tabular-nums">{station.contact.fax}</span>
+                                </div>
+                            ) : null}
+                            {station.contact?.mail ? (
                                 <div>
                                     <span className="font-medium">{t.station.mail}:</span>{" "}
-                                    <a
-                                        href={`mailto:${station.econtrol.contact.mail}`}
-                                        className="underline"
-                                    >
-                                        {station.econtrol.contact.mail}
+                                    <a href={`mailto:${station.contact.mail}`} className="underline">
+                                        {station.contact.mail}
                                     </a>
                                 </div>
                             ) : null}
-                            {station.econtrol.contact.website ? (
+                            {station.contact?.website ? (
                                 <div>
                                     <span className="font-medium">{t.station.website}:</span>{" "}
                                     <a
-                                        href={
-                                            station.econtrol.contact.website.startsWith("http")
-                                                ? station.econtrol.contact.website
-                                                : `https://${station.econtrol.contact.website}`
-                                        }
+                                        href={normalizeWebsiteUrl(station.contact.website)}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="underline"
                                     >
-                                        {station.econtrol.contact.website}
+                                        {station.contact.website}
                                     </a>
                                 </div>
                             ) : null}
                         </div>
-                    </details>
-                ) : null}
+                    ) : (
+                        <div className="mt-2 text-xs text-gray-500">—</div>
+                    )}
+                </details>
 
-                {station.econtrol?.otherServiceOffers ? (
-                    <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
-                        <summary className="text-xs font-semibold text-gray-700">
-                            {t.station.otherOffers}
+                {station.otherServiceOffers ? (
+                    <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                        <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                            <span
+                                aria-hidden="true"
+                                className="text-gray-500 transition-transform group-open:rotate-90"
+                            >
+                                ▶
+                            </span>
+                            <span className="flex-auto">{t.station.otherOffers}</span>
                         </summary>
                         <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                            {station.econtrol.otherServiceOffers}
+                            {station.otherServiceOffers}
                         </pre>
                     </details>
                 ) : null}
 
                 {debugMode && station.econtrol ? (
-                    <details className="rounded-2xl border border-gray-200 bg-white px-3 py-2">
-                        <summary className="text-xs font-semibold text-gray-700">
-                            {t.station.rawData}
+                    <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                        <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                            <span
+                                aria-hidden="true"
+                                className="text-gray-500 transition-transform group-open:rotate-90"
+                            >
+                                ▶
+                            </span>
+                            <span className="flex-auto">{t.station.rawData}</span>
                         </summary>
                         <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                            {JSON.stringify(station, null, 2)}
+                            {JSON.stringify(station.econtrol, null, 2)}
                         </pre>
                     </details>
                 ) : null}
@@ -569,6 +756,7 @@ function StationsLayer({
                            fuelType,
                            measurementSystem,
                            currencySystem,
+                           language,
                            debugMode,
                            onSelectStationAsDestination,
                            onSelectStationAsStart,
@@ -578,6 +766,7 @@ function StationsLayer({
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    language: Language;
     debugMode: boolean;
     onSelectStationAsDestination: (payload: {
         point: Point;
@@ -615,6 +804,7 @@ function StationsLayer({
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
                                     currencySystem={currencySystem}
+                                    language={language}
                                     debugMode={debugMode}
                                     t={t}
                                     onSelectStationAsStart={(payload) => {
@@ -626,277 +816,6 @@ function StationsLayer({
                                         map.closePopup();
                                     }}
                                 />
-
-                                {/* Legacy popup content (disabled; kept in git history)
-                                    <div className="min-w-60 select-text">
-                                    <div className="text-base font-semibold">{station.name}</div>
-
-                                    {station.address ? (
-                                        <div className="mt-1 text-sm text-gray-700">
-                                            {station.address}
-                                        </div>
-                                    ) : null}
-
-                                    {station.city ? (
-                                        <div className="text-sm text-gray-500">{station.city}</div>
-                                    ) : null}
-
-                                    {station.postalCode ? (
-                                        <div className="text-sm text-gray-500">
-                                            {t.station.postalCode}: {station.postalCode}
-                                        </div>
-                                    ) : null}
-
-                                    {station.distanceKm != null ? (
-                                        <div className="text-sm text-gray-500">
-                                            {t.station.distance}: {station.distanceKm!.toFixed(2)} km
-                                        </div>
-                                    ) : null}
-
-                                    {station.econtrol?.contact ? (
-                                        <div className="mt-2 space-y-1 text-xs text-gray-600">
-                                            <div className="font-medium text-gray-500">
-                                                {t.station.contact}
-                                            </div>
-
-                                            {station.econtrol.contact.telephone ? (
-                                                <div>
-                                                    <span className="font-medium">
-                                                        {t.station.phone}:
-                                                    </span>{" "}
-                                                    {station.econtrol.contact.telephone}
-                                                </div>
-                                            ) : null}
-
-                                            {station.econtrol.contact.fax ? (
-                                                <div>
-                                                    <span className="font-medium">
-                                                        {t.station.fax}:
-                                                    </span>{" "}
-                                                    {station.econtrol.contact.fax}
-                                                </div>
-                                            ) : null}
-
-                                            {station.econtrol.contact.mail ? (
-                                                <div>
-                                                    <span className="font-medium">
-                                                        {t.station.mail}:
-                                                    </span>{" "}
-                                                    <a
-                                                        href={`mailto:${station.econtrol.contact.mail}`}
-                                                        className="underline"
-                                                    >
-                                                        {station.econtrol.contact.mail}
-                                                    </a>
-                                                </div>
-                                            ) : null}
-
-                                            {station.econtrol.contact.website ? (
-                                                <div>
-                                                    <span className="font-medium">
-                                                        {t.station.website}:
-                                                    </span>{" "}
-                                                    <a
-                                                        href={
-                                                            station.econtrol.contact.website.startsWith("http")
-                                                                ? station.econtrol.contact.website
-                                                                : `https://${station.econtrol.contact.website}`
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="underline"
-                                                    >
-                                                        {station.econtrol.contact.website}
-                                                    </a>
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-
-                                    {station.econtrol?.offerInformation ? (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                            <div className="font-medium text-gray-500">
-                                                {t.station.services}
-                                            </div>
-                                            <div>
-                                                service:{" "}
-                                                {String(!!station.econtrol.offerInformation.service)}
-                                                {" · "}selfService:{" "}
-                                                {String(!!station.econtrol.offerInformation.selfService)}
-                                                {" · "}unattended:{" "}
-                                                {String(!!station.econtrol.offerInformation.unattended)}
-                                            </div>
-                                        </div>
-                                    ) : null}
-
-                                    {station.econtrol?.paymentMethods ? (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                            <div className="font-medium text-gray-500">
-                                                {t.station.payment}
-                                            </div>
-                                            <div>
-                                                cash:{" "}
-                                                {String(!!station.econtrol.paymentMethods.cash)}
-                                                {" · "}debitCard:{" "}
-                                                {String(!!station.econtrol.paymentMethods.debitCard)}
-                                                {" · "}creditCard:{" "}
-                                                {String(!!station.econtrol.paymentMethods.creditCard)}
-                                            </div>
-                                            {station.econtrol.paymentMethods.others ? (
-                                                <div className="whitespace-pre-wrap text-gray-500">
-                                                    {station.econtrol.paymentMethods.others}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-
-                                    {station.econtrol?.otherServiceOffers ? (
-                                        <details className="mt-2">
-                                            <summary className="cursor-pointer text-xs font-medium text-gray-600">
-                                                {t.station.otherOffers}
-                                            </summary>
-                                            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                                                {station.econtrol.otherServiceOffers}
-                                            </pre>
-                                        </details>
-                                    ) : null}
-
-                                    {Array.isArray(station.econtrol?.openingHours) &&
-                                    station.econtrol.openingHours.length > 0 ? (
-                                        <details className="mt-2">
-                                            <summary className="cursor-pointer text-xs font-medium text-gray-600">
-                                                {t.station.openingHours}
-                                            </summary>
-                                            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                                                {JSON.stringify(
-                                                    station.econtrol.openingHours,
-                                                    null,
-                                                    2
-                                                )}
-                                            </pre>
-                                        </details>
-                                    ) : null}
-
-                                    {station.econtrol ? (
-                                        <details className="mt-2">
-                                            <summary className="cursor-pointer text-xs font-medium text-gray-600">
-                                                {t.station.rawData}
-                                            </summary>
-                                            <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap rounded bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                                                {JSON.stringify(station.econtrol, null, 2)}
-                                            </pre>
-                                        </details>
-                                    ) : null}
-
-                                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                                        <div className="rounded-lg bg-gray-50 p-2">
-                                            <div className="text-gray-500">{t.pricing.diesel}</div>
-                                            <div className="font-semibold">
-                                                {formatDisplayPrice(
-                                                    station.diesel,
-                                                    measurementSystem,
-                                                    currencySystem
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="rounded-lg bg-gray-50 p-2">
-                                            <div className="text-gray-500">Super 95</div>
-                                            <div className="font-semibold">
-                                                {formatDisplayPrice(
-                                                    station.super95,
-                                                    measurementSystem,
-                                                    currencySystem
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 flex items-center justify-between text-xs">
-                    <span
-                        className={
-                            station.open === true
-                                ? "font-medium text-green-600"
-                                : station.open === false
-                                    ? "font-medium text-red-600"
-                                    : "text-gray-500"
-                        }
-                    >
-                      {station.open === true
-                          ? t.station.open
-                          : station.open === false
-                              ? t.station.closed
-                              : t.station.unknown}
-                    </span>
-
-                                        <span className="text-gray-400">
-                      {station.source === "econtrol"
-                          ? t.pricing.sourceEcontrol
-                          : t.pricing.sourceUnknown}
-                    </span>
-                                    </div>
-
-                                    <div className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                        {t.pricing.selectedFuel}:{" "}
-                                        <span className="font-semibold">
-                      {fuelType === "diesel"
-                          ? t.pricing.diesel
-                          : t.pricing.super95}
-                    </span>
-                                        {" · "}
-                                        {t.pricing.sourcePrice}:{" "}
-                                        <span className="font-semibold">
-                      {formatDisplayPrice(
-                          selectedPrice,
-                          measurementSystem,
-                          currencySystem
-                      )}
-                    </span>
-                                    </div>
-
-                                    <div className="mt-3 grid gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                onSelectStationAsStart({
-                                                    point: {
-                                                        lat: station.lat,
-                                                        lon: station.lon,
-                                                        label: station.name,
-                                                    },
-                                                    price: selectedPrice,
-                                                    station,
-                                                });
-
-                                                map.closePopup();
-                                            }}
-                                            className="w-full rounded-xl bg-gray-800 px-3 py-2 text-sm font-medium text-white"
-                                        >
-                                            {t.route.setAsStart}
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                onSelectStationAsDestination({
-                                                    point: {
-                                                        lat: station.lat,
-                                                        lon: station.lon,
-                                                        label: station.name,
-                                                    },
-                                                    price: selectedPrice,
-                                                    station,
-                                                });
-
-                                                map.closePopup();
-                                            }}
-                                            className="w-full rounded-xl bg-black px-3 py-2 text-sm font-medium text-white"
-                                        >
-                                            {t.route.setAsDestination}
-                                        </button>
-                                    </div>
-                                </div>
-                                */}
                             </Popup>
                         </Marker>
 
@@ -922,6 +841,7 @@ export default function MapPicker({
                                       fuelType,
                                       measurementSystem,
                                       currencySystem,
+                                      language,
                                       debugMode,
                                       t,
                                       onMapPick,
@@ -944,7 +864,7 @@ export default function MapPicker({
 
                 <ResizeFix />
                 <RecenterControl start={start} end={end} routeGeometry={routeGeometry} t={t} />
-                <SearchHereControl onStationsLoaded={setStations} t={t} />
+                <SearchHereControl onStationsLoaded={setStations} debugMode={debugMode} t={t} />
                 <FitBounds start={start} end={end} routeGeometry={routeGeometry} />
                 <ClickHandler pickMode={pickMode} onMapPick={onMapPick} />
 
@@ -957,6 +877,7 @@ export default function MapPicker({
                     fuelType={fuelType}
                     measurementSystem={measurementSystem}
                     currencySystem={currencySystem}
+                    language={language}
                     debugMode={debugMode}
                     onSelectStationAsDestination={onSelectStationAsDestination}
                     onSelectStationAsStart={onSelectStationAsStart}
