@@ -236,6 +236,7 @@ export default function MapPicker({
     const mapRef = useRef<MapLibreMap | null>(null);
     const mapLoadedRef = useRef(false);
     const mapCleanupRef = useRef<(() => void) | null>(null);
+    const lastAutoFitSignatureRef = useRef<string>("");
 
     const pickModeRef = useRef<MapPickMode>(pickMode);
     useEffect(() => {
@@ -509,6 +510,21 @@ export default function MapPicker({
                     ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
                     ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
                 ];
+        const signature = (() => {
+            if (validRoute.length > 0) {
+                const first = validRoute[0];
+                const last = validRoute[validRoute.length - 1];
+                return `r:${validRoute.length}:${first[0]},${first[1]}:${last[0]},${last[1]}`;
+            }
+            const s = start ? `${start.lat},${start.lon}` : "-";
+            const e = end ? `${end.lat},${end.lon}` : "-";
+            return `p:${s}:${e}`;
+        })();
+
+        // Prevent auto-recentering on unrelated re-renders (e.g. "Hier suchen" updates stations state).
+        if (lastAutoFitSignatureRef.current === signature) return;
+        lastAutoFitSignatureRef.current = signature;
+
         if (points.length === 0) return;
 
         // With only one point (start OR end), fitBounds zooms in aggressively.
