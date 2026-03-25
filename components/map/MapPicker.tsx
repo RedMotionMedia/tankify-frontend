@@ -556,6 +556,7 @@ function StationPopupContent({
                     {openingHours.length ? (
                         <div className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs text-gray-700">
                             {rotatedWeekdays.map((code) => {
+                                const isToday = code === today;
                                 const intervals = openingHoursByDay.get(code) ?? [];
                                 const has24 = intervals.some((x) => is24Hours(x.from, x.to));
                                 const value = has24
@@ -570,10 +571,23 @@ function StationPopupContent({
 
                                 return (
                                     <React.Fragment key={code}>
-                                        <div className="text-gray-600">
+                                        <div
+                                            className={
+                                                isToday
+                                                    ? "font-bold text-gray-900"
+                                                    : "text-gray-600"
+                                            }
+                                        >
                                             {weekdayLabel(code, language)}
                                         </div>
-                                        <div className="text-right font-medium tabular-nums">
+                                        <div
+                                            className={
+                                                "text-right tabular-nums " +
+                                                (isToday
+                                                    ? "font-bold text-gray-900"
+                                                    : "font-medium text-gray-700")
+                                            }
+                                        >
                                             {value}
                                         </div>
                                     </React.Fragment>
