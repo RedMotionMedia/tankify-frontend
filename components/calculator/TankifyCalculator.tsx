@@ -82,6 +82,7 @@ export default function TankifyCalculator() {
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [stationsQueried, setStationsQueried] = useState(false);
+    const [desktopStationsOpen, setDesktopStationsOpen] = useState(true);
     const [desktopResultsOpen, setDesktopResultsOpen] = useState(true);
 
     const {
@@ -477,6 +478,7 @@ export default function TankifyCalculator() {
     function handleStationsChange(stations: Station[]) {
         setStationsQueried(true);
         setVisibleStations(stations);
+        setDesktopStationsOpen(true);
     }
 
     function handleSelectStationAsStart({
@@ -787,7 +789,7 @@ export default function TankifyCalculator() {
                         ) : null}
                     </section>
 
-                            {stationsQueried ? (
+                            {stationsQueried && desktopStationsOpen ? (
                                     <StationsSidebar
                                         stations={visibleStations}
                                         selectedStationId={selectedStationId}
@@ -801,6 +803,7 @@ export default function TankifyCalculator() {
                                         t={t}
                                         onSelectStationAsStart={handleSelectStationAsStart}
                                         onSelectStationAsDestination={handleSelectStationAsDestination}
+                                        onClose={() => setDesktopStationsOpen(false)}
                                     />
 
                             ) : null}

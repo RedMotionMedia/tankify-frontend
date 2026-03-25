@@ -41,6 +41,7 @@ export default function StationsSidebar({
     t,
     onSelectStationAsStart,
     onSelectStationAsDestination,
+    onClose,
 }: {
     stations: Station[];
     selectedStationId: string | null;
@@ -58,6 +59,7 @@ export default function StationsSidebar({
         price?: number | null;
         station: Station;
     }) => void;
+    onClose?: () => void;
 }) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -96,6 +98,17 @@ export default function StationsSidebar({
                             : t.route.noStationsFound}
                     </div>
                 </div>
+                {onClose ? (
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                        aria-label={t.actions.close}
+                        title={t.actions.close}
+                    >
+                        ×
+                    </button>
+                ) : null}
             </div>
 
             {/* Inset the scroll container from the bottom so the scrollbar doesn't touch the panel edge. */}
