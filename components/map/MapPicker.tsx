@@ -1402,6 +1402,12 @@ function RecenterControl({
                 setUserLocation({ lat, lon });
                 onUserLocationChange?.({ lat, lon });
                 setLocationError(null);
+                try {
+                    window.localStorage.setItem(
+                        "tankify-last-location",
+                        JSON.stringify({ lat, lon, ts: Date.now() })
+                    );
+                } catch {}
 
                 if (!didCenterOnEnableRef.current) {
                     didCenterOnEnableRef.current = true;
@@ -1427,6 +1433,12 @@ function RecenterControl({
                 setUserLocation({ lat, lon });
                 onUserLocationChange?.({ lat, lon });
                 setLocationError(null);
+                try {
+                    window.localStorage.setItem(
+                        "tankify-last-location",
+                        JSON.stringify({ lat, lon, ts: Date.now() })
+                    );
+                } catch {}
 
                 if (!didCenterOnEnableRef.current) {
                     didCenterOnEnableRef.current = true;

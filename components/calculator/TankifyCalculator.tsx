@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import RouteSection from "./RouteSection";
 import PriceSection from "./PriceSection";
 import ResultsPanel from "./ResultsPanel";
@@ -78,6 +78,7 @@ export default function TankifyCalculator() {
 
     const {routeData, routeLoading, routeError} = useRoute(startPoint, endPoint);
     const t = getTranslations(language);
+    const myLocationReqIdRef = useRef(0);
 
     useEffect(() => {
 
@@ -312,17 +313,56 @@ export default function TankifyCalculator() {
         );
     }
 
+    function tryReadLastLocation(): { lat: number; lon: number } | null {
+        try {
+            const raw = window.localStorage.getItem("tankify-last-location");
+            if (!raw) return null;
+            const parsed = JSON.parse(raw) as Partial<{ lat: unknown; lon: unknown }>;
+            const lat = typeof parsed.lat === "number" ? parsed.lat : Number.NaN;
+            const lon = typeof parsed.lon === "number" ? parsed.lon : Number.NaN;
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return { lat, lon };
+        } catch {
+            return null;
+        }
+    }
+
+    function writeLastLocation(loc: { lat: number; lon: number }) {
+        try {
+            window.localStorage.setItem(
+                "tankify-last-location",
+                JSON.stringify({ lat: loc.lat, lon: loc.lon, ts: Date.now() })
+            );
+        } catch {}
+    }
+
     async function handleUseMyLocationAsStart() {
+        const reqId = ++myLocationReqIdRef.current;
         try {
             setError("");
+
+            // Instant feedback: use the last known location (if available) right away.
+            const cached = tryReadLastLocation();
+            if (cached) {
+                const label = t.route.currentLocation;
+                setStartPoint({ lat: cached.lat, lon: cached.lon, label });
+                setStartText(label);
+                setMapPickMode(null);
+            }
+
             const { lat, lon } = await getCurrentPosition();
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
+            if (reqId !== myLocationReqIdRef.current) return;
 
             const label = t.route.currentLocation;
             setStartPoint({ lat, lon, label });
             setStartText(label);
             setMapPickMode(null);
+            writeLastLocation({ lat, lon });
         } catch {
+            // If we already applied a cached location, don't block the user with an error.
+            if (reqId !== myLocationReqIdRef.current) return;
+            if (tryReadLastLocation()) return;
             setError(t.errors.locationFailed);
         }
     }
