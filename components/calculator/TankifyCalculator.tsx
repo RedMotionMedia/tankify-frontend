@@ -367,6 +367,52 @@ export default function TankifyCalculator() {
         }
     }
 
+    async function handleUseMyLocationAsDestination() {
+        const reqId = ++myLocationReqIdRef.current;
+        try {
+            setError("");
+
+            const cached = tryReadLastLocation();
+            if (cached) {
+                const label = t.route.currentLocation;
+                setEndPoint({ lat: cached.lat, lon: cached.lon, label });
+                setEndText(label);
+                setMapPickMode(null);
+            }
+
+            const { lat, lon } = await getCurrentPosition();
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
+            if (reqId !== myLocationReqIdRef.current) return;
+
+            const label = t.route.currentLocation;
+            setEndPoint({ lat, lon, label });
+            setEndText(label);
+            setMapPickMode(null);
+            writeLastLocation({ lat, lon });
+        } catch {
+            if (reqId !== myLocationReqIdRef.current) return;
+            if (tryReadLastLocation()) return;
+            setError(t.errors.locationFailed);
+        }
+    }
+
+    function handleSwapStartEnd() {
+        setError("");
+        setSearchLoading(null);
+
+        setStartText(endText);
+        setEndText(startText);
+
+        setStartPoint(endPoint);
+        setEndPoint(startPoint);
+
+        // Prices are tied to "start/local" vs "destination/end", so swap them too.
+        setLocalPricePerLiter(destinationPricePerLiter);
+        setDestinationPricePerLiter(localPricePerLiter);
+
+        setMapPickMode((prev) => (prev === "start" ? "end" : prev === "end" ? "start" : null));
+    }
+
     const calculation = useMemo(() => {
         return calculateTankify({
             oneWayKm: routeData?.distanceKm ?? 0,
@@ -409,6 +455,8 @@ export default function TankifyCalculator() {
                     minimizeBottomSheet();
                 }}
                 onUseMyLocationAsStart={handleUseMyLocationAsStart}
+                onUseMyLocationAsDestination={handleUseMyLocationAsDestination}
+                onSwapStartEnd={handleSwapStartEnd}
                 searchLoading={searchLoading}
                 mapPickMode={mapPickMode}
             />
