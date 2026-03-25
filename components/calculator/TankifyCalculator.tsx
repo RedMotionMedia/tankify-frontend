@@ -689,7 +689,7 @@ export default function TankifyCalculator() {
             />
 
             <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
-                <div className="mx-auto hidden max-w-screen-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_minmax(0,1fr)_430px] lg:items-start">
+                <div className="mx-auto hidden max-w-screen-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_minmax(0,1fr)_420px] lg:items-start">
                     <section className="self-start rounded-3xl bg-white p-6 shadow-sm">
                         <div className="flex items-start justify-between gap-3">
                             <div>

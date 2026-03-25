@@ -152,7 +152,7 @@ export default function StationPopupContent({
     const distanceKm = userLocation ? haversineKm(userLocation, station) : null;
 
     return (
-        <div className="w-85 max-w-[70vw] select-text">
+        <div className="w-full max-w-[70vw] select-text">
             <div className="flex items-start gap-3">
                 <div
                     className={
