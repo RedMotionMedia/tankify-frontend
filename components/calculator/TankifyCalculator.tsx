@@ -82,6 +82,7 @@ export default function TankifyCalculator() {
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [stationsQueried, setStationsQueried] = useState(false);
+    const [desktopResultsOpen, setDesktopResultsOpen] = useState(true);
 
     const {
         sheetContentRef,
@@ -557,6 +558,7 @@ export default function TankifyCalculator() {
         setCalcEndPoint(draftEndPoint);
         setRouteRequestId((v) => v + 1);
         setMapPickMode(null);
+        setDesktopResultsOpen(true);
     }
 
     const calculation = useMemo(() => {
@@ -748,8 +750,17 @@ export default function TankifyCalculator() {
                              </div>
                          </div>
 
-                        {hasCommittedRoute ? (
-                        <div className="rounded-3xl bg-white p-5 shadow-sm h-auto max-h-full">
+                        {hasCommittedRoute && desktopResultsOpen ? (
+                        <div className="relative rounded-3xl bg-white p-5 shadow-sm h-auto max-h-full">
+                            <button
+                                type="button"
+                                onClick={() => setDesktopResultsOpen(false)}
+                                className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                                aria-label={t.actions.close}
+                                title={t.actions.close}
+                            >
+                                ×
+                            </button>
                             <div className="h-full overflow-auto">
                                 <div className="flex flex-col gap-6">
 

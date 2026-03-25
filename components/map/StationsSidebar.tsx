@@ -126,16 +126,16 @@ export default function StationsSidebar({
                                     <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
                                         {station.logoUrl ? (
                                             // eslint-disable-next-line @next/next/no-img-element
-                                            <img
-                                                src={station.logoUrl}
-                                                alt=""
-                                                referrerPolicy="no-referrer"
-                                                className="h-full w-full object-contain p-1"
-                                                onError={(e) => {
-                                                    (e.currentTarget as HTMLImageElement).style.display =
-                                                        "none";
-                                                }}
-                                            />
+                                                <img
+                                                    src={station.logoUrl}
+                                                    alt=""
+                                                    referrerPolicy="no-referrer"
+                                                    className="h-full w-full object-contain"
+                                                    onError={(e) => {
+                                                        (e.currentTarget as HTMLImageElement).style.display =
+                                                            "none";
+                                                    }}
+                                                />
                                         ) : (
                                             <div className="grid h-full w-full place-items-center text-xs font-bold text-gray-600">
                                                 {station.name.slice(0, 2).toUpperCase()}
