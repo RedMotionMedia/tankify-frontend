@@ -12,6 +12,12 @@ export type TranslationSchema = {
         measurement: string;
         metric: string;
         imperial: string;
+        logoCache: string;
+        clearLogoCache: string;
+        clearing: string;
+        cacheCleared: string;
+        cacheClearFailed: string;
+        enableDebugMode: string;
     };
     app: {
         title: string;
@@ -53,6 +59,7 @@ export type TranslationSchema = {
         destinationPrice: string;
         priceDifference: string;
         breakEvenDiff: string;
+        dataSource: string;
         sourcePrice: string;
         sourceEcontrol: string;
         sourceUnknown: string;
@@ -95,6 +102,23 @@ export type TranslationSchema = {
         unknown: string;
         addressMissing: string;
         cityMissing: string;
+        postalCode: string;
+        distance: string;
+        contact: string;
+        phone: string;
+        fax: string;
+        mail: string;
+        website: string;
+        services: string;
+        payment: string;
+        paymentCash: string;
+        paymentDebitCard: string;
+        paymentCreditCard: string;
+        paymentOther: string;
+        otherOffers: string;
+        openingHours: string;
+        open24Hours: string;
+        rawData: string;
     };
     actions: {
         search: string;
@@ -139,6 +163,12 @@ export const translations: Record<Language, TranslationSchema> = {
             measurement: "Einheitensystem",
             metric: "Metrisch",
             imperial: "Imperial",
+            logoCache: "Logo-Cache",
+            clearLogoCache: "Logo-Cache leeren",
+            clearing: "Leere ...",
+            cacheCleared: "Logo-Cache wurde geleert.",
+            cacheClearFailed: "Cache konnte nicht geleert werden.",
+            enableDebugMode: "Debug-Modus aktivieren",
         },
         app: {
             title: "Tankify",
@@ -183,6 +213,7 @@ export const translations: Record<Language, TranslationSchema> = {
             destinationPrice: "Preis am Ziel",
             priceDifference: "Preisunterschied",
             breakEvenDiff: "Break-even Preisunterschied",
+            dataSource: "Datenquelle",
             sourcePrice: "Preis",
             sourceEcontrol: "Preis: E-Control",
             sourceUnknown: "Preis: —",
@@ -227,6 +258,23 @@ export const translations: Record<Language, TranslationSchema> = {
             unknown: "Öffnungsstatus unbekannt",
             addressMissing: "Keine Adresse verfügbar",
             cityMissing: "Kein Ort verfügbar",
+            postalCode: "PLZ",
+            distance: "Distanz",
+            contact: "Kontakt",
+            phone: "Telefon",
+            fax: "Fax",
+            mail: "E-Mail",
+            website: "Website",
+            services: "Services",
+            payment: "Zahlung",
+            paymentCash: "Bar",
+            paymentDebitCard: "Bankomatkarte",
+            paymentCreditCard: "Kreditkarte",
+            paymentOther: "Andere",
+            otherOffers: "Sonstiges",
+            openingHours: "Öffnungszeiten",
+            open24Hours: "24 Stunden geöffnet",
+            rawData: "Rohdaten (E-Control)",
         },
         actions: {
             search: "Suchen",
@@ -269,6 +317,12 @@ export const translations: Record<Language, TranslationSchema> = {
             measurement: "Measurement system",
             metric: "Metric",
             imperial: "Imperial",
+            logoCache: "Logo cache",
+            clearLogoCache: "Clear logo cache",
+            clearing: "Clearing ...",
+            cacheCleared: "Logo cache cleared.",
+            cacheClearFailed: "Failed to clear cache.",
+            enableDebugMode: "Enable Debug Mode",
         },
         app: {
             title: "Tankify",
@@ -313,6 +367,7 @@ export const translations: Record<Language, TranslationSchema> = {
             destinationPrice: "Destination price",
             priceDifference: "Price difference",
             breakEvenDiff: "Break-even price difference",
+            dataSource: "Data source",
             sourcePrice: "Price",
             sourceEcontrol: "Price: E-Control",
             sourceUnknown: "Price: —",
@@ -356,6 +411,23 @@ export const translations: Record<Language, TranslationSchema> = {
             unknown: "Opening status unknown",
             addressMissing: "No address available",
             cityMissing: "No city available",
+            postalCode: "Postal code",
+            distance: "Distance",
+            contact: "Contact",
+            phone: "Phone",
+            fax: "Fax",
+            mail: "E-mail",
+            website: "Website",
+            services: "Services",
+            payment: "Payment",
+            paymentCash: "Cash",
+            paymentDebitCard: "Debit card",
+            paymentCreditCard: "Credit card",
+            paymentOther: "Other",
+            otherOffers: "Other offers",
+            openingHours: "Opening hours",
+            open24Hours: "Open 24 hours",
+            rawData: "Raw data (E-Control)",
         },
         actions: {
             search: "Search",

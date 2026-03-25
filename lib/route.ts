@@ -30,7 +30,7 @@ export async function fetchStationsForVisibleMap(bounds: {
     east: number;
     centerLat: number;
     centerLon: number;
-}): Promise<{stations: Station[]; error?: string | null}> {
+}, options?: { includeClosed?: boolean; debug?: boolean }): Promise<{stations: Station[]; error?: string | null}> {
     const params = new URLSearchParams({
         south: String(bounds.south),
         west: String(bounds.west),
@@ -39,6 +39,9 @@ export async function fetchStationsForVisibleMap(bounds: {
         centerLat: String(bounds.centerLat),
         centerLon: String(bounds.centerLon),
     });
+
+    if (options?.includeClosed) params.set("includeClosed", "1");
+    if (options?.debug) params.set("debug", "1");
 
     const res = await fetch(`/api/stations?${params.toString()}`);
 

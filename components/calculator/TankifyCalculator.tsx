@@ -36,6 +36,10 @@ export default function TankifyCalculator() {
     const [measurementSystem, setMeasurementSystem] =
         useState<MeasurementSystem>("metric");
     const [storageReady, setStorageReady] = useState(false);
+    const [debugMode, setDebugMode] = useState(false);
+
+    const debugAllowed = process.env.NODE_ENV !== "production" ||
+        (process.env.NEXT_PUBLIC_ENABLE_DEBUG_MODE ?? "").trim() === "1";
 
     const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -77,10 +81,12 @@ export default function TankifyCalculator() {
 
     useEffect(() => {
 
+
         const savedLanguage = window.localStorage.getItem("tankify-language");
         const savedCurrency = window.localStorage.getItem("tankify-currency");
         const savedMeasurement = window.localStorage.getItem("tankify-measurement");
         const savedFuelType = window.localStorage.getItem("tankify-fuelType");
+        const savedDebugMode = window.localStorage.getItem("tankify-debug-mode");
         const savedInputsRaw = window.localStorage.getItem("tankify-inputs-v1");
 
         if (savedLanguage === "de" || savedLanguage === "en") {
@@ -97,6 +103,10 @@ export default function TankifyCalculator() {
 
         if (savedFuelType === "diesel" || savedFuelType === "super95") {
             setFuelType(savedFuelType);
+        }
+
+        if (savedDebugMode === "1" && debugAllowed) {
+            setDebugMode(true);
         }
 
         if (savedInputsRaw) {
@@ -130,7 +140,15 @@ export default function TankifyCalculator() {
         }
 
         setStorageReady(true);
-    }, []);
+    }, [debugAllowed]);
+
+    useEffect(() => {
+        if (debugAllowed) return;
+        setDebugMode(false);
+        try {
+            window.localStorage.removeItem("tankify-debug-mode");
+        } catch {}
+    }, [debugAllowed]);
 
     useEffect(() => {
         if (!storageReady) return;
@@ -151,6 +169,16 @@ export default function TankifyCalculator() {
         if (!storageReady) return;
         window.localStorage.setItem("tankify-fuelType", fuelType);
     }, [fuelType, storageReady]);
+
+    useEffect(() => {
+        if (!storageReady) return;
+        window.localStorage.setItem("tankify-debug-mode", debugMode ? "1" : "0");
+    }, [debugMode, storageReady]);
+
+    useEffect(() => {
+        if (!storageReady) return;
+        if (!debugAllowed && debugMode) setDebugMode(false);
+    }, [debugAllowed, debugMode, storageReady]);
 
     useEffect(() => {
         if (!storageReady) return;
@@ -341,6 +369,9 @@ export default function TankifyCalculator() {
                 t={t}
                 language={language}
                 setLanguage={setLanguage}
+                debugAllowed={debugAllowed}
+                debugMode={debugMode}
+                setDebugMode={setDebugMode}
                 fuelType={fuelType}
                 setFuelType={setFuelType}
                 currencySystem={currencySystem}
@@ -388,6 +419,8 @@ export default function TankifyCalculator() {
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
                                     currencySystem={currencySystem}
+                                    language={language}
+                                    debugMode={debugMode}
                                     t={t}
                                     onMapPick={(type, point) => {
                                         if (type === "start") {
@@ -447,6 +480,8 @@ export default function TankifyCalculator() {
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
                             currencySystem={currencySystem}
+                            language={language}
+                            debugMode={debugMode}
                             t={t}
                             onMapPick={(type, point) => {
                                 if (type === "start") {

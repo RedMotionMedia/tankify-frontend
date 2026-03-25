@@ -1,3 +1,5 @@
+import type { EControlGasStation } from "@/types/econtrol";
+
 export type Language = "de" | "en";
 
 export type CurrencySystem = "eur" | "usd";
@@ -23,17 +25,48 @@ export type RouteData = {
     geometry: [number, number][];
 };
 
+export type StationOpeningHour = {
+    day: string;
+    from: string | null;
+    to: string | null;
+    label?: string | null;
+    order?: number | null;
+};
+
+export type StationContact = {
+    telephone?: string | null;
+    fax?: string | null;
+    mail?: string | null;
+    website?: string | null;
+};
+
+export type StationPaymentMethods = {
+    cash?: boolean | null;
+    debitCard?: boolean | null;
+    creditCard?: boolean | null;
+    others?: string | null;
+};
+
 export type Station = {
     id: string;
     lat: number;
     lon: number;
     name: string;
     address?: string;
+    postalCode?: string;
     city?: string;
     diesel?: number | null;
     super95?: number | null;
     open?: boolean | null;
+    distanceKm?: number | null;
     source?: "econtrol";
+    brandName?: string | null;
+    logoUrl?: string | null;
+    openingHours?: StationOpeningHour[];
+    contact?: StationContact;
+    paymentMethods?: StationPaymentMethods;
+    otherServiceOffers?: string | null;
+    econtrol?: EControlGasStation;
 };
 
 export type MapPickMode = "start" | "end" | null;
