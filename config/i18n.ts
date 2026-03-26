@@ -1,6 +1,10 @@
 import { Language } from "@/types/tankify";
 
 export type TranslationSchema = {
+    onboarding: {
+        title: string;
+        note: string;
+    };
     settings: {
         title: string;
         language: string;
@@ -159,6 +163,10 @@ export type TranslationSchema = {
 
 export const translations: Record<Language, TranslationSchema> = {
     de: {
+        onboarding: {
+            title: "Schnelle Einrichtung",
+            note: "Diese Angaben kannst du später jederzeit in den Einstellungen ändern.",
+        },
         settings: {
             title: "Einstellungen",
             language: "Sprache",
@@ -320,6 +328,10 @@ export const translations: Record<Language, TranslationSchema> = {
         },
     },
     en: {
+        onboarding: {
+            title: "Quick setup",
+            note: "You can change these values later in Settings.",
+        },
         settings: {
             title: "Settings",
             language: "Language",

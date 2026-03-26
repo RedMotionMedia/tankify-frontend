@@ -7,7 +7,7 @@ import PriceSection from "./PriceSection";
 import ResultsPanel from "./ResultsPanel";
 import MobileBottomSheet from "./MobileBottomSheet";
 import SettingsModal from "./SettingsModal";
-import VehicleModal from "./VehicleModal";
+import OnboardingModal from "./OnboardingModal";
 import {getTranslations} from "@/config/i18n";
 import {calculateTankify, getProfitLevel} from "@/lib/calc";
 import {geocode} from "@/lib/geocode";
@@ -238,8 +238,11 @@ export default function TankifyCalculator() {
     useEffect(() => {
         if (!storageReady) return;
         try {
-            const key = "tankify-vehicle-onboarded-v1";
-            if (window.localStorage.getItem(key) !== "1") {
+            const legacyKey = "tankify-vehicle-onboarded-v1";
+            const key = "tankify-onboarded-v1";
+            const legacyDone = window.localStorage.getItem(legacyKey) === "1";
+            const done = window.localStorage.getItem(key) === "1";
+            if (!done && !legacyDone) {
                 setVehicleModalOpen(true);
             }
         } catch {
@@ -765,10 +768,17 @@ export default function TankifyCalculator() {
 
     return (
         <>
-            <VehicleModal
+            <OnboardingModal
                 open={vehicleModalOpen}
                 t={t}
+                language={language}
+                setLanguage={setLanguage}
+                currencySystem={currencySystem}
+                setCurrencySystem={setCurrencySystem}
                 measurementSystem={measurementSystem}
+                setMeasurementSystem={setMeasurementSystem}
+                fuelType={fuelType}
+                setFuelType={setFuelType}
                 consumption={consumptionDisplay}
                 setConsumption={setConsumption}
                 tankSize={tankSizeDisplay}
@@ -777,6 +787,7 @@ export default function TankifyCalculator() {
                 setAvgSpeed={setAvgSpeed}
                 onConfirm={() => {
                     try {
+                        window.localStorage.setItem("tankify-onboarded-v1", "1");
                         window.localStorage.setItem("tankify-vehicle-onboarded-v1", "1");
                     } catch {}
                     setVehicleModalOpen(false);
