@@ -127,6 +127,7 @@ export default function StationPopupContent({
         point: Point;
         price?: number | null;
         station: Station;
+        autoCalculate?: boolean;
     }) => void;
 }) {
     const initials = getStationInitials(station.brandName ?? station.name);
@@ -152,7 +153,7 @@ export default function StationPopupContent({
     const distanceKm = userLocation ? haversineKm(userLocation, station) : null;
 
     return (
-        <div className="w-85 max-w-[70vw] select-text">
+        <div className="w-full max-w-[70vw] select-text">
             <div className="flex items-start gap-3">
                 <div
                     className={
@@ -248,7 +249,7 @@ export default function StationPopupContent({
                             ▶
                         </span>
                         <span className="flex-auto">{t.station.openingHours}</span>
-                        <span className="text-[11px] font-medium text-gray-500">
+                        <span className="text-[11px] font-medium inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 ring-1 ring-green-200 text-green-500">
                             {station.open === true
                                 ? t.station.open
                                 : station.open === false
@@ -274,12 +275,12 @@ export default function StationPopupContent({
 
                                 return (
                                     <React.Fragment key={code}>
-                                        <div className={isToday ? "font-bold text-gray-800" : "text-gray-600"}>
+                                        <div className={isToday ? "font-bold text-gray-900" : "text-gray-600"}>
                                             {weekdayLabel(code, language)}
                                         </div>
                                         <div
                                             className={
-                                                "text-right font-medium tabular-nums " +
+                                                "text-right tabular-nums " +
                                                 (isToday ? "font-bold text-gray-900" : "")
                                             }
                                         >
@@ -405,6 +406,7 @@ export default function StationPopupContent({
                             point: { lat: station.lat, lon: station.lon, label: station.name },
                             price: selectedPrice,
                             station,
+                            autoCalculate: true,
                         })
                     }
                     className="w-full rounded-2xl bg-black px-3 py-2.5 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"

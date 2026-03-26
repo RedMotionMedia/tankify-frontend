@@ -122,14 +122,15 @@ export type TranslationSchema = {
         open24Hours: string;
         rawData: string;
     };
-    actions: {
-        search: string;
-        map: string;
-        swap: string;
-        calculate: string;
-        confirm: string;
-        cancel: string;
-    };
+        actions: {
+            search: string;
+            map: string;
+            swap: string;
+            calculate: string;
+            close: string;
+            confirm: string;
+            cancel: string;
+        };
     status: {
         loading: string;
     };
@@ -289,6 +290,7 @@ export const translations: Record<Language, TranslationSchema> = {
             map: "Karte",
             swap: "Tauschen",
             calculate: "Berechnen",
+            close: "Schließen",
             confirm: "Best\u00e4tigen",
             cancel: "Abbrechen",
         },
@@ -448,6 +450,7 @@ export const translations: Record<Language, TranslationSchema> = {
             map: "Map",
             swap: "Swap",
             calculate: "Calculate",
+            close: "Close",
             confirm: "Confirm",
             cancel: "Cancel",
         },

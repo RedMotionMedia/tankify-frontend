@@ -1,12 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { TranslationSchema } from "@/config/i18n";
 import {
-    CurrencySystem,
     FuelType,
-    Language,
     MapPickMode,
     MeasurementSystem,
     Point,
@@ -15,14 +12,11 @@ import {
 import { reverseGeocode } from "@/lib/geocode";
 import { fetchStationsForVisibleMap } from "@/lib/route";
 import { pricePerLiterToPerGallon } from "@/lib/units";
-import StationPopupContent from "@/components/map/StationPopupContent";
 import {
     ensureMapLibreDeps,
     getMapLibre,
-    type MapLibreGlobal,
     type MapLibreMap,
     type MapLibreMarker,
-    type MapLibrePopup,
 } from "@/components/map/maplibre/ensureMapLibre";
 
 type Props = {
@@ -32,21 +26,13 @@ type Props = {
     pickMode: MapPickMode;
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
-    currencySystem: CurrencySystem;
-    language: Language;
     debugMode: boolean;
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
-    onSelectStationAsDestination: (payload: {
-        point: Point;
-        price?: number | null;
-        station: Station;
-    }) => void;
-    onSelectStationAsStart: (payload: {
-        point: Point;
-        price?: number | null;
-        station: Station;
-    }) => void;
+    onStationsChange?: (stations: Station[]) => void;
+    selectedStationId?: string | null;
+    stationFocusRequestId?: number;
+    onStationSelect?: (station: Station) => void;
     defaultLocationEnabled?: boolean;
 };
 
@@ -209,13 +195,45 @@ function createUserLocationElement(): HTMLElement {
     return wrapper;
 }
 
-function buildBoundsFromPoints(maplibre: MapLibreGlobal, points: Array<[number, number]>) {
-    const b = new maplibre.LngLatBounds();
+function boundsLikeFromLatLon(points: Array<[number, number]>): [[number, number], [number, number]] | null {
+    let minLat = Infinity;
+    let minLon = Infinity;
+    let maxLat = -Infinity;
+    let maxLon = -Infinity;
+
     for (const [lat, lon] of points) {
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        b.extend([lon, lat]);
+        minLat = Math.min(minLat, lat);
+        minLon = Math.min(minLon, lon);
+        maxLat = Math.max(maxLat, lat);
+        maxLon = Math.max(maxLon, lon);
     }
-    return b;
+
+    if (!Number.isFinite(minLat) || !Number.isFinite(minLon) || !Number.isFinite(maxLat) || !Number.isFinite(maxLon)) {
+        return null;
+    }
+
+    return [[minLon, minLat], [maxLon, maxLat]];
+}
+
+function recenterToPoints(
+    map: MapLibreMap,
+    points: Array<[number, number]>,
+    duration: number
+) {
+    if (points.length === 0) return;
+
+    // With only one point (start OR end), fitBounds zooms in aggressively.
+    // Keep the current zoom and just pan to the point.
+    if (points.length === 1) {
+        const [lat, lon] = points[0];
+        map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration });
+        return;
+    }
+
+    const boundsLike = boundsLikeFromLatLon(points);
+    if (!boundsLike) return;
+    map.fitBounds(boundsLike, { padding: 30, duration });
 }
 
 export default function MapPicker({
@@ -225,18 +243,19 @@ export default function MapPicker({
     pickMode,
     fuelType,
     measurementSystem,
-    currencySystem,
-    language,
     debugMode,
     t,
     onMapPick,
-    onSelectStationAsDestination,
-    onSelectStationAsStart,
+    onStationsChange,
+    selectedStationId,
+    stationFocusRequestId,
+    onStationSelect,
     defaultLocationEnabled,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const userLocationRef = useRef<UserLocation | null>(null);
 
     const [searchLoading, setSearchLoading] = useState(false);
     const [searchHint, setSearchHint] = useState<string>(t.route.tapSearchHere);
@@ -244,6 +263,7 @@ export default function MapPicker({
     const [locationEnabled, setLocationEnabled] = useState(
         Boolean(defaultLocationEnabled)
     );
+    const locationEnabledRef = useRef(Boolean(defaultLocationEnabled));
     const [locationError, setLocationError] = useState<string | null>(null);
     const [locationAttempt, setLocationAttempt] = useState(0);
 
@@ -251,38 +271,82 @@ export default function MapPicker({
     const mapRef = useRef<MapLibreMap | null>(null);
     const mapLoadedRef = useRef(false);
     const mapCleanupRef = useRef<(() => void) | null>(null);
+    const lastAutoFitSignatureRef = useRef<string>("");
+    const pendingRecenterPointsRef = useRef<Array<[number, number]> | null>(null);
+    const pendingRecenterIdRef = useRef(0);
+    const pendingRecenterClearTimerRef = useRef<number | null>(null);
+    const resizeDebounceTimerRef = useRef<number | null>(null);
+    const resizeRafRef = useRef<number | null>(null);
+    const lastResizeSizeRef = useRef<{ w: number; h: number } | null>(null);
+
+    useEffect(() => {
+        userLocationRef.current = userLocation;
+    }, [userLocation]);
+
+    useEffect(() => {
+        locationEnabledRef.current = locationEnabled;
+    }, [locationEnabled]);
+
+    function setPendingRecenter(points: Array<[number, number]>) {
+        pendingRecenterIdRef.current += 1;
+        const id = pendingRecenterIdRef.current;
+        pendingRecenterPointsRef.current = points;
+
+        if (pendingRecenterClearTimerRef.current != null) {
+            window.clearTimeout(pendingRecenterClearTimerRef.current);
+            pendingRecenterClearTimerRef.current = null;
+        }
+
+        // If no resize happens (or the map doesn't change size), don't keep a pending recenter forever.
+        pendingRecenterClearTimerRef.current = window.setTimeout(() => {
+            pendingRecenterClearTimerRef.current = null;
+            if (pendingRecenterIdRef.current !== id) return;
+            pendingRecenterPointsRef.current = null;
+        }, 1200);
+    }
+
+    function safeResizePreserveView(map: MapLibreMap, container: HTMLElement) {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w < 10 || h < 10) return;
+
+        const last = lastResizeSizeRef.current;
+        if (last && last.w === w && last.h === h) return;
+        lastResizeSizeRef.current = { w, h };
+
+        // During layout transitions (panels sliding/collapsing) frequent resizes can cause visible "shaking"
+        // due to ongoing camera animations + rounding. Freeze the current camera around the resize.
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        const bearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
+        const pitch = typeof map.getPitch === "function" ? map.getPitch() : 0;
+
+        try {
+            map.stop?.();
+        } catch {}
+
+        try {
+            map.resize();
+        } catch {}
+
+        try {
+            map.jumpTo?.({
+                center: [center.lng, center.lat],
+                zoom,
+                bearing,
+                pitch,
+            });
+        } catch {}
+    }
 
     const pickModeRef = useRef<MapPickMode>(pickMode);
     useEffect(() => {
         pickModeRef.current = pickMode;
     }, [pickMode]);
 
-    const userLocationRef = useRef<UserLocation | null>(userLocation);
-    useEffect(() => {
-        userLocationRef.current = userLocation;
-    }, [userLocation]);
-
     const didCenterOnEnableRef = useRef(false);
     const watchIdRef = useRef<number | null>(null);
     const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const activePopupRef = useRef<{
-        popup: MapLibrePopup;
-        root: Root;
-        node: HTMLElement;
-    } | null>(null);
-
-    const closeActivePopup = useCallback(() => {
-        const active = activePopupRef.current;
-        if (!active) return;
-        activePopupRef.current = null;
-        try {
-            active.root.unmount();
-        } catch {}
-        try {
-            active.popup.remove();
-        } catch {}
-    }, []);
 
     const markerBucketRef = useRef<{
         start: MapLibreMarker | null;
@@ -300,8 +364,6 @@ export default function MapPicker({
         if (!force && hiddenStationsRef.current === hideStations) return;
         hiddenStationsRef.current = hideStations;
 
-        if (hideStations) closeActivePopup();
-
         const keepIds = protectedStationIdsRef.current;
         const bucket = markerBucketRef.current;
         for (const m of bucket.stations) {
@@ -315,7 +377,7 @@ export default function MapPicker({
                 // ignore
             }
         }
-    }, [closeActivePopup]);
+    }, []);
 
     useEffect(() => {
         const ids = new Set<string>();
@@ -330,6 +392,7 @@ export default function MapPicker({
                 if (isNearKm(end, s, km)) ids.add(s.id);
             }
         }
+        if (selectedStationId) ids.add(selectedStationId);
         protectedStationIdsRef.current = ids;
 
         // If we're currently zoomed out (stations hidden), re-apply visibility so
@@ -341,7 +404,7 @@ export default function MapPicker({
                 true
             );
         }
-    }, [start, end, stations, applyStationMarkerVisibility]);
+    }, [start, end, stations, selectedStationId, applyStationMarkerVisibility]);
 
     const safeCenter = useMemo<[number, number]>(() => {
         if (start && end) {
@@ -393,12 +456,26 @@ export default function MapPicker({
                     style: OPENFREE_MAP_STYLE_URL,
                     center: [safeCenter[1], safeCenter[0]],
                     zoom: FALLBACK_VIEW.zoom,
-                    attributionControl: true,
+                    attributionControl: false,
+                    // Reduce console noise from strict style validation on remote styles.
+                    // Also avoid internal resize tracking; we manage resize via a debounced ResizeObserver.
+                    validateStyle: false,
+                    trackResize: false,
                     dragRotate: false,
                     pitchWithRotate: false,
                     touchPitch: false,
                 });
                 mapRef.current = map;
+
+                // Show attribution text without the compact "i" button.
+                try {
+                    if (maplibre.AttributionControl && typeof map.addControl === "function") {
+                        map.addControl(
+                            new maplibre.AttributionControl({ compact: false }),
+                            "bottom-left"
+                        );
+                    }
+                } catch {}
 
                 const onMoveStart = () => setSearchHint(t.route.areaChanged);
                 map.on("movestart", onMoveStart);
@@ -443,14 +520,79 @@ export default function MapPicker({
                 });
 
                 const ro = new ResizeObserver(() => {
-                    try {
-                        map.resize();
-                    } catch {}
+                    // Debounce: while panels animate, the map container height changes a few times.
+                    // We want to re-apply a pending recenter once the size has stabilized.
+
+                    // Make the map repaint during layout transitions (panel collapse/expand),
+                    // otherwise the container grows/shrinks but MapLibre only redraws after our debounce,
+                    // which looks like a "white box" trailing behind the panels.
+                    if (resizeRafRef.current == null) {
+                        resizeRafRef.current = window.requestAnimationFrame(() => {
+                            resizeRafRef.current = null;
+                            safeResizePreserveView(map, container);
+                        });
+                    }
+
+                    if (resizeDebounceTimerRef.current != null) {
+                        window.clearTimeout(resizeDebounceTimerRef.current);
+                        resizeDebounceTimerRef.current = null;
+                    }
+
+                    resizeDebounceTimerRef.current = window.setTimeout(() => {
+                        resizeDebounceTimerRef.current = null;
+
+                        // If the container is currently collapsed (0x0) during a layout transition,
+                        // calling resize/fitBounds can put MapLibre into a bad internal state.
+                        safeResizePreserveView(map, container);
+
+                        // DevTools open causes frequent resizes; MapLibre can occasionally "lose" marker positioning.
+                        // Fully recreate the user-location marker (equivalent to toggling location off/on).
+                        try {
+                            const bucket = markerBucketRef.current;
+                            const loc = userLocationRef.current;
+                            if (locationEnabledRef.current && loc) {
+                                try {
+                                    bucket.user?.remove?.();
+                                } catch {}
+                                bucket.user = null;
+
+                                const maplibre = getMapLibre();
+                                const el = createUserLocationElement();
+                                bucket.user = new maplibre.Marker({ element: el, anchor: "center" })
+                                    .setLngLat([loc.lon, loc.lat])
+                                    .addTo(map);
+                            }
+                        } catch {}
+
+                        const pending = pendingRecenterPointsRef.current;
+                        if (!pending) return;
+                        pendingRecenterPointsRef.current = null;
+                        if (pendingRecenterClearTimerRef.current != null) {
+                            window.clearTimeout(pendingRecenterClearTimerRef.current);
+                            pendingRecenterClearTimerRef.current = null;
+                        }
+                        // Snap (no animation) after resize settle to avoid "shaking" during panel transitions.
+                        try {
+                            recenterToPoints(map, pending, 0);
+                        } catch {}
+                    }, 140);
                 });
                 ro.observe(container);
 
                 mapCleanupRef.current = () => {
                     ro.disconnect();
+                    if (resizeDebounceTimerRef.current != null) {
+                        window.clearTimeout(resizeDebounceTimerRef.current);
+                        resizeDebounceTimerRef.current = null;
+                    }
+                    if (resizeRafRef.current != null) {
+                        window.cancelAnimationFrame(resizeRafRef.current);
+                        resizeRafRef.current = null;
+                    }
+                    if (pendingRecenterClearTimerRef.current != null) {
+                        window.clearTimeout(pendingRecenterClearTimerRef.current);
+                        pendingRecenterClearTimerRef.current = null;
+                    }
                     map.off("movestart", onMoveStart);
                     map.off("zoomstart", onMoveStart);
                     map.off("zoom", onZoomVisibility);
@@ -463,7 +605,6 @@ export default function MapPicker({
         const bucketAtMount = markerBucketRef.current;
         return () => {
             cancelled = true;
-            closeActivePopup();
 
             const bucket = bucketAtMount;
             for (const m of bucket.stations) {
@@ -532,7 +673,6 @@ export default function MapPicker({
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-        const maplibre = getMapLibre();
 
         const validRoute = routeGeometry.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
@@ -544,22 +684,34 @@ export default function MapPicker({
                     ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
                     ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
                 ];
+        const signature = (() => {
+            if (validRoute.length > 0) {
+                const first = validRoute[0];
+                const last = validRoute[validRoute.length - 1];
+                return `r:${validRoute.length}:${first[0]},${first[1]}:${last[0]},${last[1]}`;
+            }
+            const s = start ? `${start.lat},${start.lon}` : "-";
+            const e = end ? `${end.lat},${end.lon}` : "-";
+            return `p:${s}:${e}`;
+        })();
+
+        // Prevent auto-recentering on unrelated re-renders (e.g. "Hier suchen" updates stations state).
+        if (lastAutoFitSignatureRef.current === signature) return;
+        lastAutoFitSignatureRef.current = signature;
+
         if (points.length === 0) return;
 
-        // With only one point (start OR end), fitBounds zooms in aggressively.
-        // Keep the current zoom and just pan to the point.
-        if (points.length === 1) {
-            const [lat, lon] = points[0];
-            try {
-                map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
-            } catch {}
-            return;
-        }
-
         try {
-            const bounds = buildBoundsFromPoints(maplibre, points);
-            if (typeof bounds?.isEmpty === "function" && bounds.isEmpty()) return;
-            map.fitBounds(bounds, { padding: 30, duration: 650 });
+            // Apply immediately, but also re-apply once after any layout-driven resize settles.
+            setPendingRecenter(points);
+            window.requestAnimationFrame(() => {
+                try {
+                    map.resize();
+                } catch {}
+                try {
+                    recenterToPoints(map, points, 650);
+                } catch {}
+            });
         } catch {}
     }, [start, end, routeGeometry]);
 
@@ -568,8 +720,6 @@ export default function MapPicker({
         const map = mapRef.current;
         if (!map) return;
         const maplibre = getMapLibre();
-
-        closeActivePopup();
 
         const bucket = markerBucketRef.current;
         for (const m of bucket.stations) {
@@ -588,49 +738,7 @@ export default function MapPicker({
             el.dataset.stationId = station.id;
             el.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                closeActivePopup();
-
-                const node = document.createElement("div");
-                const root = createRoot(node);
-                root.render(
-                    <StationPopupContent
-                        station={station}
-                        selectedPrice={selectedPrice}
-                        measurementSystem={measurementSystem}
-                        currencySystem={currencySystem}
-                        language={language}
-                        debugMode={debugMode}
-                        logoCacheBust={logoCacheBust}
-                        userLocation={userLocationRef.current}
-                        t={t}
-                        onSelectStationAsStart={(payload) => {
-                            onSelectStationAsStart(payload);
-                            closeActivePopup();
-                        }}
-                        onSelectStationAsDestination={(payload) => {
-                            onSelectStationAsDestination(payload);
-                            closeActivePopup();
-                        }}
-                    />
-                );
-
-                const popup = new maplibre.Popup({
-                    closeButton: true,
-                    closeOnClick: true,
-                    maxWidth: "420px",
-                    className: "station-popup",
-                })
-                    .setLngLat([station.lon, station.lat])
-                    .setDOMContent(node)
-                    .addTo(map);
-
-                popup.on("close", () => {
-                    try {
-                        root.unmount();
-                    } catch {}
-                });
-
-                activePopupRef.current = { popup, root, node };
+                onStationSelect?.(station);
             });
 
             const m = new maplibre.Marker({ element: el, anchor: "center" })
@@ -644,24 +752,49 @@ export default function MapPicker({
             map.getZoom() < HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM,
             true
         );
-
-        return () => {
-            closeActivePopup();
-        };
     }, [
         stations,
         fuelType,
         measurementSystem,
-        currencySystem,
-        language,
-        debugMode,
         logoCacheBust,
-        t,
-        onSelectStationAsDestination,
-        onSelectStationAsStart,
+        onStationSelect,
         applyStationMarkerVisibility,
-        closeActivePopup,
     ]);
+
+    // Highlight and center the selected station (no popups; selection is shown in the UI list).
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        const bucket = markerBucketRef.current;
+        for (const m of bucket.stations) {
+            try {
+                const el = typeof m.getElement === "function" ? m.getElement() : null;
+                if (!el) continue;
+                const id = el.dataset.stationId;
+                const isSelected = !!selectedStationId && id === selectedStationId;
+                el.classList.toggle("station-marker--selected", isSelected);
+                el.style.zIndex = isSelected ? "10" : "";
+            } catch {
+                // ignore
+            }
+        }
+
+        if (!selectedStationId) return;
+        const station = stations.find((s) => s.id === selectedStationId);
+        if (!station) return;
+        const points: Array<[number, number]> = [[station.lat, station.lon]];
+        try {
+            // When side panels open/close, ResizeObserver may call map.stop() and cancel animations.
+            // Keep a pending recenter so we re-apply after the resize settles.
+            setPendingRecenter(points);
+            window.requestAnimationFrame(() => {
+                try {
+                    recenterToPoints(map, points, 650);
+                } catch {}
+            });
+        } catch {}
+    }, [selectedStationId, stations, stationFocusRequestId]);
 
     // Start/end markers.
     useEffect(() => {
@@ -863,6 +996,7 @@ export default function MapPicker({
         if (currentZoom < 12) {
             setSearchHint(t.route.zoomInMore);
             setStations([]);
+            onStationsChange?.([]);
             return;
         }
 
@@ -888,6 +1022,7 @@ export default function MapPicker({
             );
 
             setStations(result.stations as Station[]);
+            onStationsChange?.(result.stations as Station[]);
 
             if (result.error) {
                 setSearchHint(result.error);
@@ -900,6 +1035,7 @@ export default function MapPicker({
             }
         } catch {
             setStations([]);
+            onStationsChange?.([]);
             setSearchHint(t.route.stationsLoadFailed);
         } finally {
             setSearchLoading(false);
@@ -909,7 +1045,6 @@ export default function MapPicker({
     function handleRecenter() {
         const map = mapRef.current;
         if (!map) return;
-        const maplibre = getMapLibre();
 
         const validRoute = routeGeometry.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
@@ -923,15 +1058,18 @@ export default function MapPicker({
                 ];
         if (points.length === 0) return;
         try {
-            // With only one point (start OR end), fitBounds zooms in aggressively.
-            // Keep the current zoom and just pan to the point.
-            if (points.length === 1) {
-                const [lat, lon] = points[0];
-                map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
-                return;
-            }
-            const bounds = buildBoundsFromPoints(maplibre, points);
-            map.fitBounds(bounds, { padding: 30, duration: 650 });
+            // If a layout transition resizes the map right after recentering,
+            // the resulting view can look "off". Keep one pending recenter to re-apply after resize.
+            setPendingRecenter(points);
+
+            // Apply immediately too, but after a resize tick.
+            window.requestAnimationFrame(() => {
+                const container = containerRef.current;
+                if (container) safeResizePreserveView(map, container);
+                try {
+                    recenterToPoints(map, points, 650);
+                } catch {}
+            });
         } catch {}
     }
 
@@ -945,16 +1083,11 @@ export default function MapPicker({
         setSearchHint(t.route.tapSearchHere);
     }, [t]);
 
-    // When UI-meaningful options change, close popups (avoids stale text/units in already-open popups).
-    useEffect(() => {
-        closeActivePopup();
-    }, [fuelType, measurementSystem, currencySystem, language, t, logoCacheBust, closeActivePopup]);
-
     return (
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full" />
 
-            <div className="pointer-events-none absolute right-3 top-3 z-1000 flex flex-col gap-2">
+            <div className="pointer-events-none absolute left-3 top-3 z-1000 flex flex-col gap-2">
                 <button
                     type="button"
                     onClick={handleRecenter}

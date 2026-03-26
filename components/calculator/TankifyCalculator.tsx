@@ -23,15 +23,29 @@ import {
     pricePerGallonToPerLiter,
     pricePerLiterToPerGallon,
 } from "@/lib/units";
-import {CurrencySystem, FuelType, Language, MapPickMode, MeasurementSystem, Point,} from "@/types/tankify";
+import {
+    CurrencySystem,
+    FuelType,
+    Language,
+    MapPickMode,
+    MeasurementSystem,
+    Point,
+    Station,
+} from "@/types/tankify";
 import WorthPanel from "@/components/calculator/WorthPanel";
+import StationsSidebar from "@/components/map/StationsSidebar";
 
 const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
     ssr: false,
 });
 
 export default function TankifyCalculator() {
+    const PANEL_ANIM_MS = 300;
     const [language, setLanguage] = useState<Language>("de");
+    const [isDesktop, setIsDesktop] = useState(() => {
+        if (typeof window === "undefined") return true;
+        return window.matchMedia("(min-width: 1024px)").matches;
+    });
     const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
     const [measurementSystem, setMeasurementSystem] =
         useState<MeasurementSystem>("metric");
@@ -69,6 +83,18 @@ export default function TankifyCalculator() {
     const [error, setError] = useState("");
     const [mapPickMode, setMapPickMode] = useState<MapPickMode>(null);
 
+    const [visibleStations, setVisibleStations] = useState<Station[]>([]);
+    const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const [stationFocusRequestId, setStationFocusRequestId] = useState(0);
+    const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+    const [stationsQueried, setStationsQueried] = useState(false);
+    const [desktopStationsOpen, setDesktopStationsOpen] = useState(true);
+    const [desktopStationsMounted, setDesktopStationsMounted] = useState(false);
+    const [desktopStationsEntering, setDesktopStationsEntering] = useState(false);
+    const [desktopResultsOpen, setDesktopResultsOpen] = useState(true);
+    const [desktopResultsMounted, setDesktopResultsMounted] = useState(false);
+    const [desktopResultsEntering, setDesktopResultsEntering] = useState(false);
+
     const {
         sheetContentRef,
         sheetY,
@@ -90,6 +116,21 @@ export default function TankifyCalculator() {
     );
     const t = getTranslations(language);
     const myLocationReqIdRef = useRef(0);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const mq = window.matchMedia("(min-width: 1024px)");
+        const handleChange = () => setIsDesktop(mq.matches);
+        handleChange();
+        try {
+            mq.addEventListener("change", handleChange);
+            return () => mq.removeEventListener("change", handleChange);
+        } catch {
+            // Safari fallback
+            mq.addListener(handleChange);
+            return () => mq.removeListener(handleChange);
+        }
+    }, []);
 
     useEffect(() => {
 
@@ -421,11 +462,13 @@ export default function TankifyCalculator() {
 
     useEffect(() => {
         function handleUserLocation(ev: Event) {
-            if (draftStartPoint) return;
             const detail = (ev as CustomEvent<Partial<{ lat: unknown; lon: unknown }>>).detail;
             const lat = typeof detail?.lat === "number" ? detail.lat : Number.NaN;
             const lon = typeof detail?.lon === "number" ? detail.lon : Number.NaN;
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+            setUserLocation({ lat, lon });
+            if (draftStartPoint) return;
 
             const label = t.route.currentLocation;
             setDraftStartPoint({ lat, lon, label });
@@ -453,6 +496,65 @@ export default function TankifyCalculator() {
         setMapPickMode((prev) => (prev === "start" ? "end" : prev === "end" ? "start" : null));
     }
 
+    function handleToggleStation(stationId: string) {
+        setSelectedStationId((prev) => (prev === stationId ? null : stationId));
+    }
+
+    function handleStationsChange(stations: Station[]) {
+        setStationsQueried(true);
+        setVisibleStations(stations);
+        openDesktopStationsPanel();
+    }
+
+    function handleSelectStationAsStart({
+                                            point,
+                                            price,
+                                            station,
+                                        }: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+    }) {
+        setDraftStartPoint(point);
+        setStartText(point.label);
+
+        if (price != null) {
+            setLocalPricePerLiter(price);
+        }
+
+        setSelectedStationId(station.id);
+    }
+
+    function handleSelectStationAsDestination({
+                                                  point,
+                                                  price,
+                                                  station,
+                                                  autoCalculate,
+                                              }: {
+        point: Point;
+        price?: number | null;
+        station: Station;
+        autoCalculate?: boolean;
+    }) {
+        setError("");
+        setDraftEndPoint(point);
+        setEndText(point.label);
+
+        if (price != null) {
+            setDestinationPricePerLiter(price);
+        }
+
+        setSelectedStationId(station.id);
+
+        if (autoCalculate) {
+            if (!draftStartPoint) {
+                setError(t.errors.noStartFound);
+                return;
+            }
+            commitRoute(draftStartPoint, point);
+        }
+    }
+
     function pointsEqual(a: Point | null, b: Point | null): boolean {
         if (a === b) return true;
         if (!a || !b) return false;
@@ -469,9 +571,53 @@ export default function TankifyCalculator() {
         );
     }, [draftStartPoint, draftEndPoint, calcStartPoint, calcEndPoint]);
 
+    useEffect(() => {
+        if (!selectedStationId) return;
+        if (visibleStations.some((s) => s.id === selectedStationId)) return;
+        setSelectedStationId(null);
+    }, [visibleStations, selectedStationId]);
+
     const hasCommittedRoute = Boolean(
         routeRequestId > 0 && !isDirty && calcStartPoint && calcEndPoint
     );
+
+    function openDesktopStationsPanel() {
+        if (!desktopStationsMounted) {
+            setDesktopStationsMounted(true);
+            setDesktopStationsOpen(true);
+            setDesktopStationsEntering(true);
+            window.requestAnimationFrame(() => setDesktopStationsEntering(false));
+            return;
+        }
+        setDesktopStationsOpen(true);
+    }
+
+    function openDesktopResultsPanel() {
+        if (!desktopResultsMounted) {
+            setDesktopResultsMounted(true);
+            setDesktopResultsOpen(true);
+            setDesktopResultsEntering(true);
+            window.requestAnimationFrame(() => setDesktopResultsEntering(false));
+            return;
+        }
+        setDesktopResultsOpen(true);
+    }
+
+    useEffect(() => {
+        if (!hasCommittedRoute) {
+            setDesktopResultsMounted(false);
+            return;
+        }
+        setDesktopResultsMounted(true);
+    }, [hasCommittedRoute, desktopResultsOpen, desktopResultsMounted, PANEL_ANIM_MS]);
+
+    function commitRoute(nextStart: Point, nextEnd: Point) {
+        setCalcStartPoint(nextStart);
+        setCalcEndPoint(nextEnd);
+        setRouteRequestId((v) => v + 1);
+        setMapPickMode(null);
+        openDesktopResultsPanel();
+    }
 
     function handleCalculateRoute() {
         setError("");
@@ -484,10 +630,7 @@ export default function TankifyCalculator() {
             return;
         }
 
-        setCalcStartPoint(draftStartPoint);
-        setCalcEndPoint(draftEndPoint);
-        setRouteRequestId((v) => v + 1);
-        setMapPickMode(null);
+        commitRoute(draftStartPoint, draftEndPoint);
     }
 
     const calculation = useMemo(() => {
@@ -619,9 +762,14 @@ export default function TankifyCalculator() {
                 setAvgSpeed={setAvgSpeed}
             />
 
-            <main className="min-h-screen bg-white md:bg-neutral-100 md:p-8">
-                <div className="mx-auto hidden max-w-7xl gap-6 p-4 lg:grid lg:grid-cols-[420px_1fr] lg:items-start">
-                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm">
+            <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
+                {isDesktop ? (
+                <div className="mx-auto lg:flex lg:flex-row lg:gap-5 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden">
+                    <div className="h-full pt-5 pl-5 pb-5">
+                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
+
+
+
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <h1 className="text-3xl font-bold">{t.app.title}</h1>
@@ -638,11 +786,23 @@ export default function TankifyCalculator() {
                             </button>
                         </div>
 
-                        <div className="mt-6">{routeControls}</div>
+                        <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
+                    </div>
 
-                    <section className="space-y-6">
-                        <div className="map-resizable rounded-3xl bg-white shadow-sm">
+                    <section
+                        className={
+                            "relative flex-1 min-w-0 h-full min-h-0 flex flex-col transition-[margin-right] duration-300 ease-out pb-5 pt-5 " +
+                            (!stationsQueried && !desktopStationsMounted
+                                ? "pr-5"
+                                : "pr-0")
+                        }
+                    >
+                        <div
+                            className={
+                                "min-h-0 rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
+                            }
+                        >
                             <div className="h-full overflow-hidden rounded-3xl">
                                 <MapPicker
                                     start={draftStartPoint}
@@ -651,11 +811,17 @@ export default function TankifyCalculator() {
                                     pickMode={mapPickMode}
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
-                                    currencySystem={currencySystem}
-                                    language={language}
                                     debugMode={debugMode}
                                     t={t}
                                     defaultLocationEnabled
+                                    onStationsChange={handleStationsChange}
+                                    selectedStationId={selectedStationId}
+                                    stationFocusRequestId={stationFocusRequestId}
+                                    onStationSelect={(station) => {
+                                        setSelectedStationId(station.id);
+                                        setStationFocusRequestId((v) => v + 1);
+                                        if (!desktopStationsOpen) openDesktopStationsPanel();
+                                    }}
                                     onMapPick={(type, point) => {
                                         if (type === "start") {
                                             setDraftStartPoint(point);
@@ -666,49 +832,142 @@ export default function TankifyCalculator() {
                                         }
                                         setMapPickMode(null);
                                     }}
-                                    onSelectStationAsStart={({point, price}) => {
-                                        setDraftStartPoint(point);
-                                        setStartText(point.label);
-
-                                        if (price != null) {
-                                            setLocalPricePerLiter(price);
-                                        }
-                                    }}
-                                    onSelectStationAsDestination={({point, price}) => {
-                                        setDraftEndPoint(point);
-                                        setEndText(point.label);
-
-                                        if (price != null) {
-                                            setDestinationPricePerLiter(price);
-                                        }
-                                    }}
                                 />
                             </div>
                         </div>
 
                         {hasCommittedRoute ? (
-                            <WorthPanel
-                                t={t}
-                                currencySystem={currencySystem}
-                                profit={profit}
-                                netSaving={calculation.netSaving}
-                            />
+                            <div
+                                className={
+                                    "min-h-0 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out " +
+                                    (desktopResultsOpen && !desktopResultsEntering
+                                        ? "max-h-full opacity-100 translate-y-0"
+                                        : "max-h-0 opacity-0 translate-y-2 pointer-events-none")
+                                }
+                            >
+                                <div className="pt-4 min-h-0 h-full">
+                                    <div className="relative rounded-3xl bg-white p-5 shadow-sm h-full max-h-full min-h-0 flex flex-col">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDesktopResultsOpen(false)}
+                                            className="absolute right-5 top-0 grid rounded-b-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95 h-10 w-10 place-items-center"
+                                            aria-label={t.actions.close}
+                                            title={t.actions.close}
+                                        >
+                                            <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
+                                                <path
+                                                    d="M5 7.5l5 5 5-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </button>
+
+                                        <div className="min-h-0 flex-1 overflow-auto">
+                                            <div className="flex flex-col gap-6">
+                                                <WorthPanel
+                                                    t={t}
+                                                    currencySystem={currencySystem}
+                                                    profit={profit}
+                                                    netSaving={calculation.netSaving}
+                                                />
+                                                <div className="rounded-2xl border border-gray-100 p-4">
+                                                    <ResultsPanel
+                                                        t={t}
+                                                        currencySystem={currencySystem}
+                                                        measurementSystem={measurementSystem}
+                                                        profit={profit}
+                                                        routeLoading={routeLoading}
+                                                        calculation={calculation}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         ) : null}
 
-                        {hasCommittedRoute ? (
-                            <ResultsPanel
-                                t={t}
-                                currencySystem={currencySystem}
-                                measurementSystem={measurementSystem}
-                                profit={profit}
-                                routeLoading={routeLoading}
-                                calculation={calculation}
-                            />
+                        {hasCommittedRoute && !desktopResultsOpen ? (
+                            <button
+                                type="button"
+                                onClick={() => setDesktopResultsOpen(true)}
+                                className="absolute bottom-0 right-5 z-50 rounded-t-full border border-gray-200 bg-white text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 grid h-12 w-12 place-items-center"
+                                aria-label="Expand results"
+                                title="Expand results"
+                            >
+                                <span className="inline-flex items-center gap-2">
+                                    <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
+                                        <path
+                                            d="M5 12.5l5-5 5 5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </span>
+                            </button>
                         ) : null}
                     </section>
-                </div>
 
-                <div className="lg:hidden">
+                            {stationsQueried && desktopStationsMounted ? (
+                                    <div
+                                        className={
+                                            "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col  " +
+                                            (desktopStationsOpen && !desktopStationsEntering
+                                                ? "w-105 opacity-100 translate-x-0 pt-5 pb-5 pr-5"
+                                                : "w-0 opacity-0 translate-x-6 pointer-events-none")
+                                        }
+                                    >
+                                        <StationsSidebar
+                                stations={visibleStations}
+                                selectedStationId={selectedStationId}
+                                onToggleStation={handleToggleStation}
+                                fuelType={fuelType}
+                                measurementSystem={measurementSystem}
+                                currencySystem={currencySystem}
+                                language={language}
+                                debugMode={debugMode}
+                                userLocation={userLocation}
+                                t={t}
+                                onSelectStationAsStart={handleSelectStationAsStart}
+                                onSelectStationAsDestination={handleSelectStationAsDestination}
+                                onClose={() => setDesktopStationsOpen(false)}
+                            />
+                                    </div>
+
+                            ) : null}
+
+                            {stationsQueried && !desktopStationsOpen ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setDesktopStationsOpen(true)}
+                                    className="fixed right-0 top-15 z-50 -translate-y-1/2 rounded-l-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 h-12 w-12 place-items-center"
+                                    aria-label="Expand stations"
+                                    title="Expand stations"
+                                >
+                                    <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
+                                        <path
+                                            d="M12.5 5l-5 5 5 5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </button>
+                            ) : null}
+                </div>
+                ) : null}
+
+                {!isDesktop ? (
+                <div>
                     <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
                         <MapPicker
                             start={draftStartPoint}
@@ -717,11 +976,16 @@ export default function TankifyCalculator() {
                             pickMode={mapPickMode}
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
-                            currencySystem={currencySystem}
-                            language={language}
                             debugMode={debugMode}
                             t={t}
                             defaultLocationEnabled
+                            selectedStationId={selectedStationId}
+                            stationFocusRequestId={stationFocusRequestId}
+                            onStationSelect={(station) => {
+                                setSelectedStationId(station.id);
+                                setStationFocusRequestId((v) => v + 1);
+                                setBottomSheet(window.innerHeight * snapWorthMultiplicator);
+                            }}
                             onMapPick={(type, point) => {
                                 if (type === "start") {
                                     setDraftStartPoint(point);
@@ -731,24 +995,6 @@ export default function TankifyCalculator() {
                                     setEndText(point.label);
                                 }
                                 setMapPickMode(null);
-                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
-                            }}
-                            onSelectStationAsStart={({point, price}) => {
-                                setDraftStartPoint(point);
-                                setStartText(point.label);
-
-                                if (price != null) {
-                                    setLocalPricePerLiter(price);
-                                }
-                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
-                            }}
-                            onSelectStationAsDestination={({point, price}) => {
-                                setDraftEndPoint(point);
-                                setEndText(point.label);
-
-                                if (price != null) {
-                                    setDestinationPricePerLiter(price);
-                                }
                                 setBottomSheet(window.innerHeight*snapWorthMultiplicator);
                             }}
                         />
@@ -788,6 +1034,7 @@ export default function TankifyCalculator() {
                         profit={profit}
                     />
                 </div>
+                ) : null}
             </main>
         </>
     );
