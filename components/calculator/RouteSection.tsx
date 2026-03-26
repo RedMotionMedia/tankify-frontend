@@ -58,7 +58,7 @@ export default function RouteSection({
                 <button
                     type="button"
                     onClick={onSwapStartEnd}
-                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 active:scale-95"
                     aria-label={t.actions.swap}
                     title={t.actions.swap}
                 >
@@ -79,7 +79,7 @@ export default function RouteSection({
                             strokeLinejoin="round"
                         />
                     </svg>
-                    {t.actions.swap}
+                    <span className="text-sm">{t.actions.swap}</span>
                 </button>
             </div>
 

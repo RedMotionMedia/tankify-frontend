@@ -168,7 +168,7 @@ function contentTypeForExt(ext: string): string {
 }
 
 async function tryLoadLocalLogo(key: string): Promise<CacheEntry | null> {
-    const baseDir = path.join(process.cwd(), "resources", "logos");
+    const baseDir = path.join(process.cwd(), "resources", "logos", "stations");
     const exts = ["svg", "webp", "png", "jpg", "jpeg", "ico"] as const;
 
     for (const ext of exts) {
