@@ -745,7 +745,7 @@ export default function TankifyCalculator() {
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
                 <div
                     className={
-                        "mx-auto hidden lg:flex lg:flex-row lg:gap-6 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden"
+                        "mx-auto hidden lg:flex lg:flex-row lg:gap-5 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden"
                     }
                 >
                     <div className="h-full pt-5 pl-5 pb-5">
@@ -775,7 +775,10 @@ export default function TankifyCalculator() {
 
                     <section
                         className={
-                            "relative flex-1 min-w-0 h-full min-h-0 flex flex-col transition-[margin-right] duration-300 ease-out pb-5 pt-5 "
+                            "relative flex-1 min-w-0 h-full min-h-0 flex flex-col transition-[margin-right] duration-300 ease-out pb-5 pt-5 " +
+                            (!stationsQueried && !desktopStationsMounted
+                                ? "pr-5"
+                                : "pr-0")
                         }
                     >
                         <div

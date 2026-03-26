@@ -413,12 +413,19 @@ export default function MapPicker({
                     style: OPENFREE_MAP_STYLE_URL,
                     center: [safeCenter[1], safeCenter[0]],
                     zoom: FALLBACK_VIEW.zoom,
-                    attributionControl: true,
+                    attributionControl: false,
                     dragRotate: false,
                     pitchWithRotate: false,
                     touchPitch: false,
                 });
                 mapRef.current = map;
+
+                // Show attribution text without the compact "i" button.
+                try {
+                    if (maplibre.AttributionControl && typeof map.addControl === "function") {
+                        map.addControl(new maplibre.AttributionControl({ compact: true }), "bottom-left");
+                    }
+                } catch {}
 
                 const onMoveStart = () => setSearchHint(t.route.areaChanged);
                 map.on("movestart", onMoveStart);

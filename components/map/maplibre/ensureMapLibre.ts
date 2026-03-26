@@ -11,6 +11,7 @@ export type MapLibreMap = {
     off: (type: string, listener: (ev: unknown) => void) => void;
     remove: () => void;
     resize: () => void;
+    addControl?: (control: unknown, position?: string) => void;
     getZoom: () => number;
     getBounds: () => {
         getSouthWest: () => MapLibreLngLat;
