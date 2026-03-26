@@ -584,22 +584,11 @@ export default function TankifyCalculator() {
     }
 
     useEffect(() => {
-        if (!stationsQueried) return;
-        if (desktopStationsOpen) return;
-        if (!desktopStationsMounted) return;
-        const timer = window.setTimeout(() => setDesktopStationsMounted(false), PANEL_ANIM_MS);
-        return () => window.clearTimeout(timer);
-    }, [stationsQueried, desktopStationsOpen, desktopStationsMounted, PANEL_ANIM_MS]);
-
-    useEffect(() => {
         if (!hasCommittedRoute) {
             setDesktopResultsMounted(false);
             return;
         }
-        if (desktopResultsOpen) return;
-        if (!desktopResultsMounted) return;
-        const timer = window.setTimeout(() => setDesktopResultsMounted(false), PANEL_ANIM_MS);
-        return () => window.clearTimeout(timer);
+        setDesktopResultsMounted(true);
     }, [hasCommittedRoute, desktopResultsOpen, desktopResultsMounted, PANEL_ANIM_MS]);
 
     function commitRoute(nextStart: Point, nextEnd: Point) {
@@ -756,10 +745,10 @@ export default function TankifyCalculator() {
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
                 <div
                     className={
-                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-480 h-full min-w-0 gap-6 overflow-hidden"
+                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden"
                     }
                 >
-                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
+                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col mr-6">
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <h1 className="text-3xl font-bold">{t.app.title}</h1>
@@ -779,7 +768,12 @@ export default function TankifyCalculator() {
                         <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
 
-                    <section className="flex-1 min-w-0 h-full min-h-0 flex flex-col">
+                    <section
+                        className={
+                            "relative flex-1 min-w-0 h-full min-h-0 flex flex-col transition-[margin-right] duration-300 ease-out " +
+                            (stationsQueried && (desktopStationsOpen || desktopStationsEntering) ? "mr-6" : "mr-0")
+                        }
+                    >
                         <div
                             className={
                                 "min-h-0 rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
@@ -813,62 +807,95 @@ export default function TankifyCalculator() {
                             </div>
                         </div>
 
-                        {desktopResultsMounted ? (
+                        {hasCommittedRoute ? (
                             <div
                                 className={
-                                    "mt-4 min-h-0 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out " +
+                                    "min-h-0 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out " +
                                     (desktopResultsOpen && !desktopResultsEntering
                                         ? "max-h-full opacity-100 translate-y-0"
                                         : "max-h-0 opacity-0 translate-y-2 pointer-events-none")
                                 }
                             >
-                                <div className="relative rounded-3xl bg-white p-5 shadow-sm h-full max-h-full min-h-0 flex flex-col">
-                                    <button
-                                        type="button"
-                                        onClick={() => setDesktopResultsOpen(false)}
-                                        className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
-                                        aria-label={t.actions.close}
-                                        title={t.actions.close}
-                                    >
-                                        X
-                                    </button>
-                                    <div className="min-h-0 flex-1 overflow-auto">
-                                        <div className="flex flex-col gap-6">
+                                <div className="pt-4 min-h-0 h-full">
+                                    <div className="relative rounded-3xl bg-white p-5 shadow-sm h-full max-h-full min-h-0 flex flex-col">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDesktopResultsOpen(false)}
+                                            className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                                            aria-label={t.actions.close}
+                                            title={t.actions.close}
+                                        >
+                                            <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                                <path
+                                                    d="M5 7.5l5 5 5-5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </button>
 
-                                            <WorthPanel
-                                                t={t}
-                                                currencySystem={currencySystem}
-                                                profit={profit}
-                                                netSaving={calculation.netSaving}
-                                            />
-                                            <div className="rounded-2xl border border-gray-100 p-4">
-                                                <ResultsPanel
+                                        <div className="min-h-0 flex-1 overflow-auto">
+                                            <div className="flex flex-col gap-6">
+                                                <WorthPanel
                                                     t={t}
                                                     currencySystem={currencySystem}
-                                                    measurementSystem={measurementSystem}
                                                     profit={profit}
-                                                    routeLoading={routeLoading}
-                                                    calculation={calculation}
+                                                    netSaving={calculation.netSaving}
                                                 />
+                                                <div className="rounded-2xl border border-gray-100 p-4">
+                                                    <ResultsPanel
+                                                        t={t}
+                                                        currencySystem={currencySystem}
+                                                        measurementSystem={measurementSystem}
+                                                        profit={profit}
+                                                        routeLoading={routeLoading}
+                                                        calculation={calculation}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-
                                 </div>
                             </div>
                         ) : null}
+
+                        {hasCommittedRoute && !desktopResultsOpen ? (
+                            <button
+                                type="button"
+                                onClick={() => setDesktopResultsOpen(true)}
+                                className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95"
+                                aria-label="Expand results"
+                                title="Expand results"
+                            >
+                                <span className="inline-flex items-center gap-2">
+                                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                        <path
+                                            d="M5 12.5l5-5 5 5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </span>
+                            </button>
+                        ) : null}
                     </section>
 
-                    {stationsQueried && desktopStationsMounted ? (
-                        <div
-                            className={
-                                "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col " +
-                                (desktopStationsOpen && !desktopStationsEntering
-                                    ? "w-105 opacity-100 translate-x-0"
-                                    : "w-0 opacity-0 translate-x-6 pointer-events-none")
-                            }
-                        >
-                            <StationsSidebar
+                            {stationsQueried && desktopStationsMounted ? (
+                                    <div
+                                        className={
+                                            "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col " +
+                                            (desktopStationsOpen && !desktopStationsEntering
+                                                ? "w-105 opacity-100 translate-x-0"
+                                                : "w-0 opacity-0 translate-x-6 pointer-events-none")
+                                        }
+                                    >
+                                        <StationsSidebar
                                 stations={visibleStations}
                                 selectedStationId={selectedStationId}
                                 onToggleStation={handleToggleStation}
@@ -883,9 +910,30 @@ export default function TankifyCalculator() {
                                 onSelectStationAsDestination={handleSelectStationAsDestination}
                                 onClose={() => setDesktopStationsOpen(false)}
                             />
-                        </div>
+                                    </div>
 
-                    ) : null}
+                            ) : null}
+
+                            {stationsQueried && !desktopStationsOpen ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setDesktopStationsOpen(true)}
+                                    className="fixed right-3 top-1/2 z-50 -translate-y-1/2 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95"
+                                    aria-label="Expand stations"
+                                    title="Expand stations"
+                                >
+                                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                        <path
+                                            d="M12.5 5l-5 5 5 5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
+                                    </svg>
+                                </button>
+                            ) : null}
                 </div>
 
                 <div className="lg:hidden">

@@ -107,7 +107,16 @@ export default function StationsSidebar({
                         aria-label={t.actions.close}
                         title={t.actions.close}
                     >
-                        X
+                        <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                            <path
+                                d="M7.5 5l5 5-5 5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
                     </button>
                 ) : null}
             </div>
