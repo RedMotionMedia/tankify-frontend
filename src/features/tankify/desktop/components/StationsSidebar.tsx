@@ -97,6 +97,7 @@ export default function StationsSidebar({
     onSelectStationAsStart,
     onSelectStationAsDestination,
     onClose,
+    scrollContainerRef,
 }: {
     stations: Station[];
     selectedStationId: string | null;
@@ -117,6 +118,7 @@ export default function StationsSidebar({
         autoCalculate?: boolean;
     }) => void;
     onClose?: () => void;
+    scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -280,7 +282,7 @@ export default function StationsSidebar({
             </div>
 
             <div className="min-h-0 flex-1 pb-5 flex flex-col">
-                <div className="min-h-0 flex-1 overflow-auto px-5">
+                <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-auto px-5">
                     <div ref={scrollRef} className="min-h-0 space-y-3">
                         {sortedStations.map((station) => {
                             const isOpen = station.id === selectedStationId;

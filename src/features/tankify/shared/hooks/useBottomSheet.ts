@@ -24,6 +24,7 @@ export function useBottomSheet() {
 
     const draggingRef = useRef(false);
     const dragSourceRef = useRef<"handle" | "content" | null>(null);
+    const pendingContentDragRef = useRef(false);
     const startXRef = useRef(0);
     const startYRef = useRef(0);
     const startOffsetRef = useRef(0);
@@ -81,11 +82,12 @@ export function useBottomSheet() {
         };
     }, []);
 
-    function beginDrag(e: React.TouchEvent, source: "handle" | "content") {
+    function captureStart(e: React.TouchEvent, source: "handle" | "content") {
         draggingRef.current = true;
         setDragging(true);
         dragSourceRef.current = source;
         axisRef.current = "undecided";
+        pendingContentDragRef.current = false;
 
         const t = e.touches[0];
         startXRef.current = t.clientX;
@@ -94,7 +96,7 @@ export function useBottomSheet() {
     }
 
     function onTouchStartHandle(e: React.TouchEvent) {
-        beginDrag(e, "handle");
+        captureStart(e, "handle");
     }
 
     function onTouchStartContent(e: React.TouchEvent) {
@@ -110,45 +112,78 @@ export function useBottomSheet() {
         // don't hijack the gesture as a sheet drag.
         if (sheetY === 0 && !atTop) return;
 
-        beginDrag(e, "content");
+        // For content drags we defer "starting a sheet drag" until we know the gesture is vertical.
+        // This keeps horizontal carousel swipes responsive on the calculator page.
+        draggingRef.current = false;
+        setDragging(false);
+        dragSourceRef.current = "content";
+        pendingContentDragRef.current = true;
+        axisRef.current = "undecided";
+
+        const t = e.touches[0];
+        startXRef.current = t.clientX;
+        startYRef.current = t.clientY;
+        startOffsetRef.current = sheetY;
     }
 
-    function isHorizontalGesture(dx: number, dy: number): boolean {
+    function decideAxis(dx: number, dy: number): "undecided" | "horizontal" | "vertical" {
         const threshold = 6;
         const adx = Math.abs(dx);
         const ady = Math.abs(dy);
 
         if (axisRef.current === "undecided") {
-            if (adx < threshold && ady < threshold) return true; // not enough signal yet
+            if (adx < threshold && ady < threshold) return "undecided"; // not enough signal yet
             axisRef.current = adx > ady ? "horizontal" : "vertical";
         }
 
-        return axisRef.current === "horizontal";
+        return axisRef.current;
     }
 
     function onTouchMove(e: React.TouchEvent) {
-        if (!draggingRef.current) return;
+        if (dragSourceRef.current == null) return;
 
         const t = e.touches[0];
         const dx = t.clientX - startXRef.current;
         const dy = t.clientY - startYRef.current;
-        if (isHorizontalGesture(dx, dy)) {
+        const axis = decideAxis(dx, dy);
+        if (axis === "undecided") return;
+        if (axis === "horizontal") {
             // Horizontal swipe should belong to the carousel/list, not the sheet.
-            if (axisRef.current === "horizontal") {
-                draggingRef.current = false;
-                dragSourceRef.current = null;
-                setDragging(false);
-            }
+            draggingRef.current = false;
+            pendingContentDragRef.current = false;
+            dragSourceRef.current = null;
+            setDragging(false);
+            axisRef.current = "undecided";
             return;
         }
 
         if (dragSourceRef.current === "handle") {
+            if (!draggingRef.current) return;
             setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
             return;
         }
 
         const content = sheetContentRef.current;
         const atTop = !content || content.scrollTop <= 0;
+
+        // If this is a content gesture and we haven't actually started a sheet drag yet,
+        // decide whether this should become a sheet drag at all.
+        if (!draggingRef.current && pendingContentDragRef.current) {
+            const shouldStartDrag =
+                atTop && ((dy > 0) || (dy < 0 && sheetY > 0));
+
+            if (!shouldStartDrag) {
+                // Let the content scroll naturally. Don't turn this gesture into a sheet drag mid-stream.
+                pendingContentDragRef.current = false;
+                dragSourceRef.current = null;
+                axisRef.current = "undecided";
+                return;
+            }
+
+            draggingRef.current = true;
+            pendingContentDragRef.current = false;
+            setDragging(true);
+        }
 
         // Drag down to collapse when the content is at the top.
         if (dy > 0 && atTop) {
@@ -163,10 +198,16 @@ export function useBottomSheet() {
     }
 
     function onTouchEnd() {
-        if (!draggingRef.current) return;
+        if (!draggingRef.current) {
+            pendingContentDragRef.current = false;
+            dragSourceRef.current = null;
+            axisRef.current = "undecided";
+            return;
+        }
         draggingRef.current = false;
         setDragging(false);
         dragSourceRef.current = null;
+        pendingContentDragRef.current = false;
         axisRef.current = "undecided";
 
         const h = getViewportHeight();

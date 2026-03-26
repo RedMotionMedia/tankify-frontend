@@ -85,6 +85,15 @@ export default function MobileBottomSheet({
                                               onSelectStationAsDestination,
                                           }: Props) {
     const carouselRef = useRef<HTMLDivElement | null>(null);
+    const calcScrollRef = useRef<HTMLDivElement | null>(null);
+    const stationsScrollRef = useRef<HTMLDivElement | null>(null);
+    const carouselSwipeRef = useRef<{
+        active: boolean;
+        axis: "undecided" | "horizontal" | "vertical";
+        startX: number;
+        startY: number;
+        startScrollLeft: number;
+    }>({ active: false, axis: "undecided", startX: 0, startY: 0, startScrollLeft: 0 });
     const [page, setPage] = useState<0 | 1>(0);
 
     useEffect(() => {
@@ -102,6 +111,72 @@ export default function MobileBottomSheet({
         el.addEventListener("scroll", onScroll, { passive: true });
         return () => el.removeEventListener("scroll", onScroll);
     }, []);
+
+    useEffect(() => {
+        // Tell the BottomSheet hook which element is currently the active vertical scroll container.
+        sheetContentRef.current = page === 0 ? calcScrollRef.current : stationsScrollRef.current;
+    }, [page, sheetContentRef]);
+
+    function onCarouselTouchStart(e: React.TouchEvent) {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest("input, textarea, select, [data-no-carousel-swipe]")) return;
+
+        const el = carouselRef.current;
+        if (!el) return;
+
+        const t0 = e.touches[0];
+        carouselSwipeRef.current.active = true;
+        carouselSwipeRef.current.axis = "undecided";
+        carouselSwipeRef.current.startX = t0.clientX;
+        carouselSwipeRef.current.startY = t0.clientY;
+        carouselSwipeRef.current.startScrollLeft = el.scrollLeft;
+    }
+
+    function onCarouselTouchMove(e: React.TouchEvent) {
+        const state = carouselSwipeRef.current;
+        if (!state.active) return;
+
+        const el = carouselRef.current;
+        if (!el) return;
+
+        const t0 = e.touches[0];
+        const dx = t0.clientX - state.startX;
+        const dy = t0.clientY - state.startY;
+
+        if (state.axis === "undecided") {
+            const threshold = 6;
+            const adx = Math.abs(dx);
+            const ady = Math.abs(dy);
+            if (adx < threshold && ady < threshold) return;
+            state.axis = adx > ady ? "horizontal" : "vertical";
+
+            if (state.axis === "vertical") {
+                // Let the page-specific scroll container handle it.
+                state.active = false;
+                state.axis = "undecided";
+                return;
+            }
+        }
+
+        if (state.axis === "horizontal") {
+            // Manual horizontal scroll to make swipe reliable even inside nested vertical scrollers.
+            e.preventDefault();
+            el.scrollLeft = state.startScrollLeft - dx;
+        }
+    }
+
+    function onCarouselTouchEnd() {
+        const state = carouselSwipeRef.current;
+        const el = carouselRef.current;
+        if (state.active && state.axis === "horizontal" && el) {
+            const w = el.clientWidth || 1;
+            const idx = Math.max(0, Math.min(1, Math.round(el.scrollLeft / w))) as 0 | 1;
+            el.scrollTo({ left: idx * w, behavior: "smooth" });
+            setPage(idx);
+        }
+        carouselSwipeRef.current.active = false;
+        carouselSwipeRef.current.axis = "undecided";
+    }
 
     function goTo(next: 0 | 1) {
         const el = carouselRef.current;
@@ -184,18 +259,23 @@ export default function MobileBottomSheet({
                 </div>
 
                 <div
-                    ref={sheetContentRef}
-                    className="flex-1 overflow-y-auto overscroll-contain pb-10"
+                    className="flex-1 overflow-hidden"
                     onTouchStartCapture={onTouchStartContent}
                 >
-                    <div className="px-4">
                     <div
                         ref={carouselRef}
-                        className="flex w-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
+                        className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
                         style={{ WebkitOverflowScrolling: "touch" }}
+                        onTouchStartCapture={onCarouselTouchStart}
+                        onTouchMoveCapture={onCarouselTouchMove}
+                        onTouchEndCapture={onCarouselTouchEnd}
+                        onTouchCancelCapture={onCarouselTouchEnd}
                     >
-                        <div className="w-full shrink-0 snap-start pr-4">
-                            <div className="space-y-6">
+                        <div
+                            ref={calcScrollRef}
+                            className="h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4"
+                        >
+                            <div className="space-y-6 pb-10">
                                 {showResults ? (
                                     <WorthPanel
                                         t={t}
@@ -225,8 +305,8 @@ export default function MobileBottomSheet({
                             </div>
                         </div>
 
-                        <div className="w-full shrink-0 snap-start">
-                            <div className="rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
+                        <div className="h-full w-full shrink-0 snap-start overflow-hidden px-4">
+                            <div className="h-full w-full rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
                                 <StationsSidebar
                                     stations={stations}
                                     selectedStationId={selectedStationId}
@@ -241,11 +321,11 @@ export default function MobileBottomSheet({
                                     t={t}
                                     onSelectStationAsStart={onSelectStationAsStart}
                                     onSelectStationAsDestination={onSelectStationAsDestination}
+                                    scrollContainerRef={stationsScrollRef}
                                 />
                             </div>
                         </div>
                     </div>
-                </div>
                 </div>
             </div>
         </div>
