@@ -26,6 +26,8 @@ type Props = {
     eurToCurrencyRate: number;
     measurementSystem: MeasurementSystem;
     sheetContentRef: React.RefObject<HTMLDivElement | null>;
+    page?: 0 | 1;
+    onPageChange?: (page: 0 | 1) => void;
     sheetY: number;
     dragging: boolean;
     isSheetReady: boolean;
@@ -61,6 +63,8 @@ export default function MobileBottomSheet({
                                               eurToCurrencyRate,
                                               measurementSystem,
                                               sheetContentRef,
+                                              page: controlledPage,
+                                              onPageChange,
                                               sheetY,
                                               dragging,
                                               isSheetReady,
@@ -108,7 +112,9 @@ export default function MobileBottomSheet({
         lastX: 0,
         lastTimeMs: 0,
     });
-    const [page, setPage] = useState<0 | 1>(0);
+    const [uncontrolledPage, setUncontrolledPage] = useState<0 | 1>(0);
+    const page = controlledPage ?? uncontrolledPage;
+    const setPage = onPageChange ?? setUncontrolledPage;
 
     useEffect(() => {
         const el = carouselRef.current;
@@ -125,6 +131,16 @@ export default function MobileBottomSheet({
         el.addEventListener("scroll", onScroll, { passive: true });
         return () => el.removeEventListener("scroll", onScroll);
     }, []);
+
+    useEffect(() => {
+        if (controlledPage == null) return;
+        const el = carouselRef.current;
+        if (!el) return;
+        const w = el.clientWidth || 1;
+        const desiredLeft = page * w;
+        if (Math.abs(el.scrollLeft - desiredLeft) <= 2) return;
+        el.scrollTo({ left: desiredLeft, behavior: "smooth" });
+    }, [controlledPage, page]);
 
     useEffect(() => {
         // Tell the BottomSheet hook which element is currently the active vertical scroll container.

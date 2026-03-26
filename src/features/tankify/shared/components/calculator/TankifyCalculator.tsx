@@ -121,6 +121,8 @@ export default function TankifyCalculator() {
         setBottomSheet,
     } = useBottomSheet();
 
+    const [mobileSheetPage, setMobileSheetPage] = useState<0 | 1>(0);
+
     const {routeData, routeLoading, routeError} = useRoute(
         calcStartPoint,
         calcEndPoint,
@@ -143,6 +145,10 @@ export default function TankifyCalculator() {
             return () => mq.removeListener(handleChange);
         }
     }, []);
+
+    useEffect(() => {
+        if (isDesktop) setMobileSheetPage(0);
+    }, [isDesktop]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -630,6 +636,11 @@ export default function TankifyCalculator() {
                 return;
             }
             commitRoute(draftStartPoint, point);
+
+            if (!isDesktop) {
+                setMobileSheetPage(0);
+                setBottomSheet(window.innerHeight * snapWorthMultiplicator);
+            }
         }
     }
 
@@ -1184,6 +1195,8 @@ export default function TankifyCalculator() {
                         eurToCurrencyRate={eurToCurrencyRate}
                         measurementSystem={measurementSystem}
                         sheetContentRef={sheetContentRef}
+                        page={mobileSheetPage}
+                        onPageChange={setMobileSheetPage}
                         sheetY={sheetY}
                         dragging={dragging}
                         isSheetReady={isSheetReady}
