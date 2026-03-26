@@ -138,6 +138,20 @@ export default function StationPopupContent({
     const initials = getStationInitials(station.brandName ?? station.name);
     const openingHours = Array.isArray(station.openingHours) ? station.openingHours : [];
     const logoUrl = station.logoUrl ? withCacheBuster(station.logoUrl, logoCacheBust) : null;
+    const payment = station.paymentMethods ?? null;
+
+    const paymentBubbles: string[] = [];
+    if (payment?.cash) paymentBubbles.push(t.station.paymentCash);
+    if (payment?.debitCard) paymentBubbles.push(t.station.paymentDebitCard);
+    if (payment?.creditCard) paymentBubbles.push(t.station.paymentCreditCard);
+    if (typeof payment?.others === "string" && payment.others.trim()) {
+        const parts = payment.others
+            .split(/[,;\n]+/)
+            .map((x) => x.trim())
+            .filter(Boolean);
+        if (parts.length) paymentBubbles.push(...parts);
+        else paymentBubbles.push(t.station.paymentOther);
+    }
 
     const openingHoursByDay = new Map<string, Array<{ from: string | null; to: string | null }>>();
     for (const h of openingHours) {
@@ -155,7 +169,11 @@ export default function StationPopupContent({
             ? [...WEEKDAY_ORDER]
             : [...WEEKDAY_ORDER.slice(todayIdx), ...WEEKDAY_ORDER.slice(0, todayIdx)];
 
-    const distanceKm = userLocation ? haversineKm(userLocation, station) : null;
+    const distanceKm = (() => {
+        const v = station.distanceKm;
+        if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
+        return userLocation ? haversineKm(userLocation, station) : null;
+    })();
 
     return (
         <div className="w-full max-w-[70vw] select-text">
@@ -308,6 +326,33 @@ export default function StationPopupContent({
                         >
                             ▶
                         </span>
+                        <span className="flex-auto">{t.station.payment}</span>
+                    </summary>
+
+                    {paymentBubbles.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {paymentBubbles.map((label) => (
+                                <span
+                                    key={label}
+                                    className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200"
+                                >
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="mt-2 text-xs text-gray-500">â€”</div>
+                    )}
+                </details>
+
+                <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                    <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                        <span
+                            aria-hidden="true"
+                            className="text-gray-500 transition-transform group-open:rotate-90"
+                        >
+                            ▶
+                        </span>
                         <span className="flex-auto">{t.station.contact}</span>
                     </summary>
 
@@ -371,7 +416,7 @@ export default function StationPopupContent({
                     </details>
                 ) : null}
 
-                {debugMode && station.econtrol ? (
+                {debugMode && station ? (
                     <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
                         <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
                             <span

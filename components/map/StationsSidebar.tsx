@@ -32,6 +32,56 @@ function formatPrice(
     return `${inCurrency.toFixed(3)} ${currencySystem}${unit}`;
 }
 
+type SortDir = "off" | "asc" | "desc";
+
+function SortIcon({ dir }: { dir: SortDir }) {
+    if (dir === "asc") {
+        return (
+            <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                <path
+                    d="M5 12.5l5-5 5 5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+    if (dir === "desc") {
+        return (
+            <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                <path
+                    d="M5 7.5l5 5 5-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+    return null;
+}
+
+function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+    const R = 6371;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLon = Math.sin(dLon / 2);
+    const h =
+        sinDLat * sinDLat +
+        Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 export default function StationsSidebar({
     stations,
     selectedStationId,
@@ -70,6 +120,9 @@ export default function StationsSidebar({
 }) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
+    const [priceSort, setPriceSort] = useState<SortDir>("off");
+    const [distanceSort, setDistanceSort] = useState<SortDir>("off");
+    const [openFirst, setOpenFirst] = useState(false);
 
     useEffect(() => {
         function handleLogoCacheCleared() {
@@ -89,11 +142,68 @@ export default function StationsSidebar({
         } catch {}
     }, [selectedStationId]);
 
-    const sortedStations = useMemo(() => stations, [stations]);
+    const hasDistanceData = Boolean(userLocation);
+
+    const sortedStations = useMemo(() => {
+        const effectiveDistanceSort: SortDir = userLocation ? distanceSort : "off";
+
+        const getPriceEur = (s: Station): number | null => {
+            const v = fuelType === "diesel" ? s.diesel : s.super95;
+            return typeof v === "number" && Number.isFinite(v) ? v : null;
+        };
+
+        const getDistanceKm = (s: Station): number | null => {
+            const v = s.distanceKm;
+            if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
+            if (!userLocation) return null;
+            return haversineKm(userLocation, s);
+        };
+
+        const indexed = stations.map((s, idx) => ({ s, idx }));
+        indexed.sort((a, b) => {
+            if (openFirst) {
+                const ao = a.s.open === true;
+                const bo = b.s.open === true;
+                if (ao !== bo) return ao ? -1 : 1;
+            }
+
+            if (priceSort !== "off") {
+                const ap = getPriceEur(a.s);
+                const bp = getPriceEur(b.s);
+                if (ap === null && bp !== null) return 1;
+                if (ap !== null && bp === null) return -1;
+                if (ap !== null && bp !== null && ap !== bp) {
+                    const dir = priceSort === "asc" ? 1 : -1;
+                    return (ap - bp) * dir;
+                }
+            }
+
+            if (effectiveDistanceSort !== "off") {
+                const ad = getDistanceKm(a.s);
+                const bd = getDistanceKm(b.s);
+                if (ad === null && bd !== null) return 1;
+                if (ad !== null && bd === null) return -1;
+                if (ad !== null && bd !== null && ad !== bd) {
+                    const dir = effectiveDistanceSort === "asc" ? 1 : -1;
+                    return (ad - bd) * dir;
+                }
+            }
+
+            return a.idx - b.idx;
+        });
+
+        return indexed.map((x) => x.s);
+    }, [stations, fuelType, priceSort, distanceSort, userLocation, openFirst]);
+
+    const cycleSort = (dir: SortDir): SortDir => {
+        if (dir === "off") return "asc";
+        if (dir === "asc") return "desc";
+        return "off";
+    };
 
     return (
         <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-full">
-            <div className="flex items-center gap-3 border-b border-gray-100 pt-5 pb-3">
+            <div className="flex items-center gap-3 border-b border-gray-100 pt-5 pb-3 pr-5">
                 {onClose ? (
                     <button
                         type="button"
@@ -124,12 +234,58 @@ export default function StationsSidebar({
                 </div>
             </div>
 
+            <div className="flex flex-row items-center gap-2 py-2 px-5">
+                <button
+                    type="button"
+                    onClick={() => setOpenFirst((v) => !v)}
+                    className={
+                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-95 " +
+                        (openFirst
+                            ? "border-green-200 bg-green-50 text-green-500"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50")
+                    }
+                    title="Geoeffnet zuerst"
+                    aria-pressed={openFirst}
+                >
+                    {t.station.open}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setPriceSort((v) => cycleSort(v))}
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-95"
+                    title="Preis sortieren"
+                    aria-label="Preis sortieren"
+                >
+                    <SortIcon dir={priceSort} />
+                    Preis
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setDistanceSort((v) => cycleSort(v))}
+                    disabled={!hasDistanceData}
+                    className={
+                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-95 " +
+                        (hasDistanceData
+                            ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                            : "border-gray-200 bg-white text-gray-400 opacity-60")
+                    }
+                    title={hasDistanceData ? "Distanz sortieren" : "Distanz nur mit Standort verfuegbar"}
+                    aria-label="Distanz sortieren"
+                >
+                    <SortIcon dir={hasDistanceData ? distanceSort : "off"} />
+                    {t.station.distance}
+                </button>
+            </div>
+
             <div className="min-h-0 flex-1 pb-5 flex flex-col">
-                <div className="min-h-0 flex-1 overflow-auto px-5 pt-5">
+                <div className="min-h-0 flex-1 overflow-auto px-5">
                     <div ref={scrollRef} className="min-h-0 space-y-3">
                         {sortedStations.map((station) => {
                             const isOpen = station.id === selectedStationId;
                             const priceEur = fuelType === "diesel" ? station.diesel : station.super95;
+                            const deemphasize = openFirst && station.open !== true;
 
                             return (
                                 <div
@@ -141,6 +297,7 @@ export default function StationsSidebar({
                                             ? "border-blue-200 bg-blue-50/30"
                                             : "border-gray-100 bg-white hover:bg-gray-50")
                                     }
+                                    style={deemphasize ? { opacity: 0.55 } : undefined}
                                 >
                                     <button
                                         type="button"
