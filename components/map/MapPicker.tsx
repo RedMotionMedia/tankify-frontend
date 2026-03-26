@@ -274,6 +274,8 @@ export default function MapPicker({
     const pendingRecenterIdRef = useRef(0);
     const pendingRecenterClearTimerRef = useRef<number | null>(null);
     const resizeDebounceTimerRef = useRef<number | null>(null);
+    const resizeRafRef = useRef<number | null>(null);
+    const lastResizeSizeRef = useRef<{ w: number; h: number } | null>(null);
 
     useEffect(() => {
         userLocationRef.current = userLocation;
@@ -299,6 +301,40 @@ export default function MapPicker({
             if (pendingRecenterIdRef.current !== id) return;
             pendingRecenterPointsRef.current = null;
         }, 1200);
+    }
+
+    function safeResizePreserveView(map: MapLibreMap, container: HTMLElement) {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w < 10 || h < 10) return;
+
+        const last = lastResizeSizeRef.current;
+        if (last && last.w === w && last.h === h) return;
+        lastResizeSizeRef.current = { w, h };
+
+        // During layout transitions (panels sliding/collapsing) frequent resizes can cause visible "shaking"
+        // due to ongoing camera animations + rounding. Freeze the current camera around the resize.
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        const bearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
+        const pitch = typeof map.getPitch === "function" ? map.getPitch() : 0;
+
+        try {
+            map.stop?.();
+        } catch {}
+
+        try {
+            map.resize();
+        } catch {}
+
+        try {
+            map.jumpTo?.({
+                center: [center.lng, center.lat],
+                zoom,
+                bearing,
+                pitch,
+            });
+        } catch {}
     }
 
     const pickModeRef = useRef<MapPickMode>(pickMode);
@@ -419,6 +455,10 @@ export default function MapPicker({
                     center: [safeCenter[1], safeCenter[0]],
                     zoom: FALLBACK_VIEW.zoom,
                     attributionControl: false,
+                    // Reduce console noise from strict style validation on remote styles.
+                    // Also avoid internal resize tracking; we manage resize via a debounced ResizeObserver.
+                    validateStyle: false,
+                    trackResize: false,
                     dragRotate: false,
                     pitchWithRotate: false,
                     touchPitch: false,
@@ -428,7 +468,10 @@ export default function MapPicker({
                 // Show attribution text without the compact "i" button.
                 try {
                     if (maplibre.AttributionControl && typeof map.addControl === "function") {
-                        map.addControl(new maplibre.AttributionControl({ compact: true }), "bottom-left");
+                        map.addControl(
+                            new maplibre.AttributionControl({ compact: false }),
+                            "bottom-left"
+                        );
                     }
                 } catch {}
 
@@ -477,6 +520,17 @@ export default function MapPicker({
                 const ro = new ResizeObserver(() => {
                     // Debounce: while panels animate, the map container height changes a few times.
                     // We want to re-apply a pending recenter once the size has stabilized.
+
+                    // Make the map repaint during layout transitions (panel collapse/expand),
+                    // otherwise the container grows/shrinks but MapLibre only redraws after our debounce,
+                    // which looks like a "white box" trailing behind the panels.
+                    if (resizeRafRef.current == null) {
+                        resizeRafRef.current = window.requestAnimationFrame(() => {
+                            resizeRafRef.current = null;
+                            safeResizePreserveView(map, container);
+                        });
+                    }
+
                     if (resizeDebounceTimerRef.current != null) {
                         window.clearTimeout(resizeDebounceTimerRef.current);
                         resizeDebounceTimerRef.current = null;
@@ -487,12 +541,7 @@ export default function MapPicker({
 
                         // If the container is currently collapsed (0x0) during a layout transition,
                         // calling resize/fitBounds can put MapLibre into a bad internal state.
-                        const rect = container.getBoundingClientRect();
-                        if (rect.width < 10 || rect.height < 10) return;
-
-                        try {
-                            map.resize();
-                        } catch {}
+                        safeResizePreserveView(map, container);
 
                         // DevTools open causes frequent resizes; MapLibre can occasionally "lose" marker positioning.
                         // Fully recreate the user-location marker (equivalent to toggling location off/on).
@@ -520,8 +569,9 @@ export default function MapPicker({
                             window.clearTimeout(pendingRecenterClearTimerRef.current);
                             pendingRecenterClearTimerRef.current = null;
                         }
+                        // Snap (no animation) after resize settle to avoid "shaking" during panel transitions.
                         try {
-                            recenterToPoints(map, pending, 350);
+                            recenterToPoints(map, pending, 0);
                         } catch {}
                     }, 140);
                 });
@@ -532,6 +582,10 @@ export default function MapPicker({
                     if (resizeDebounceTimerRef.current != null) {
                         window.clearTimeout(resizeDebounceTimerRef.current);
                         resizeDebounceTimerRef.current = null;
+                    }
+                    if (resizeRafRef.current != null) {
+                        window.cancelAnimationFrame(resizeRafRef.current);
+                        resizeRafRef.current = null;
                     }
                     if (pendingRecenterClearTimerRef.current != null) {
                         window.clearTimeout(pendingRecenterClearTimerRef.current);
@@ -1004,9 +1058,8 @@ export default function MapPicker({
 
             // Apply immediately too, but after a resize tick.
             window.requestAnimationFrame(() => {
-                try {
-                    map.resize();
-                } catch {}
+                const container = containerRef.current;
+                if (container) safeResizePreserveView(map, container);
                 try {
                     recenterToPoints(map, points, 650);
                 } catch {}
