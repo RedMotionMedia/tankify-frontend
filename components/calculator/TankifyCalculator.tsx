@@ -487,10 +487,10 @@ export default function TankifyCalculator() {
     }
 
     function handleSelectStationAsStart({
-        point,
-        price,
-        station,
-    }: {
+                                            point,
+                                            price,
+                                            station,
+                                        }: {
         point: Point;
         price?: number | null;
         station: Station;
@@ -506,11 +506,11 @@ export default function TankifyCalculator() {
     }
 
     function handleSelectStationAsDestination({
-        point,
-        price,
-        station,
-        autoCalculate,
-    }: {
+                                                  point,
+                                                  price,
+                                                  station,
+                                                  autoCalculate,
+                                              }: {
         point: Point;
         price?: number | null;
         station: Station;
@@ -761,20 +761,20 @@ export default function TankifyCalculator() {
                 >
                     <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
                         <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <h1 className="text-3xl font-bold">{t.app.title}</h1>
-                                    <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setSettingsOpen(true)}
-                                    className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
-                                    aria-label="Open settings"
-                                >
-                                    ⚙️
-                                </button>
+                            <div>
+                                <h1 className="text-3xl font-bold">{t.app.title}</h1>
+                                <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setSettingsOpen(true)}
+                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
+                                aria-label="Open settings"
+                            >
+                                ⚙️
+                            </button>
+                        </div>
 
                         <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
@@ -782,142 +782,142 @@ export default function TankifyCalculator() {
                     <section className="flex-1 min-w-0 h-full min-h-0 flex flex-col">
                         <div
                             className={
-                                "rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
+                                "min-h-0 rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
                             }
                         >
                             <div className="h-full overflow-hidden rounded-3xl">
-                                 <MapPicker
-                                     start={draftStartPoint}
-                                     end={draftEndPoint}
-                                     routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
-                                     pickMode={mapPickMode}
-                                     fuelType={fuelType}
-                                     measurementSystem={measurementSystem}
-                                     debugMode={debugMode}
-                                     t={t}
-                                     defaultLocationEnabled
-                                     onStationsChange={handleStationsChange}
-                                     selectedStationId={selectedStationId}
-                                     onStationSelect={(station) => setSelectedStationId(station.id)}
-                                     onMapPick={(type, point) => {
-                                         if (type === "start") {
-                                             setDraftStartPoint(point);
-                                             setStartText(point.label);
-                                         } else {
-                                             setDraftEndPoint(point);
-                                             setEndText(point.label);
-                                         }
-                                         setMapPickMode(null);
-                                     }}
-                                 />
-                             </div>
-                         </div>
+                                <MapPicker
+                                    start={draftStartPoint}
+                                    end={draftEndPoint}
+                                    routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                                    pickMode={mapPickMode}
+                                    fuelType={fuelType}
+                                    measurementSystem={measurementSystem}
+                                    debugMode={debugMode}
+                                    t={t}
+                                    defaultLocationEnabled
+                                    onStationsChange={handleStationsChange}
+                                    selectedStationId={selectedStationId}
+                                    onStationSelect={(station) => setSelectedStationId(station.id)}
+                                    onMapPick={(type, point) => {
+                                        if (type === "start") {
+                                            setDraftStartPoint(point);
+                                            setStartText(point.label);
+                                        } else {
+                                            setDraftEndPoint(point);
+                                            setEndText(point.label);
+                                        }
+                                        setMapPickMode(null);
+                                    }}
+                                />
+                            </div>
+                        </div>
 
                         {desktopResultsMounted ? (
-                        <div
-                            className={
-                                "mt-4 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out " +
-                                (desktopResultsOpen && !desktopResultsEntering
-                                    ? "max-h-[1000px] opacity-100 translate-y-0"
-                                    : "max-h-0 opacity-0 translate-y-2 pointer-events-none")
-                            }
-                        >
-                        <div className="relative rounded-3xl bg-white p-5 shadow-sm h-auto max-h-full">
-                            <button
-                                type="button"
-                                onClick={() => setDesktopResultsOpen(false)}
-                                className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
-                                aria-label={t.actions.close}
-                                title={t.actions.close}
+                            <div
+                                className={
+                                    "mt-4 min-h-0 overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-out " +
+                                    (desktopResultsOpen && !desktopResultsEntering
+                                        ? "max-h-full opacity-100 translate-y-0"
+                                        : "max-h-0 opacity-0 translate-y-2 pointer-events-none")
+                                }
                             >
-                                X
-                            </button>
-                            <div className="h-full overflow-auto">
-                                <div className="flex flex-col gap-6">
+                                <div className="relative rounded-3xl bg-white p-5 shadow-sm h-full max-h-full min-h-0 flex flex-col">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDesktopResultsOpen(false)}
+                                        className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                                        aria-label={t.actions.close}
+                                        title={t.actions.close}
+                                    >
+                                        X
+                                    </button>
+                                    <div className="min-h-0 flex-1 overflow-auto">
+                                        <div className="flex flex-col gap-6">
 
-                                    <WorthPanel
-                                        t={t}
-                                        currencySystem={currencySystem}
-                                        profit={profit}
-                                        netSaving={calculation.netSaving}
-                                    />
-                                    <div className="h-full rounded-2xl border border-gray-100 p-4">
-                                        <ResultsPanel
-                                            t={t}
-                                            currencySystem={currencySystem}
-                                            measurementSystem={measurementSystem}
-                                            profit={profit}
-                                            routeLoading={routeLoading}
-                                            calculation={calculation}
-                                        />
+                                            <WorthPanel
+                                                t={t}
+                                                currencySystem={currencySystem}
+                                                profit={profit}
+                                                netSaving={calculation.netSaving}
+                                            />
+                                            <div className="rounded-2xl border border-gray-100 p-4">
+                                                <ResultsPanel
+                                                    t={t}
+                                                    currencySystem={currencySystem}
+                                                    measurementSystem={measurementSystem}
+                                                    profit={profit}
+                                                    routeLoading={routeLoading}
+                                                    calculation={calculation}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
+
                                 </div>
                             </div>
-
-                        </div>
-                        </div>
                         ) : null}
                     </section>
 
-                            {stationsQueried && desktopStationsMounted ? (
-                                    <div
-                                        className={
-                                            "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col " +
-                                            (desktopStationsOpen && !desktopStationsEntering
-                                                ? "w-105 opacity-100 translate-x-0"
-                                                : "w-0 opacity-0 translate-x-6 pointer-events-none")
-                                        }
-                                    >
-                                        <StationsSidebar
-                                            stations={visibleStations}
-                                            selectedStationId={selectedStationId}
-                                            onToggleStation={handleToggleStation}
-                                            fuelType={fuelType}
-                                            measurementSystem={measurementSystem}
-                                            currencySystem={currencySystem}
-                                            language={language}
-                                            debugMode={debugMode}
-                                            userLocation={userLocation}
-                                            t={t}
-                                            onSelectStationAsStart={handleSelectStationAsStart}
-                                            onSelectStationAsDestination={handleSelectStationAsDestination}
-                                            onClose={() => setDesktopStationsOpen(false)}
-                                        />
-                                    </div>
+                    {stationsQueried && desktopStationsMounted ? (
+                        <div
+                            className={
+                                "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col " +
+                                (desktopStationsOpen && !desktopStationsEntering
+                                    ? "w-105 opacity-100 translate-x-0"
+                                    : "w-0 opacity-0 translate-x-6 pointer-events-none")
+                            }
+                        >
+                            <StationsSidebar
+                                stations={visibleStations}
+                                selectedStationId={selectedStationId}
+                                onToggleStation={handleToggleStation}
+                                fuelType={fuelType}
+                                measurementSystem={measurementSystem}
+                                currencySystem={currencySystem}
+                                language={language}
+                                debugMode={debugMode}
+                                userLocation={userLocation}
+                                t={t}
+                                onSelectStationAsStart={handleSelectStationAsStart}
+                                onSelectStationAsDestination={handleSelectStationAsDestination}
+                                onClose={() => setDesktopStationsOpen(false)}
+                            />
+                        </div>
 
-                            ) : null}
+                    ) : null}
                 </div>
 
                 <div className="lg:hidden">
                     <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
                         <MapPicker
-                             start={draftStartPoint}
-                             end={draftEndPoint}
-                             routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
-                             pickMode={mapPickMode}
-                             fuelType={fuelType}
-                             measurementSystem={measurementSystem}
-                             debugMode={debugMode}
-                             t={t}
-                             defaultLocationEnabled
-                             selectedStationId={selectedStationId}
-                             onStationSelect={(station) => {
-                                 setSelectedStationId(station.id);
-                                 setBottomSheet(window.innerHeight * snapWorthMultiplicator);
-                             }}
-                             onMapPick={(type, point) => {
-                                 if (type === "start") {
-                                     setDraftStartPoint(point);
-                                     setStartText(point.label);
+                            start={draftStartPoint}
+                            end={draftEndPoint}
+                            routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                            pickMode={mapPickMode}
+                            fuelType={fuelType}
+                            measurementSystem={measurementSystem}
+                            debugMode={debugMode}
+                            t={t}
+                            defaultLocationEnabled
+                            selectedStationId={selectedStationId}
+                            onStationSelect={(station) => {
+                                setSelectedStationId(station.id);
+                                setBottomSheet(window.innerHeight * snapWorthMultiplicator);
+                            }}
+                            onMapPick={(type, point) => {
+                                if (type === "start") {
+                                    setDraftStartPoint(point);
+                                    setStartText(point.label);
                                 } else {
                                     setDraftEndPoint(point);
                                     setEndText(point.label);
-                                 }
-                                 setMapPickMode(null);
-                                 setBottomSheet(window.innerHeight*snapWorthMultiplicator);
-                             }}
-                         />
-                     </div>
+                                }
+                                setMapPickMode(null);
+                                setBottomSheet(window.innerHeight*snapWorthMultiplicator);
+                            }}
+                        />
+                    </div>
 
                     <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
                         <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
