@@ -48,6 +48,7 @@ export type TranslationSchema = {
         myLocation: string;
         currentLocation: string;
         searchHere: string;
+        searchHereLong: string;
         loading: string;
         tapSearchHere: string;
         areaChanged: string;
@@ -213,6 +214,7 @@ export const translations: Record<Language, TranslationSchema> = {
             myLocation: "Standort",
             currentLocation: "Aktueller Standort",
             searchHere: "Hier suchen",
+            searchHereLong: "Tankstellen hier suchen",
             loading: "Lädt ...",
             tapSearchHere: "Tippe auf „Hier suchen“ für Tankstellen.",
             areaChanged: "Kartenausschnitt geändert – „Hier suchen“ drücken.",
@@ -378,6 +380,7 @@ export const translations: Record<Language, TranslationSchema> = {
             myLocation: "My location",
             currentLocation: "Current location",
             searchHere: "Search here",
+            searchHereLong: "Search gas stations here",
             loading: "Loading ...",
             tapSearchHere: 'Tap "Search here" for gas stations.',
             areaChanged: 'Map area changed – press "Search here".',

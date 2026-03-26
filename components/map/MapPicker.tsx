@@ -122,6 +122,26 @@ function formatBadgePrice(
 
 const stationMarkerTemplateCache = new Map<string, HTMLElement>();
 
+function getTapSearchHereHint(t: TranslationSchema, label: string): string {
+    if (label.includes("Tankstellen")) {
+        return `Tippe auf "${label}", um Tankstellen im Kartenausschnitt zu laden.`;
+    }
+    if (label.toLowerCase().includes("gas station")) {
+        return `Tap "${label}" to load stations in this area.`;
+    }
+    return t.route.tapSearchHere;
+}
+
+function getAreaChangedHint(t: TranslationSchema, label: string): string {
+    if (label.includes("Tankstellen")) {
+        return `Kartenausschnitt geaendert. Tippe auf "${label}".`;
+    }
+    if (label.toLowerCase().includes("gas station")) {
+        return `Map area changed. Tap "${label}".`;
+    }
+    return t.route.areaChanged;
+}
+
 function createStationMarkerElement({
     station,
     hasPrice,
@@ -267,8 +287,14 @@ export default function MapPicker({
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const userLocationRef = useRef<UserLocation | null>(null);
 
+    const SEARCH_HERE_SEEN_KEY = "tankify-search-here-seen-v1";
+    const [searchHereSeen, setSearchHereSeen] = useState(false);
+    const searchHereSeenRef = useRef(false);
     const [searchLoading, setSearchLoading] = useState(false);
-    const [searchHint, setSearchHint] = useState<string>(t.route.tapSearchHere);
+    const [searchHint, setSearchHint] = useState<string>(() =>
+        getTapSearchHereHint(t, t.route.searchHereLong ?? t.route.searchHere)
+    );
+    const [needsSearchHere, setNeedsSearchHere] = useState(true);
 
     const [locationEnabled, setLocationEnabled] = useState(
         Boolean(defaultLocationEnabled)
@@ -294,8 +320,20 @@ export default function MapPicker({
     }, [userLocation]);
 
     useEffect(() => {
+        searchHereSeenRef.current = searchHereSeen;
+    }, [searchHereSeen]);
+
+    useEffect(() => {
         locationEnabledRef.current = locationEnabled;
     }, [locationEnabled]);
+
+    useEffect(() => {
+        try {
+            setSearchHereSeen(window.localStorage.getItem(SEARCH_HERE_SEEN_KEY) === "1");
+        } catch {
+            setSearchHereSeen(false);
+        }
+    }, []);
 
     function setPendingRecenter(points: Array<[number, number]>) {
         pendingRecenterIdRef.current += 1;
@@ -487,7 +525,13 @@ export default function MapPicker({
                     }
                 } catch {}
 
-                const onMoveStart = () => setSearchHint(t.route.areaChanged);
+                const onMoveStart = () => {
+                    setNeedsSearchHere(true);
+                    const label = searchHereSeenRef.current
+                        ? t.route.searchHere
+                        : t.route.searchHereLong ?? t.route.searchHere;
+                    setSearchHint(getAreaChangedHint(t, label));
+                };
                 map.on("movestart", onMoveStart);
                 map.on("zoomstart", onMoveStart);
 
@@ -1014,7 +1058,17 @@ export default function MapPicker({
             return;
         }
 
+        // After the first usage, keep the label short for this user.
+        if (!searchHereSeenRef.current) {
+            try {
+                window.localStorage.setItem(SEARCH_HERE_SEEN_KEY, "1");
+            } catch {}
+            searchHereSeenRef.current = true;
+            setSearchHereSeen(true);
+        }
+
         setSearchLoading(true);
+        setNeedsSearchHere(false);
         setSearchHint(t.route.stationsLoading);
 
         try {
@@ -1094,8 +1148,12 @@ export default function MapPicker({
     }
 
     useEffect(() => {
-        setSearchHint(t.route.tapSearchHere);
-    }, [t]);
+        const label = searchHereSeenRef.current
+            ? t.route.searchHere
+            : t.route.searchHereLong ?? t.route.searchHere;
+        setSearchHint(getTapSearchHereHint(t, label));
+        setNeedsSearchHere(true);
+    }, [t, searchHereSeen]);
 
     return (
         <div className="relative h-full w-full">
@@ -1105,9 +1163,33 @@ export default function MapPicker({
                 <button
                     type="button"
                     onClick={handleRecenter}
-                    className="pointer-events-auto rounded-full bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-lg transition active:scale-95"
+                    aria-label={t.route.center}
+                    title={t.route.center}
+                    className="pointer-events-auto grid h-11 w-11 place-items-center rounded-full bg-white text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95"
                 >
-                    {t.route.center}
+                    <svg
+                        viewBox="0 0 24 24"
+                        className="h-5 w-5"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        <path
+                            d="M12 2v3M12 19v3M2 12h3M19 12h3"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                        />
+                        <circle
+                            cx="12"
+                            cy="12"
+                            r="5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                        />
+                        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                    </svg>
                 </button>
 
                 <button
@@ -1128,28 +1210,73 @@ export default function MapPicker({
                     }
                     aria-pressed={locationEnabled}
                     className={
-                        "pointer-events-auto rounded-full px-3 py-2 text-sm font-medium shadow-lg transition active:scale-95 " +
+                        "pointer-events-auto relative grid h-11 w-11 place-items-center rounded-full shadow-lg transition active:scale-95 " +
                         (locationEnabled
                             ? "bg-blue-600 text-white hover:bg-blue-700"
                             : "bg-white text-gray-900 hover:bg-gray-50") +
                         (!canUseGeolocation() ? " opacity-60" : "")
                     }
                 >
-                    {t.route.myLocation}
+                    <svg
+                        viewBox="0 0 24 24"
+                        className="h-6 w-6"
+                        aria-hidden="true"
+                        focusable="false"
+                    >
+                        {/* Location pointer (GPS-style) */}
+                        <path
+                            d="M12 2l7 19-7-3-7 3 7-19z"
+                            fill="currentColor"
+                        />
+                    </svg>
                 </button>
             </div>
 
             <div className="pointer-events-none absolute bottom-1/12 left-1/2 z-1000 -translate-x-1/2 md:bottom-1">
                 <div className="flex flex-col items-center gap-1">
+                    {(() => {
+                        const label = searchHereSeen ? t.route.searchHere : (t.route.searchHereLong ?? t.route.searchHere);
+                        return (
                     <button
                         type="button"
                         onClick={handleSearchHere}
-                        className="pointer-events-auto rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
+                        aria-label={label}
+                        title={label}
+                        className={
+                            "pointer-events-auto flex items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 " +
+                            (!searchLoading && needsSearchHere
+                                ? "ring-4 ring-blue-200 ring-offset-2 ring-offset-white"
+                                : "")
+                        }
                     >
-                        {searchLoading ? t.route.loading : t.route.searchHere}
+                        <svg
+                            viewBox="0 0 20 20"
+                            className="h-4 w-4"
+                            aria-hidden="true"
+                            focusable="false"
+                        >
+                            <path
+                                d="M12.5 12.5l4 4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                            />
+                            <circle
+                                cx="8.5"
+                                cy="8.5"
+                                r="5.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                            />
+                        </svg>
+                        {searchLoading ? t.route.loading : label}
                     </button>
+                        );
+                    })()}
 
-                    <div className="w-65 rounded-full bg-white/50 px-3 py-1 text-center text-[10px] text-gray-700 shadow md:w-auto md:text-xs">
+                    <div className="w-72 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-center text-[11px] text-gray-800 shadow backdrop-blur md:w-auto md:text-xs">
                         {searchHint}
                     </div>
                 </div>
