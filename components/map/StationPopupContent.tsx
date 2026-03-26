@@ -371,7 +371,7 @@ export default function StationPopupContent({
                     </details>
                 ) : null}
 
-                {debugMode && station.econtrol ? (
+                {debugMode && station ? (
                     <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
                         <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
                             <span

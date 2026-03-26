@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import {useEffect, useMemo, useRef, useState} from "react";
 import RouteSection from "./RouteSection";
 import PriceSection from "./PriceSection";
@@ -826,8 +827,18 @@ export default function TankifyCalculator() {
 
 
                         <div className="flex flex-col gap-3">
-                            <div className="flex flex-row items-center">
-                                <h1 className="text-3xl font-bold w-full">{t.app.title}</h1>
+                            <div className="flex flex-row items-center gap-3">
+                                <div className="flex items-center gap-3 w-full min-w-0">
+                                    <Image
+                                        src="/resources/logos/tankify-logo.png"
+                                        alt="Tankify logo"
+                                        width={36}
+                                        height={36}
+                                        priority
+                                        className="h-9 w-9"
+                                    />
+                                    <h1 className="text-3xl font-bold w-full truncate">{t.app.title}</h1>
+                                </div>
                                 <div className="w-auto">
                                     <button
                                         type="button"
@@ -1091,7 +1102,15 @@ export default function TankifyCalculator() {
                     </div>
 
                     <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
-                        <div className="rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
+                        <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
+                            <Image
+                                src="/resources/logos/tankify-logo.png"
+                                alt="Tankify logo"
+                                width={22}
+                                height={22}
+                                priority
+                                className="h-[22px] w-[22px]"
+                            />
                             <h1 className="text-lg font-bold">{t.app.title}</h1>
                         </div>
 

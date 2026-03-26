@@ -168,7 +168,7 @@ function contentTypeForExt(ext: string): string {
 }
 
 async function tryLoadLocalLogo(key: string): Promise<CacheEntry | null> {
-    const baseDir = path.join(process.cwd(), "resources", "logos", "stations");
+    const baseDir = path.join(process.cwd(), "public", "resources", "logos", "stations");
     const exts = ["svg", "webp", "png", "jpg", "jpeg", "ico"] as const;
 
     for (const ext of exts) {
@@ -188,6 +188,23 @@ async function tryLoadLocalLogo(key: string): Promise<CacheEntry | null> {
         }
     }
 
+    return null;
+}
+
+async function tryResolveLocalLogoUrl(origin: string, key: string): Promise<string | null> {
+    // In some production setups (notably serverless), the API runtime cannot read `public/` from disk,
+    // even though the static asset is still served by the platform/CDN. As a fallback, probe the static
+    // URL and redirect to it if it exists.
+    const exts = ["webp", "png", "svg", "jpg", "jpeg", "ico"] as const;
+    for (const ext of exts) {
+        const url = new URL(`/resources/logos/stations/${key}.${ext}`, origin).toString();
+        try {
+            const res = await fetch(url, { method: "HEAD" });
+            if (res.ok) return url;
+        } catch {
+            // ignore
+        }
+    }
     return null;
 }
 
@@ -296,6 +313,11 @@ export async function GET(req: NextRequest) {
             putCache(localKey, local);
             return respond(local);
         }
+
+        const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, domainKey);
+        if (localUrl) {
+            return NextResponse.redirect(localUrl, { status: 307 });
+        }
     }
 
     if (nameKey) {
@@ -307,6 +329,11 @@ export async function GET(req: NextRequest) {
         if (local) {
             putCache(localKey, local);
             return respond(local);
+        }
+
+        const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, nameKey);
+        if (localUrl) {
+            return NextResponse.redirect(localUrl, { status: 307 });
         }
     }
 
