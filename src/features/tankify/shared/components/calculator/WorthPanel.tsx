@@ -28,7 +28,7 @@ export default function WorthPanel({
     const netSaving = eurToQuote(netSavingEur, eurToCurrencyRate);
 
     return (
-        <div className="flex flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
             <div className={`rounded-3xl p-6 shadow-sm ${profit.bgClass}`}>
                 <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{t.result.worthTrip}</span>

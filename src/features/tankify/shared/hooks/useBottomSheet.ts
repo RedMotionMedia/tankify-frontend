@@ -8,104 +8,206 @@ export function useBottomSheet() {
     const snapWorthMultiplicator = 0.17;
     const snapBottomMultiplicator = 0.82;
 
-    // Start at the same "resting" position immediately to avoid a visible jump on reload.
+    function getViewportHeight() {
+        return window.visualViewport?.height ?? window.innerHeight;
+    }
+
     const initialSheetY = (() => {
         if (typeof window === "undefined") return 0;
-        const h = window.visualViewport?.height ?? window.innerHeight;
+        const h = getViewportHeight();
         return h * snapBottomMultiplicator;
     })();
 
     const [sheetY, setSheetY] = useState(initialSheetY);
     const [dragging, setDragging] = useState(false);
-    const [startY, setStartY] = useState(0);
-    const [startOffset, setStartOffset] = useState(0);
     const [isSheetReady, setIsSheetReady] = useState(false);
+
+    const draggingRef = useRef(false);
+    const dragSourceRef = useRef<"handle" | "content" | null>(null);
+    const startXRef = useRef(0);
+    const startYRef = useRef(0);
+    const startOffsetRef = useRef(0);
+    const axisRef = useRef<"undecided" | "horizontal" | "vertical">("undecided");
+
+    const dragRafRef = useRef<number | null>(null);
+    const pendingSheetYRef = useRef<number | null>(null);
+
+    function cancelDragRaf() {
+        if (dragRafRef.current != null) {
+            window.cancelAnimationFrame(dragRafRef.current);
+            dragRafRef.current = null;
+        }
+    }
+
+    function commitSheetY(nextY: number) {
+        const epsilon = 2;
+        const v = nextY <= epsilon ? 0 : nextY;
+        setSheetY(v);
+    }
+
+    function setSheetYThrottled(nextY: number) {
+        const epsilon = 2;
+        const v = nextY <= epsilon ? 0 : nextY;
+
+        if (v === 0) {
+            pendingSheetYRef.current = null;
+            cancelDragRaf();
+            setSheetY(0);
+            return;
+        }
+
+        pendingSheetYRef.current = v;
+        if (dragRafRef.current != null) return;
+
+        dragRafRef.current = window.requestAnimationFrame(() => {
+            dragRafRef.current = null;
+            const pending = pendingSheetYRef.current;
+            pendingSheetYRef.current = null;
+            if (pending == null) return;
+            setSheetY(pending);
+        });
+    }
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
-            setSheetY(window.innerHeight * 0.82);
             setIsSheetReady(true);
         });
-
         return () => window.cancelAnimationFrame(frame);
     }, []);
 
-    function onTouchStart(e: React.TouchEvent) {
+    useEffect(() => {
+        return () => {
+            cancelDragRaf();
+        };
+    }, []);
+
+    function beginDrag(e: React.TouchEvent, source: "handle" | "content") {
+        draggingRef.current = true;
         setDragging(true);
-        setStartY(e.touches[0].clientY);
-        setStartOffset(sheetY);
+        dragSourceRef.current = source;
+        axisRef.current = "undecided";
+
+        const t = e.touches[0];
+        startXRef.current = t.clientX;
+        startYRef.current = t.clientY;
+        startOffsetRef.current = sheetY;
     }
 
-    function onTouchMoveHandle(e: React.TouchEvent) {
-        if (!dragging) return;
+    function onTouchStartHandle(e: React.TouchEvent) {
+        beginDrag(e, "handle");
+    }
 
-        const currentY = e.touches[0].clientY;
-        const delta = currentY - startY;
-        const content = sheetContentRef.current;
-
-        const atTop = !content || content.scrollTop <= 0;
-
-
-        if (delta > 0 && atTop) {
-            setSheetY(Math.max(0, startOffset + delta));
+    function onTouchStartContent(e: React.TouchEvent) {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest("input, textarea, select, button, a[href], [data-no-sheet-drag]")) {
             return;
         }
 
-        if (delta < 0) {
-            setSheetY(Math.max(0, startOffset + delta));
-        }
+        const content = sheetContentRef.current;
+        const atTop = !content || content.scrollTop <= 0;
+
+        // If we're fully expanded and the user is scrolling inside the sheet,
+        // don't hijack the gesture as a sheet drag.
+        if (sheetY === 0 && !atTop) return;
+
+        beginDrag(e, "content");
     }
 
-    function onTouchMoveContent(e: React.TouchEvent) {
-        if (!dragging) return;
+    function isHorizontalGesture(dx: number, dy: number): boolean {
+        const threshold = 6;
+        const adx = Math.abs(dx);
+        const ady = Math.abs(dy);
 
-        const currentY = e.touches[0].clientY;
-        const delta = currentY - startY;
-        const content = sheetContentRef.current;
+        if (axisRef.current === "undecided") {
+            if (adx < threshold && ady < threshold) return true; // not enough signal yet
+            axisRef.current = adx > ady ? "horizontal" : "vertical";
+        }
 
-        const atTop = !content || content.scrollTop <= 0;
-        const atEnd =
-            !content || content.scrollTop + window.innerHeight >= content.scrollHeight;
+        return axisRef.current === "horizontal";
+    }
 
-        if (delta > 0 && atTop) {
-            setSheetY(Math.max(0, startOffset + delta));
+    function onTouchMove(e: React.TouchEvent) {
+        if (!draggingRef.current) return;
+
+        const t = e.touches[0];
+        const dx = t.clientX - startXRef.current;
+        const dy = t.clientY - startYRef.current;
+        if (isHorizontalGesture(dx, dy)) {
+            // Horizontal swipe should belong to the carousel/list, not the sheet.
+            if (axisRef.current === "horizontal") {
+                draggingRef.current = false;
+                dragSourceRef.current = null;
+                setDragging(false);
+            }
             return;
         }
 
-        if (delta < 0 && sheetY > 0 && atEnd) {
-            setSheetY(Math.max(0, startOffset + delta));
+        if (dragSourceRef.current === "handle") {
+            setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
+            return;
+        }
+
+        const content = sheetContentRef.current;
+        const atTop = !content || content.scrollTop <= 0;
+
+        // Drag down to collapse when the content is at the top.
+        if (dy > 0 && atTop) {
+            setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
+            return;
+        }
+
+        // Drag up to expand while we're not fully expanded yet and the content is at the top.
+        if (dy < 0 && sheetY > 0 && atTop) {
+            setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
         }
     }
 
     function onTouchEnd() {
+        if (!draggingRef.current) return;
+        draggingRef.current = false;
         setDragging(false);
+        dragSourceRef.current = null;
+        axisRef.current = "undecided";
 
-        const h = window.innerHeight;
+        const h = getViewportHeight();
         const snapTop = h * snapTopMultiplicator;
         const snapMid = h * snapMidMultiplicator;
         const snapBottom = h * snapBottomMultiplicator;
 
-        const options = [snapTop, snapMid, snapBottom];
-        const nearest = options.reduce((prev, curr) =>
-            Math.abs(curr - sheetY) < Math.abs(prev - sheetY) ? curr : prev
-        );
+        const effectiveY = pendingSheetYRef.current ?? sheetY;
+        pendingSheetYRef.current = null;
+        cancelDragRaf();
 
-        setSheetY(nearest);
+        // Make snapping to top easier.
+        const topCutoff = h * 0.38;
+        const midCutoff = h * 0.72;
+
+        if (effectiveY <= topCutoff) {
+            commitSheetY(snapTop);
+            return;
+        }
+        if (effectiveY <= midCutoff) {
+            commitSheetY(snapMid);
+            return;
+        }
+        commitSheetY(snapBottom);
     }
 
     function minimizeBottomSheet() {
-        const h = window.innerHeight;
+        const h = getViewportHeight();
 
         sheetContentRef.current?.scrollTo({
             top: 0,
             behavior: "smooth",
         });
 
-        setSheetY(h * snapBottomMultiplicator);
+        commitSheetY(h * snapBottomMultiplicator);
     }
 
     function setBottomSheet(snapHeight: number) {
-        setSheetY(snapHeight);
+        pendingSheetYRef.current = null;
+        cancelDragRaf();
+        commitSheetY(snapHeight);
     }
 
     return {
@@ -114,9 +216,10 @@ export function useBottomSheet() {
         dragging,
         isSheetReady,
         snapWorthMultiplicator,
-        onTouchStart,
-        onTouchMoveHandle,
-        onTouchMoveContent,
+        onTouchStartHandle,
+        onTouchStartContent,
+        onTouchMoveHandle: onTouchMove,
+        onTouchMoveContent: onTouchMove,
         onTouchEnd,
         minimizeBottomSheet,
         setBottomSheet,

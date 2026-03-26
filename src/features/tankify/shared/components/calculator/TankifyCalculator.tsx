@@ -112,7 +112,8 @@ export default function TankifyCalculator() {
         dragging,
         isSheetReady,
         snapWorthMultiplicator,
-        onTouchStart,
+        onTouchStartHandle,
+        onTouchStartContent,
         onTouchMoveHandle,
         onTouchMoveContent,
         onTouchEnd,
@@ -1110,6 +1111,7 @@ export default function TankifyCalculator() {
                             debugMode={debugMode}
                             t={t}
                             defaultLocationEnabled
+                            onStationsChange={handleStationsChange}
                             selectedStationId={selectedStationId}
                             stationFocusRequestId={stationFocusRequestId}
                             onStationSelect={(station) => {
@@ -1185,7 +1187,8 @@ export default function TankifyCalculator() {
                         sheetY={sheetY}
                         dragging={dragging}
                         isSheetReady={isSheetReady}
-                        onTouchStart={onTouchStart}
+                        onTouchStartHandle={onTouchStartHandle}
+                        onTouchStartContent={onTouchStartContent}
                         onTouchMoveHandle={onTouchMoveHandle}
                         onTouchMoveContent={onTouchMoveContent}
                         onTouchEnd={onTouchEnd}
@@ -1194,6 +1197,15 @@ export default function TankifyCalculator() {
                         showResults={hasCommittedRoute}
                         calculation={calculation}
                         profit={profit}
+                        stations={visibleStations}
+                        selectedStationId={selectedStationId}
+                        onToggleStation={handleToggleStation}
+                        fuelType={fuelType}
+                        language={language}
+                        debugMode={debugMode}
+                        userLocation={userLocation}
+                        onSelectStationAsStart={handleSelectStationAsStart}
+                        onSelectStationAsDestination={handleSelectStationAsDestination}
                     />
                 </div>
                 ) : null}
