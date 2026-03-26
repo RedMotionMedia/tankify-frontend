@@ -23,16 +23,12 @@ export function useBottomSheet() {
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
-            // If we rendered from SSR fallback (0), sync once on mount.
-            if (sheetY === 0) {
-                const h = window.visualViewport?.height ?? window.innerHeight;
-                setSheetY(h * snapBottomMultiplicator);
-            }
+            setSheetY(window.innerHeight * 0.82);
             setIsSheetReady(true);
         });
 
         return () => window.cancelAnimationFrame(frame);
-    }, [sheetY]);
+    }, []);
 
     function onTouchStart(e: React.TouchEvent) {
         setDragging(true);
