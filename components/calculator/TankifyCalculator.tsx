@@ -42,6 +42,10 @@ const MapPicker = dynamic(() => import("@/components/map/MapPicker"), {
 export default function TankifyCalculator() {
     const PANEL_ANIM_MS = 300;
     const [language, setLanguage] = useState<Language>("de");
+    const [isDesktop, setIsDesktop] = useState(() => {
+        if (typeof window === "undefined") return true;
+        return window.matchMedia("(min-width: 1024px)").matches;
+    });
     const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
     const [measurementSystem, setMeasurementSystem] =
         useState<MeasurementSystem>("metric");
@@ -111,6 +115,21 @@ export default function TankifyCalculator() {
     );
     const t = getTranslations(language);
     const myLocationReqIdRef = useRef(0);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const mq = window.matchMedia("(min-width: 1024px)");
+        const handleChange = () => setIsDesktop(mq.matches);
+        handleChange();
+        try {
+            mq.addEventListener("change", handleChange);
+            return () => mq.removeEventListener("change", handleChange);
+        } catch {
+            // Safari fallback
+            mq.addListener(handleChange);
+            return () => mq.removeListener(handleChange);
+        }
+    }, []);
 
     useEffect(() => {
 
@@ -743,11 +762,8 @@ export default function TankifyCalculator() {
             />
 
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
-                <div
-                    className={
-                        "mx-auto hidden lg:flex lg:flex-row lg:gap-5 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden"
-                    }
-                >
+                {isDesktop ? (
+                <div className="mx-auto lg:flex lg:flex-row lg:gap-5 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden">
                     <div className="h-full pt-5 pl-5 pb-5">
                     <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
 
@@ -942,8 +958,10 @@ export default function TankifyCalculator() {
                                 </button>
                             ) : null}
                 </div>
+                ) : null}
 
-                <div className="lg:hidden">
+                {!isDesktop ? (
+                <div>
                     <div className="fixed inset-0 z-0 h-svh w-screen bg-white">
                         <MapPicker
                             start={draftStartPoint}
@@ -1008,6 +1026,7 @@ export default function TankifyCalculator() {
                         profit={profit}
                     />
                 </div>
+                ) : null}
             </main>
         </>
     );

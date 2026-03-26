@@ -253,6 +253,7 @@ export default function MapPicker({
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const userLocationRef = useRef<UserLocation | null>(null);
 
     const [searchLoading, setSearchLoading] = useState(false);
     const [searchHint, setSearchHint] = useState<string>(t.route.tapSearchHere);
@@ -260,6 +261,7 @@ export default function MapPicker({
     const [locationEnabled, setLocationEnabled] = useState(
         Boolean(defaultLocationEnabled)
     );
+    const locationEnabledRef = useRef(Boolean(defaultLocationEnabled));
     const [locationError, setLocationError] = useState<string | null>(null);
     const [locationAttempt, setLocationAttempt] = useState(0);
 
@@ -272,6 +274,14 @@ export default function MapPicker({
     const pendingRecenterIdRef = useRef(0);
     const pendingRecenterClearTimerRef = useRef<number | null>(null);
     const resizeDebounceTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        userLocationRef.current = userLocation;
+    }, [userLocation]);
+
+    useEffect(() => {
+        locationEnabledRef.current = locationEnabled;
+    }, [locationEnabled]);
 
     function setPendingRecenter(points: Array<[number, number]>) {
         pendingRecenterIdRef.current += 1;
@@ -295,11 +305,6 @@ export default function MapPicker({
     useEffect(() => {
         pickModeRef.current = pickMode;
     }, [pickMode]);
-
-    const userLocationRef = useRef<UserLocation | null>(userLocation);
-    useEffect(() => {
-        userLocationRef.current = userLocation;
-    }, [userLocation]);
 
     const didCenterOnEnableRef = useRef(false);
     const watchIdRef = useRef<number | null>(null);
@@ -479,8 +484,33 @@ export default function MapPicker({
 
                     resizeDebounceTimerRef.current = window.setTimeout(() => {
                         resizeDebounceTimerRef.current = null;
+
+                        // If the container is currently collapsed (0x0) during a layout transition,
+                        // calling resize/fitBounds can put MapLibre into a bad internal state.
+                        const rect = container.getBoundingClientRect();
+                        if (rect.width < 10 || rect.height < 10) return;
+
                         try {
                             map.resize();
+                        } catch {}
+
+                        // DevTools open causes frequent resizes; MapLibre can occasionally "lose" marker positioning.
+                        // Fully recreate the user-location marker (equivalent to toggling location off/on).
+                        try {
+                            const bucket = markerBucketRef.current;
+                            const loc = userLocationRef.current;
+                            if (locationEnabledRef.current && loc) {
+                                try {
+                                    bucket.user?.remove?.();
+                                } catch {}
+                                bucket.user = null;
+
+                                const maplibre = getMapLibre();
+                                const el = createUserLocationElement();
+                                bucket.user = new maplibre.Marker({ element: el, anchor: "center" })
+                                    .setLngLat([loc.lon, loc.lat])
+                                    .addTo(map);
+                            }
                         } catch {}
 
                         const pending = pendingRecenterPointsRef.current;
@@ -493,11 +523,7 @@ export default function MapPicker({
                         try {
                             recenterToPoints(map, pending, 350);
                         } catch {}
-                    }, 120);
-
-                    try {
-                        map.resize();
-                    } catch {}
+                    }, 140);
                 });
                 ro.observe(container);
 
