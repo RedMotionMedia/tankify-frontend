@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TranslationSchema } from "@/config/i18n";
 import {
+    CurrencySystem,
     FuelType,
     MapPickMode,
     MeasurementSystem,
@@ -12,6 +13,7 @@ import {
 import { reverseGeocode } from "@/lib/geocode";
 import { fetchStationsForVisibleMap } from "@/lib/route";
 import { pricePerLiterToPerGallon } from "@/lib/units";
+import { eurToQuote } from "@/lib/fx";
 import {
     ensureMapLibreDeps,
     getMapLibre,
@@ -26,6 +28,8 @@ type Props = {
     pickMode: MapPickMode;
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
+    currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     debugMode: boolean;
     t: TranslationSchema;
     onMapPick: (type: "start" | "end", point: Point) => void;
@@ -104,12 +108,16 @@ function getStationInitials(name: string | undefined): string {
 
 function formatBadgePrice(
     value: number | null | undefined,
-    measurementSystem: MeasurementSystem
+    measurementSystem: MeasurementSystem,
+    currencySystem: CurrencySystem,
+    eurToCurrencyRate: number
 ) {
     if (value === null || value === undefined) return null;
     const converted =
         measurementSystem === "metric" ? value : pricePerLiterToPerGallon(value);
-    return converted.toFixed(3);
+    const inCurrency = eurToQuote(converted, eurToCurrencyRate);
+    void currencySystem; // keep badge text compact (number only) for now
+    return inCurrency.toFixed(3);
 }
 
 const stationMarkerTemplateCache = new Map<string, HTMLElement>();
@@ -243,6 +251,8 @@ export default function MapPicker({
     pickMode,
     fuelType,
     measurementSystem,
+    currencySystem,
+    eurToCurrencyRate,
     debugMode,
     t,
     onMapPick,
@@ -732,7 +742,9 @@ export default function MapPicker({
         for (const station of stations) {
             const selectedPrice = fuelType === "diesel" ? station.diesel : station.super95;
             const hasPrice = selectedPrice !== null && selectedPrice !== undefined;
-            const badgeText = hasPrice ? formatBadgePrice(selectedPrice, measurementSystem) : null;
+            const badgeText = hasPrice
+                ? formatBadgePrice(selectedPrice, measurementSystem, currencySystem, eurToCurrencyRate)
+                : null;
 
             const el = createStationMarkerElement({ station, hasPrice, badgeText, logoCacheBust });
             el.dataset.stationId = station.id;
@@ -756,6 +768,8 @@ export default function MapPicker({
         stations,
         fuelType,
         measurementSystem,
+        currencySystem,
+        eurToCurrencyRate,
         logoCacheBust,
         onStationSelect,
         applyStationMarkerVisibility,

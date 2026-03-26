@@ -23,6 +23,7 @@ import {
     pricePerGallonToPerLiter,
     pricePerLiterToPerGallon,
 } from "@/lib/units";
+import { eurToQuote, quoteToEur } from "@/lib/fx";
 import {
     CurrencySystem,
     FuelType,
@@ -46,7 +47,8 @@ export default function TankifyCalculator() {
         if (typeof window === "undefined") return true;
         return window.matchMedia("(min-width: 1024px)").matches;
     });
-    const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
+    const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("EUR");
+    const [eurToCurrencyRate, setEurToCurrencyRate] = useState(1);
     const [measurementSystem, setMeasurementSystem] =
         useState<MeasurementSystem>("metric");
     const [storageReady, setStorageReady] = useState(false);
@@ -133,6 +135,41 @@ export default function TankifyCalculator() {
     }, []);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const quote = (currencySystem ?? "EUR").toUpperCase();
+        if (quote === "EUR") {
+            setEurToCurrencyRate(1);
+            return;
+        }
+
+        let cancelled = false;
+        const ac = new AbortController();
+
+        (async () => {
+            try {
+                const res = await fetch(`/api/fx/rate?base=EUR&quote=${encodeURIComponent(quote)}`, {
+                    signal: ac.signal,
+                });
+                if (!res.ok) throw new Error(`FX_RATE_HTTP_${res.status}`);
+                const json = (await res.json()) as { rate?: unknown };
+                const rate = typeof json.rate === "number" ? json.rate : Number.NaN;
+                if (cancelled) return;
+                setEurToCurrencyRate(Number.isFinite(rate) && rate > 0 ? rate : 1);
+            } catch {
+                if (cancelled) return;
+                setEurToCurrencyRate(1);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            try {
+                ac.abort();
+            } catch {}
+        };
+    }, [currencySystem]);
+
+    useEffect(() => {
 
 
         const savedLanguage = window.localStorage.getItem("tankify-language");
@@ -146,8 +183,11 @@ export default function TankifyCalculator() {
             setLanguage(savedLanguage);
         }
 
-        if (savedCurrency === "eur" || savedCurrency === "usd") {
-            setCurrencySystem(savedCurrency);
+        if (savedCurrency) {
+            const trimmed = savedCurrency.trim();
+            if (trimmed === "eur") setCurrencySystem("EUR");
+            else if (trimmed === "usd") setCurrencySystem("USD");
+            else if (/^[A-Za-z]{3}$/.test(trimmed)) setCurrencySystem(trimmed.toUpperCase());
         }
 
         if (savedMeasurement === "metric" || savedMeasurement === "imperial") {
@@ -288,12 +328,13 @@ export default function TankifyCalculator() {
     const tankSizeGallons = litersToGallons(tankSizeLiters);
     const avgSpeedMph = kmhToMph(avgSpeedKmh);
 
-    const localPriceDisplay =
+    const localPriceDisplayEur =
         measurementSystem === "metric" ? localPricePerLiter : localPricePerGallon;
-    const destinationPriceDisplay =
-        measurementSystem === "metric"
-            ? destinationPricePerLiter
-            : destinationPricePerGallon;
+    const destinationPriceDisplayEur =
+        measurementSystem === "metric" ? destinationPricePerLiter : destinationPricePerGallon;
+
+    const localPriceDisplay = eurToQuote(localPriceDisplayEur, eurToCurrencyRate);
+    const destinationPriceDisplay = eurToQuote(destinationPriceDisplayEur, eurToCurrencyRate);
     const consumptionDisplay =
         measurementSystem === "metric" ? consumptionLPer100Km : consumptionMpg;
     const tankSizeDisplay =
@@ -301,14 +342,16 @@ export default function TankifyCalculator() {
     const avgSpeedDisplay = measurementSystem === "metric" ? avgSpeedKmh : avgSpeedMph;
 
     const setLocalPrice = (value: number) => {
+        const valueEur = quoteToEur(value, eurToCurrencyRate);
         setLocalPricePerLiter(
-            measurementSystem === "metric" ? value : pricePerGallonToPerLiter(value)
+            measurementSystem === "metric" ? valueEur : pricePerGallonToPerLiter(valueEur)
         );
     };
 
     const setDestinationPrice = (value: number) => {
+        const valueEur = quoteToEur(value, eurToCurrencyRate);
         setDestinationPricePerLiter(
-            measurementSystem === "metric" ? value : pricePerGallonToPerLiter(value)
+            measurementSystem === "metric" ? valueEur : pricePerGallonToPerLiter(valueEur)
         );
     };
 
@@ -811,6 +854,8 @@ export default function TankifyCalculator() {
                                     pickMode={mapPickMode}
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
+                                    currencySystem={currencySystem}
+                                    eurToCurrencyRate={eurToCurrencyRate}
                                     debugMode={debugMode}
                                     t={t}
                                     defaultLocationEnabled
@@ -871,13 +916,15 @@ export default function TankifyCalculator() {
                                                 <WorthPanel
                                                     t={t}
                                                     currencySystem={currencySystem}
+                                                    eurToCurrencyRate={eurToCurrencyRate}
                                                     profit={profit}
-                                                    netSaving={calculation.netSaving}
+                                                    netSavingEur={calculation.netSaving}
                                                 />
                                                 <div className="rounded-2xl border border-gray-100 p-4">
                                                     <ResultsPanel
                                                         t={t}
                                                         currencySystem={currencySystem}
+                                                        eurToCurrencyRate={eurToCurrencyRate}
                                                         measurementSystem={measurementSystem}
                                                         profit={profit}
                                                         routeLoading={routeLoading}
@@ -931,6 +978,7 @@ export default function TankifyCalculator() {
                                 fuelType={fuelType}
                                 measurementSystem={measurementSystem}
                                 currencySystem={currencySystem}
+                                eurToCurrencyRate={eurToCurrencyRate}
                                 language={language}
                                 debugMode={debugMode}
                                 userLocation={userLocation}
@@ -976,6 +1024,8 @@ export default function TankifyCalculator() {
                             pickMode={mapPickMode}
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
+                            currencySystem={currencySystem}
+                            eurToCurrencyRate={eurToCurrencyRate}
                             debugMode={debugMode}
                             t={t}
                             defaultLocationEnabled
@@ -1018,6 +1068,7 @@ export default function TankifyCalculator() {
                     <MobileBottomSheet
                         t={t}
                         currencySystem={currencySystem}
+                        eurToCurrencyRate={eurToCurrencyRate}
                         measurementSystem={measurementSystem}
                         sheetContentRef={sheetContentRef}
                         sheetY={sheetY}

@@ -14,6 +14,7 @@ type ProfitLevel = {
 type Props = {
     t: TranslationSchema;
     currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     measurementSystem: MeasurementSystem;
     sheetContentRef: React.RefObject<HTMLDivElement | null>;
     sheetY: number;
@@ -33,6 +34,7 @@ type Props = {
 export default function MobileBottomSheet({
                                               t,
                                               currencySystem,
+                                              eurToCurrencyRate,
                                               measurementSystem,
                                               sheetContentRef,
                                               sheetY,
@@ -89,8 +91,9 @@ export default function MobileBottomSheet({
                         <WorthPanel
                             t={t}
                             currencySystem={currencySystem}
+                            eurToCurrencyRate={eurToCurrencyRate}
                             profit={profit}
-                            netSaving={calculation.netSaving}
+                            netSavingEur={calculation.netSaving}
                         />
                     ) : null}
 
@@ -103,6 +106,7 @@ export default function MobileBottomSheet({
                         <ResultsPanel
                             t={t}
                             currencySystem={currencySystem}
+                            eurToCurrencyRate={eurToCurrencyRate}
                             measurementSystem={measurementSystem}
                             profit={profit}
                             routeLoading={routeLoading}

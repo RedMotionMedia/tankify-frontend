@@ -2,7 +2,8 @@ import type { EControlGasStation } from "@/types/econtrol";
 
 export type Language = "de" | "en";
 
-export type CurrencySystem = "eur" | "usd";
+// ISO 4217 currency code (e.g. "EUR", "USD", "CHF").
+export type CurrencySystem = string;
 export type MeasurementSystem = "metric" | "imperial";
 
 export type FuelType = "diesel" | "super95";

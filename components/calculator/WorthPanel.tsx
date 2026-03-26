@@ -1,6 +1,7 @@
 import { TranslationSchema } from "@/config/i18n";
 import { CurrencySystem } from "@/types/tankify";
 import { formatCurrency } from "@/lib/format";
+import { eurToQuote } from "@/lib/fx";
 
 type ProfitLevel = {
     labelKey: "notWorthIt" | "barelyWorthIt" | "worthIt" | "veryWorthIt";
@@ -12,41 +13,43 @@ type ProfitLevel = {
 type Props = {
     t: TranslationSchema;
     currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     profit: ProfitLevel;
-    netSaving: number;
+    netSavingEur: number;
 };
 
 export default function WorthPanel({
-                                       t,
-                                       currencySystem,
-                                       profit,
-                                       netSaving,
-                                   }: Props) {
+    t,
+    currencySystem,
+    eurToCurrencyRate,
+    profit,
+    netSavingEur,
+}: Props) {
+    const netSaving = eurToQuote(netSavingEur, eurToCurrencyRate);
+
     return (
         <div className="flex flex-row gap-4">
             <div className={`rounded-3xl p-6 shadow-sm ${profit.bgClass}`}>
                 <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">{t.result.worthTrip}</span>
                     <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                    {t.profit[profit.labelKey]}
-                  </span>
+                        {t.profit[profit.labelKey]}
+                    </span>
                 </div>
 
                 <div className={`mt-2 text-4xl font-bold ${profit.colorClass}`}>
                     {formatCurrency(netSaving, currencySystem)}
                 </div>
 
-                <p className="mt-2 text-sm text-gray-600">
-                    {t.result.netSavingAfterTrip}
-                </p>
+                <p className="mt-2 text-sm text-gray-600">{t.result.netSavingAfterTrip}</p>
             </div>
 
             <div className="rounded-3xl bg-white p-5 shadow-sm flex-auto">
                 <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm text-gray-500">{t.result.estimate}</span>
                     <span className={`text-sm font-semibold ${profit.colorClass}`}>
-                    {t.profit[profit.labelKey]}
-                  </span>
+                        {t.profit[profit.labelKey]}
+                    </span>
                 </div>
 
                 <div className="relative pt-2 pb-8">
@@ -54,8 +57,9 @@ export default function WorthPanel({
                     <div
                         className="absolute bottom-0 -translate-x-1/2 text-lg leading-none"
                         style={{ left: `${profit.percent}%` }}
+                        aria-hidden="true"
                     >
-                        ▲
+                        ^
                     </div>
                 </div>
 
@@ -64,3 +68,4 @@ export default function WorthPanel({
         </div>
     );
 }
+

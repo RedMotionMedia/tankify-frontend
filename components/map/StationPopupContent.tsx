@@ -10,6 +10,7 @@ import {
     Point,
     Station,
 } from "@/types/tankify";
+import { eurToQuote } from "@/lib/fx";
 import { kmToMiles, pricePerLiterToPerGallon } from "@/lib/units";
 
 type UserLocation = { lat: number; lon: number };
@@ -31,19 +32,21 @@ function getStationInitials(name: string | undefined): string {
 }
 
 function formatDisplayPrice(
-    value: number | null | undefined,
+    valueEurPerLiter: number | null | undefined,
     measurementSystem: MeasurementSystem,
-    currencySystem: CurrencySystem
+    currencySystem: CurrencySystem,
+    eurToCurrencyRate: number
 ) {
-    if (value === null || value === undefined) return "—";
+    if (valueEurPerLiter === null || valueEurPerLiter === undefined) return "—";
 
-    const converted =
-        measurementSystem === "metric" ? value : pricePerLiterToPerGallon(value);
+    const perUnit =
+        measurementSystem === "metric"
+            ? valueEurPerLiter
+            : pricePerLiterToPerGallon(valueEurPerLiter);
+    const inCurrency = eurToQuote(perUnit, eurToCurrencyRate);
 
-    const symbol = currencySystem === "eur" ? "€" : "$";
     const unit = measurementSystem === "metric" ? "/L" : "/gal";
-
-    return `${converted.toFixed(3)} ${symbol}${unit}`;
+    return `${inCurrency.toFixed(3)} ${currencySystem}${unit}`;
 }
 
 function haversineKm(a: UserLocation, b: { lat: number; lon: number }): number {
@@ -101,6 +104,7 @@ export default function StationPopupContent({
     selectedPrice,
     measurementSystem,
     currencySystem,
+    eurToCurrencyRate,
     language,
     debugMode,
     logoCacheBust,
@@ -110,9 +114,10 @@ export default function StationPopupContent({
     onSelectStationAsDestination,
 }: {
     station: Station;
-    selectedPrice: number | null | undefined;
+    selectedPrice: number | null | undefined; // EUR/L from E-Control
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     language: Language;
     debugMode: boolean;
     logoCacheBust: number;
@@ -227,14 +232,14 @@ export default function StationPopupContent({
                 <div className="rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
                     <div className="text-[11px] font-semibold text-gray-600">{t.pricing.diesel}</div>
                     <div className="mt-0.5 text-sm font-extrabold text-gray-900">
-                        {formatDisplayPrice(station.diesel, measurementSystem, currencySystem)}
+                        {formatDisplayPrice(station.diesel, measurementSystem, currencySystem, eurToCurrencyRate)}
                     </div>
                 </div>
 
                 <div className="rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
                     <div className="text-[11px] font-semibold text-gray-600">{t.pricing.super95}</div>
                     <div className="mt-0.5 text-sm font-extrabold text-gray-900">
-                        {formatDisplayPrice(station.super95, measurementSystem, currencySystem)}
+                        {formatDisplayPrice(station.super95, measurementSystem, currencySystem, eurToCurrencyRate)}
                     </div>
                 </div>
             </div>

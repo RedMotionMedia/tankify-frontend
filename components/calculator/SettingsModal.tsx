@@ -57,7 +57,36 @@ export default function SettingsModal({
                                       }: Props) {
     const [cacheClearing, setCacheClearing] = useState(false);
     const [cacheStatus, setCacheStatus] = useState<"ok" | "error" | null>(null);
+    const [fxCurrencies, setFxCurrencies] = useState<Record<string, string> | null>(null);
     const showDebugControls = debugAllowed;
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/fx/currencies");
+                if (!res.ok) return;
+                const json = (await res.json()) as { currencies?: unknown };
+                const obj = json.currencies as Record<string, unknown> | undefined;
+                if (!obj) return;
+
+                const out: Record<string, string> = {};
+                for (const [k, v] of Object.entries(obj)) {
+                    const code = (k ?? "").trim().toUpperCase();
+                    const name = typeof v === "string" ? v.trim() : "";
+                    if (!/^[A-Z]{3}$/.test(code) || !name) continue;
+                    out[code] = name;
+                }
+                if (cancelled) return;
+                if (Object.keys(out).length > 0) setFxCurrencies(out);
+            } catch {
+                // ignore
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         if (!open) return;
@@ -190,8 +219,14 @@ export default function SettingsModal({
                                 onChange={(e) => setCurrencySystem(e.target.value as CurrencySystem)}
                                 className="flex-auto rounded-2xl border border-gray-300 px-4 py-3 outline-none"
                             >
-                                <option value="eur">{t.settings.currencyEuro}</option>
-                                <option value="usd">{t.settings.currencyDollar}</option>
+                                {(fxCurrencies ?? { EUR: "Euro", USD: "US Dollar" }) &&
+                                    Object.entries(fxCurrencies ?? { EUR: "Euro", USD: "US Dollar" })
+                                        .sort((a, b) => a[0].localeCompare(b[0]))
+                                        .map(([code, name]) => (
+                                            <option key={code} value={code}>
+                                                {code} - {name}
+                                            </option>
+                                        ))}
                             </select>
                         </div>
 

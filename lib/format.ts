@@ -1,9 +1,10 @@
 import { CurrencySystem } from "@/types/tankify";
 
 export function formatCurrency(value: number, currencySystem: CurrencySystem) {
-    return new Intl.NumberFormat(currencySystem === "eur" ? "de-AT" : "en-US", {
+    // Use the user's locale by default; currency code drives formatting.
+    return new Intl.NumberFormat(undefined, {
         style: "currency",
-        currency: currencySystem === "eur" ? "EUR" : "USD",
+        currency: currencySystem,
     }).format(value);
 }
 
@@ -26,10 +27,9 @@ export function formatInputValue(value: number, step: number) {
     return value.toFixed(3);
 }
 
-export function formatPrice(
-    value?: number | null,
-    currencySystem: CurrencySystem = "eur"
-) {
-    if (value === null || value === undefined) return "—";
-    return `${value.toFixed(3)} ${currencySystem === "eur" ? "€" : "$"}`;
+export function formatPrice(value?: number | null, currencySystem: CurrencySystem = "EUR") {
+    if (value === null || value === undefined) return "-";
+    // Keep 3 decimals for fuel prices; code is clearer than symbols across many currencies.
+    return `${value.toFixed(3)} ${currencySystem}`;
 }
+

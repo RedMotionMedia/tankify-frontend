@@ -1,5 +1,5 @@
-import {TranslationSchema} from "@/config/i18n";
-import {CurrencySystem, MeasurementSystem,} from "@/types/tankify";
+import { TranslationSchema } from "@/config/i18n";
+import { CurrencySystem, MeasurementSystem } from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
 
 type Props = {
@@ -13,19 +13,15 @@ type Props = {
 };
 
 export default function PriceSection({
-                                         t,
-                                         localPrice,
-                                         setLocalPrice,
-                                         destinationPrice,
-                                         setDestinationPrice,
-                                         currencySystem,
-                                         measurementSystem,
-                                     }: Props) {
-    const currencySymbol = currencySystem === "eur" ? "€" : "$";
-    const unit =
-        measurementSystem === "metric"
-            ? `${currencySymbol}/L`
-            : `${currencySymbol}/gal`;
+    t,
+    localPrice,
+    setLocalPrice,
+    destinationPrice,
+    setDestinationPrice,
+    currencySystem,
+    measurementSystem,
+}: Props) {
+    const unit = measurementSystem === "metric" ? `${currencySystem}/L` : `${currencySystem}/gal`;
 
     return (
         <section className="space-y-4">
@@ -56,3 +52,4 @@ export default function PriceSection({
         </section>
     );
 }
+
