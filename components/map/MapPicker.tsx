@@ -215,6 +215,26 @@ function boundsLikeFromLatLon(points: Array<[number, number]>): [[number, number
     return [[minLon, minLat], [maxLon, maxLat]];
 }
 
+function recenterToPoints(
+    map: MapLibreMap,
+    points: Array<[number, number]>,
+    duration: number
+) {
+    if (points.length === 0) return;
+
+    // With only one point (start OR end), fitBounds zooms in aggressively.
+    // Keep the current zoom and just pan to the point.
+    if (points.length === 1) {
+        const [lat, lon] = points[0];
+        map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration });
+        return;
+    }
+
+    const boundsLike = boundsLikeFromLatLon(points);
+    if (!boundsLike) return;
+    map.fitBounds(boundsLike, { padding: 30, duration });
+}
+
 export default function MapPicker({
     start,
     end,
@@ -248,6 +268,28 @@ export default function MapPicker({
     const mapLoadedRef = useRef(false);
     const mapCleanupRef = useRef<(() => void) | null>(null);
     const lastAutoFitSignatureRef = useRef<string>("");
+    const pendingRecenterPointsRef = useRef<Array<[number, number]> | null>(null);
+    const pendingRecenterIdRef = useRef(0);
+    const pendingRecenterClearTimerRef = useRef<number | null>(null);
+    const resizeDebounceTimerRef = useRef<number | null>(null);
+
+    function setPendingRecenter(points: Array<[number, number]>) {
+        pendingRecenterIdRef.current += 1;
+        const id = pendingRecenterIdRef.current;
+        pendingRecenterPointsRef.current = points;
+
+        if (pendingRecenterClearTimerRef.current != null) {
+            window.clearTimeout(pendingRecenterClearTimerRef.current);
+            pendingRecenterClearTimerRef.current = null;
+        }
+
+        // If no resize happens (or the map doesn't change size), don't keep a pending recenter forever.
+        pendingRecenterClearTimerRef.current = window.setTimeout(() => {
+            pendingRecenterClearTimerRef.current = null;
+            if (pendingRecenterIdRef.current !== id) return;
+            pendingRecenterPointsRef.current = null;
+        }, 1200);
+    }
 
     const pickModeRef = useRef<MapPickMode>(pickMode);
     useEffect(() => {
@@ -421,6 +463,31 @@ export default function MapPicker({
                 });
 
                 const ro = new ResizeObserver(() => {
+                    // Debounce: while panels animate, the map container height changes a few times.
+                    // We want to re-apply a pending recenter once the size has stabilized.
+                    if (resizeDebounceTimerRef.current != null) {
+                        window.clearTimeout(resizeDebounceTimerRef.current);
+                        resizeDebounceTimerRef.current = null;
+                    }
+
+                    resizeDebounceTimerRef.current = window.setTimeout(() => {
+                        resizeDebounceTimerRef.current = null;
+                        try {
+                            map.resize();
+                        } catch {}
+
+                        const pending = pendingRecenterPointsRef.current;
+                        if (!pending) return;
+                        pendingRecenterPointsRef.current = null;
+                        if (pendingRecenterClearTimerRef.current != null) {
+                            window.clearTimeout(pendingRecenterClearTimerRef.current);
+                            pendingRecenterClearTimerRef.current = null;
+                        }
+                        try {
+                            recenterToPoints(map, pending, 350);
+                        } catch {}
+                    }, 120);
+
                     try {
                         map.resize();
                     } catch {}
@@ -429,6 +496,14 @@ export default function MapPicker({
 
                 mapCleanupRef.current = () => {
                     ro.disconnect();
+                    if (resizeDebounceTimerRef.current != null) {
+                        window.clearTimeout(resizeDebounceTimerRef.current);
+                        resizeDebounceTimerRef.current = null;
+                    }
+                    if (pendingRecenterClearTimerRef.current != null) {
+                        window.clearTimeout(pendingRecenterClearTimerRef.current);
+                        pendingRecenterClearTimerRef.current = null;
+                    }
                     map.off("movestart", onMoveStart);
                     map.off("zoomstart", onMoveStart);
                     map.off("zoom", onZoomVisibility);
@@ -537,20 +612,17 @@ export default function MapPicker({
 
         if (points.length === 0) return;
 
-        // With only one point (start OR end), fitBounds zooms in aggressively.
-        // Keep the current zoom and just pan to the point.
-        if (points.length === 1) {
-            const [lat, lon] = points[0];
-            try {
-                map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
-            } catch {}
-            return;
-        }
-
         try {
-            const boundsLike = boundsLikeFromLatLon(points);
-            if (!boundsLike) return;
-            map.fitBounds(boundsLike, { padding: 30, duration: 650 });
+            // Apply immediately, but also re-apply once after any layout-driven resize settles.
+            setPendingRecenter(points);
+            window.requestAnimationFrame(() => {
+                try {
+                    map.resize();
+                } catch {}
+                try {
+                    recenterToPoints(map, points, 650);
+                } catch {}
+            });
         } catch {}
     }, [start, end, routeGeometry]);
 
@@ -893,16 +965,19 @@ export default function MapPicker({
                 ];
         if (points.length === 0) return;
         try {
-            // With only one point (start OR end), fitBounds zooms in aggressively.
-            // Keep the current zoom and just pan to the point.
-            if (points.length === 1) {
-                const [lat, lon] = points[0];
-                map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
-                return;
-            }
-            const boundsLike = boundsLikeFromLatLon(points);
-            if (!boundsLike) return;
-            map.fitBounds(boundsLike, { padding: 30, duration: 650 });
+            // If a layout transition resizes the map right after recentering,
+            // the resulting view can look "off". Keep one pending recenter to re-apply after resize.
+            setPendingRecenter(points);
+
+            // Apply immediately too, but after a resize tick.
+            window.requestAnimationFrame(() => {
+                try {
+                    map.resize();
+                } catch {}
+                try {
+                    recenterToPoints(map, points, 650);
+                } catch {}
+            });
         } catch {}
     }
 
