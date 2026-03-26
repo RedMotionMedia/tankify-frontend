@@ -41,6 +41,11 @@ const MapPicker = dynamic(
     () => import("@/features/tankify/shared/components/map/MapPicker"),
     {
     ssr: false,
+        loading: () => (
+            <div className="h-full w-full bg-neutral-100">
+                <div className="h-full w-full animate-pulse bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-100" />
+            </div>
+        ),
     }
 );
 
@@ -846,7 +851,7 @@ export default function TankifyCalculator() {
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
                 {isDesktop ? (
                 <div className="mx-auto lg:flex lg:flex-row lg:gap-5 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden">
-                    <div className="h-full pt-5 pl-5 pb-5">
+                    <div className="hidden lg:block h-full pt-5 pl-5 pb-5">
                     <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
 
 
@@ -1168,7 +1173,6 @@ export default function TankifyCalculator() {
                                     strokeWidth="3"
                                 />
                             </svg>
-                            ⚙️
                         </button>
                     </div>
 

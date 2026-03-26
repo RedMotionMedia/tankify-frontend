@@ -3,24 +3,36 @@ import { useEffect, useRef, useState } from "react";
 export function useBottomSheet() {
     const sheetContentRef = useRef<HTMLDivElement | null>(null);
 
-    const [sheetY, setSheetY] = useState(0);
-    const [dragging, setDragging] = useState(false);
-    const [startY, setStartY] = useState(0);
-    const [startOffset, setStartOffset] = useState(0);
     const snapTopMultiplicator = 0;
     const snapMidMultiplicator = 0.4;
     const snapWorthMultiplicator = 0.17;
     const snapBottomMultiplicator = 0.82;
+
+    // Start at the same "resting" position immediately to avoid a visible jump on reload.
+    const initialSheetY = (() => {
+        if (typeof window === "undefined") return 0;
+        const h = window.visualViewport?.height ?? window.innerHeight;
+        return h * snapBottomMultiplicator;
+    })();
+
+    const [sheetY, setSheetY] = useState(initialSheetY);
+    const [dragging, setDragging] = useState(false);
+    const [startY, setStartY] = useState(0);
+    const [startOffset, setStartOffset] = useState(0);
     const [isSheetReady, setIsSheetReady] = useState(false);
 
     useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
-            setSheetY(window.innerHeight * 0.67);
+            // If we rendered from SSR fallback (0), sync once on mount.
+            if (sheetY === 0) {
+                const h = window.visualViewport?.height ?? window.innerHeight;
+                setSheetY(h * snapBottomMultiplicator);
+            }
             setIsSheetReady(true);
         });
 
         return () => window.cancelAnimationFrame(frame);
-    }, []);
+    }, [sheetY]);
 
     function onTouchStart(e: React.TouchEvent) {
         setDragging(true);

@@ -286,6 +286,7 @@ export default function MapPicker({
     const [logoCacheBust, setLogoCacheBust] = useState(0);
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const userLocationRef = useRef<UserLocation | null>(null);
+    const onStationSelectRef = useRef<Props["onStationSelect"]>(onStationSelect);
 
     const SEARCH_HERE_SEEN_KEY = "tankify-search-here-seen-v1";
     const [searchHereSeen, setSearchHereSeen] = useState(false);
@@ -318,6 +319,10 @@ export default function MapPicker({
     useEffect(() => {
         userLocationRef.current = userLocation;
     }, [userLocation]);
+
+    useEffect(() => {
+        onStationSelectRef.current = onStationSelect;
+    }, [onStationSelect]);
 
     useEffect(() => {
         searchHereSeenRef.current = searchHereSeen;
@@ -794,7 +799,7 @@ export default function MapPicker({
             el.dataset.stationId = station.id;
             el.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                onStationSelect?.(station);
+                onStationSelectRef.current?.(station);
             });
 
             const m = new maplibre.Marker({ element: el, anchor: "center" })
@@ -815,7 +820,6 @@ export default function MapPicker({
         currencySystem,
         eurToCurrencyRate,
         logoCacheBust,
-        onStationSelect,
         applyStationMarkerVisibility,
     ]);
 
