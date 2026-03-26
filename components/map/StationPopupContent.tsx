@@ -383,7 +383,7 @@ export default function StationPopupContent({
                             <span className="flex-auto">{t.station.rawData}</span>
                         </summary>
                         <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                            {JSON.stringify(station.econtrol, null, 2)}
+                            {JSON.stringify(station, null, 2)}
                         </pre>
                     </details>
                 ) : null}

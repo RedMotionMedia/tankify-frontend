@@ -217,7 +217,7 @@ export default function SettingsModal({
                             <select
                                 value={currencySystem}
                                 onChange={(e) => setCurrencySystem(e.target.value as CurrencySystem)}
-                                className="flex-auto rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                                className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none overflow-auto"
                             >
                                 {(fxCurrencies ?? { EUR: "Euro", USD: "US Dollar" }) &&
                                     Object.entries(fxCurrencies ?? { EUR: "Euro", USD: "US Dollar" })

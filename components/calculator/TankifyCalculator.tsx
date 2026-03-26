@@ -731,6 +731,7 @@ export default function TankifyCalculator() {
                 destinationPrice={destinationPriceDisplay}
                 setDestinationPrice={setDestinationPrice}
                 currencySystem={currencySystem}
+                eurToCurrencyRate={eurToCurrencyRate}
                 measurementSystem={measurementSystem}
             />
 
