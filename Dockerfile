@@ -31,7 +31,6 @@ ENV NEXT_PUBLIC_ENABLE_DEBUG_MODE=$NEXT_PUBLIC_ENABLE_DEBUG_MODE
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/resources ./resources
 COPY --from=deps /app/node_modules ./node_modules
 
 RUN chown -R node:node /app
