@@ -138,6 +138,20 @@ export default function StationPopupContent({
     const initials = getStationInitials(station.brandName ?? station.name);
     const openingHours = Array.isArray(station.openingHours) ? station.openingHours : [];
     const logoUrl = station.logoUrl ? withCacheBuster(station.logoUrl, logoCacheBust) : null;
+    const payment = station.paymentMethods ?? null;
+
+    const paymentBubbles: string[] = [];
+    if (payment?.cash) paymentBubbles.push(t.station.paymentCash);
+    if (payment?.debitCard) paymentBubbles.push(t.station.paymentDebitCard);
+    if (payment?.creditCard) paymentBubbles.push(t.station.paymentCreditCard);
+    if (typeof payment?.others === "string" && payment.others.trim()) {
+        const parts = payment.others
+            .split(/[,;\n]+/)
+            .map((x) => x.trim())
+            .filter(Boolean);
+        if (parts.length) paymentBubbles.push(...parts);
+        else paymentBubbles.push(t.station.paymentOther);
+    }
 
     const openingHoursByDay = new Map<string, Array<{ from: string | null; to: string | null }>>();
     for (const h of openingHours) {
@@ -297,6 +311,33 @@ export default function StationPopupContent({
                         </div>
                     ) : (
                         <div className="mt-2 text-xs text-gray-500">—</div>
+                    )}
+                </details>
+
+                <details className="group rounded-2xl border border-gray-200 bg-white px-3 py-2">
+                    <summary className="flex list-none items-center gap-2 text-xs font-semibold text-gray-700">
+                        <span
+                            aria-hidden="true"
+                            className="text-gray-500 transition-transform group-open:rotate-90"
+                        >
+                            ▶
+                        </span>
+                        <span className="flex-auto">{t.station.payment}</span>
+                    </summary>
+
+                    {paymentBubbles.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {paymentBubbles.map((label) => (
+                                <span
+                                    key={label}
+                                    className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200"
+                                >
+                                    {label}
+                                </span>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="mt-2 text-xs text-gray-500">â€”</div>
                     )}
                 </details>
 
