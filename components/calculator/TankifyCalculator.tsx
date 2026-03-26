@@ -85,6 +85,7 @@ export default function TankifyCalculator() {
 
     const [visibleStations, setVisibleStations] = useState<Station[]>([]);
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+    const [stationFocusRequestId, setStationFocusRequestId] = useState(0);
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [stationsQueried, setStationsQueried] = useState(false);
     const [desktopStationsOpen, setDesktopStationsOpen] = useState(true);
@@ -815,7 +816,12 @@ export default function TankifyCalculator() {
                                     defaultLocationEnabled
                                     onStationsChange={handleStationsChange}
                                     selectedStationId={selectedStationId}
-                                    onStationSelect={(station) => setSelectedStationId(station.id)}
+                                    stationFocusRequestId={stationFocusRequestId}
+                                    onStationSelect={(station) => {
+                                        setSelectedStationId(station.id);
+                                        setStationFocusRequestId((v) => v + 1);
+                                        if (!desktopStationsOpen) openDesktopStationsPanel();
+                                    }}
                                     onMapPick={(type, point) => {
                                         if (type === "start") {
                                             setDraftStartPoint(point);
@@ -974,8 +980,10 @@ export default function TankifyCalculator() {
                             t={t}
                             defaultLocationEnabled
                             selectedStationId={selectedStationId}
+                            stationFocusRequestId={stationFocusRequestId}
                             onStationSelect={(station) => {
                                 setSelectedStationId(station.id);
+                                setStationFocusRequestId((v) => v + 1);
                                 setBottomSheet(window.innerHeight * snapWorthMultiplicator);
                             }}
                             onMapPick={(type, point) => {

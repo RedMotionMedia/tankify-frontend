@@ -31,6 +31,7 @@ type Props = {
     onMapPick: (type: "start" | "end", point: Point) => void;
     onStationsChange?: (stations: Station[]) => void;
     selectedStationId?: string | null;
+    stationFocusRequestId?: number;
     onStationSelect?: (station: Station) => void;
     defaultLocationEnabled?: boolean;
 };
@@ -247,6 +248,7 @@ export default function MapPicker({
     onMapPick,
     onStationsChange,
     selectedStationId,
+    stationFocusRequestId,
     onStationSelect,
     defaultLocationEnabled,
 }: Props) {
@@ -781,14 +783,18 @@ export default function MapPicker({
         if (!selectedStationId) return;
         const station = stations.find((s) => s.id === selectedStationId);
         if (!station) return;
+        const points: Array<[number, number]> = [[station.lat, station.lon]];
         try {
-            map.easeTo({
-                center: [station.lon, station.lat],
-                zoom: map.getZoom(),
-                duration: 650,
+            // When side panels open/close, ResizeObserver may call map.stop() and cancel animations.
+            // Keep a pending recenter so we re-apply after the resize settles.
+            setPendingRecenter(points);
+            window.requestAnimationFrame(() => {
+                try {
+                    recenterToPoints(map, points, 650);
+                } catch {}
             });
         } catch {}
-    }, [selectedStationId, stations]);
+    }, [selectedStationId, stations, stationFocusRequestId]);
 
     // Start/end markers.
     useEffect(() => {
