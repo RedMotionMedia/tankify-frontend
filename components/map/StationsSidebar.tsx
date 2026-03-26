@@ -32,6 +32,40 @@ function formatPrice(
     return `${inCurrency.toFixed(3)} ${currencySystem}${unit}`;
 }
 
+type SortDir = "off" | "asc" | "desc";
+
+function SortIcon({ dir }: { dir: SortDir }) {
+    if (dir === "asc") {
+        return (
+            <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                <path
+                    d="M5 12.5l5-5 5 5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+    if (dir === "desc") {
+        return (
+            <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                <path
+                    d="M5 7.5l5 5 5-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+    }
+    return null;
+}
+
 export default function StationsSidebar({
     stations,
     selectedStationId,
@@ -70,7 +104,6 @@ export default function StationsSidebar({
 }) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
-    type SortDir = "off" | "asc" | "desc";
     const [priceSort, setPriceSort] = useState<SortDir>("off");
     const [distanceSort, setDistanceSort] = useState<SortDir>("off");
     const [openFirst, setOpenFirst] = useState(false);
@@ -153,12 +186,6 @@ export default function StationsSidebar({
         return "off";
     };
 
-    const sortBadge = (dir: SortDir): string => {
-        if (dir === "asc") return "^";
-        if (dir === "desc") return "|";
-        return "-";
-    };
-
     return (
         <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-full">
             <div className="flex items-center gap-3 border-b border-gray-100 pt-5 pb-3 pr-5">
@@ -192,7 +219,7 @@ export default function StationsSidebar({
                 </div>
             </div>
 
-            <div className="flex flex-row items-center gap-2 p-2">
+            <div className="flex flex-row items-center gap-2 py-2 px-5">
                 <button
                     type="button"
                     onClick={() => setOpenFirst((v) => !v)}
@@ -215,8 +242,7 @@ export default function StationsSidebar({
                     title="Preis sortieren"
                     aria-label="Preis sortieren"
                 >
-
-                    <span className="text-[11px]">{sortBadge(priceSort)}</span>
+                    <SortIcon dir={priceSort} />
                     Preis
                 </button>
 
@@ -233,13 +259,13 @@ export default function StationsSidebar({
                     title={hasDistanceData ? "Distanz sortieren" : "Distanz nur mit Standort verfuegbar"}
                     aria-label="Distanz sortieren"
                 >
-                    <span className="text-[11px]">{sortBadge(hasDistanceData ? distanceSort : "off")}</span>
+                    <SortIcon dir={hasDistanceData ? distanceSort : "off"} />
                     {t.station.distance}
                 </button>
             </div>
 
             <div className="min-h-0 flex-1 pb-5 flex flex-col">
-                <div className="min-h-0 flex-1 overflow-auto px-5 pt-5">
+                <div className="min-h-0 flex-1 overflow-auto px-5">
                     <div ref={scrollRef} className="min-h-0 space-y-3">
                         {sortedStations.map((station) => {
                             const isOpen = station.id === selectedStationId;

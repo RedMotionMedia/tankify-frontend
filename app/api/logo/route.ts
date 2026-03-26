@@ -314,10 +314,10 @@ export async function GET(req: NextRequest) {
             return respond(local);
         }
 
-        const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, domainKey);
-        if (localUrl) {
-            return NextResponse.redirect(localUrl, { status: 307 });
-        }
+        // const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, domainKey);
+        // if (localUrl) {
+        //     return NextResponse.redirect(localUrl, { status: 307 });
+        // }
     }
 
     if (nameKey) {
@@ -331,10 +331,10 @@ export async function GET(req: NextRequest) {
             return respond(local);
         }
 
-        const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, nameKey);
-        if (localUrl) {
-            return NextResponse.redirect(localUrl, { status: 307 });
-        }
+        // const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, nameKey);
+        // if (localUrl) {
+        //     return NextResponse.redirect(localUrl, { status: 307 });
+        // }
     }
 
     // 2) Name lookup (logo.dev name endpoint; token required).
