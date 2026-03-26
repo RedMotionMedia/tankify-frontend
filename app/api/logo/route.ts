@@ -26,12 +26,6 @@ const MAX_LOGO_BYTES = (() => {
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<CacheEntry>>();
 
-type RedirectCacheEntry = { url: string; expiresAt: number };
-const localRedirectCache = new Map<string, RedirectCacheEntry>();
-const localRedirectNegativeCache = new Map<string, number>(); // key -> expiresAt
-const LOCAL_REDIRECT_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
-const LOCAL_REDIRECT_NEGATIVE_TTL_MS = 1000 * 60 * 10; // 10 minutes
-
 async function readArrayBufferWithLimit(
     res: Response,
     maxBytes: number

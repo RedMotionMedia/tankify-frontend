@@ -169,7 +169,11 @@ export default function StationPopupContent({
             ? [...WEEKDAY_ORDER]
             : [...WEEKDAY_ORDER.slice(todayIdx), ...WEEKDAY_ORDER.slice(0, todayIdx)];
 
-    const distanceKm = userLocation ? haversineKm(userLocation, station) : null;
+    const distanceKm = (() => {
+        const v = station.distanceKm;
+        if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
+        return userLocation ? haversineKm(userLocation, station) : null;
+    })();
 
     return (
         <div className="w-full max-w-[70vw] select-text">

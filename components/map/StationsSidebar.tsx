@@ -66,6 +66,22 @@ function SortIcon({ dir }: { dir: SortDir }) {
     return null;
 }
 
+function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+    const R = 6371;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLon = Math.sin(dLon / 2);
+    const h =
+        sinDLat * sinDLat +
+        Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 export default function StationsSidebar({
     stations,
     selectedStationId,
@@ -126,13 +142,10 @@ export default function StationsSidebar({
         } catch {}
     }, [selectedStationId]);
 
-    const hasDistanceData = useMemo(() => {
-        if (!userLocation) return false;
-        return stations.some((s) => typeof s.distanceKm === "number" && Number.isFinite(s.distanceKm));
-    }, [stations, userLocation]);
+    const hasDistanceData = Boolean(userLocation);
 
     const sortedStations = useMemo(() => {
-        const effectiveDistanceSort: SortDir = hasDistanceData ? distanceSort : "off";
+        const effectiveDistanceSort: SortDir = userLocation ? distanceSort : "off";
 
         const getPriceEur = (s: Station): number | null => {
             const v = fuelType === "diesel" ? s.diesel : s.super95;
@@ -141,7 +154,9 @@ export default function StationsSidebar({
 
         const getDistanceKm = (s: Station): number | null => {
             const v = s.distanceKm;
-            return typeof v === "number" && Number.isFinite(v) ? v : null;
+            if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
+            if (!userLocation) return null;
+            return haversineKm(userLocation, s);
         };
 
         const indexed = stations.map((s, idx) => ({ s, idx }));
@@ -178,7 +193,7 @@ export default function StationsSidebar({
         });
 
         return indexed.map((x) => x.s);
-    }, [stations, fuelType, priceSort, distanceSort, hasDistanceData, openFirst]);
+    }, [stations, fuelType, priceSort, distanceSort, userLocation, openFirst]);
 
     const cycleSort = (dir: SortDir): SortDir => {
         if (dir === "off") return "asc";
