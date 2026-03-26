@@ -2,6 +2,8 @@
 
 export type MapLibreLngLat = { lat: number; lng: number };
 export type MapLibreBounds = { extend: (lngLat: [number, number]) => void; isEmpty?: () => boolean };
+// MapLibre accepts "LngLatBoundsLike" e.g. [[swLng, swLat], [neLng, neLat]] as well as bounds objects.
+export type MapLibreBoundsLike = MapLibreBounds | [[number, number], [number, number]];
 export type MapLibreSource = { setData?: (data: unknown) => void };
 
 export type MapLibreMap = {
@@ -15,7 +17,7 @@ export type MapLibreMap = {
         getNorthEast: () => MapLibreLngLat;
     };
     getCenter: () => MapLibreLngLat;
-    fitBounds: (bounds: MapLibreBounds, options: { padding: number; duration?: number }) => void;
+    fitBounds: (bounds: MapLibreBoundsLike, options: { padding: number; duration?: number }) => void;
     easeTo: (options: { center: [number, number]; zoom: number; duration?: number }) => void;
     addSource: (id: string, source: unknown) => void;
     addLayer: (layer: unknown) => void;

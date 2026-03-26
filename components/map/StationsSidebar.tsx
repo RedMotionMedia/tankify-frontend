@@ -89,7 +89,7 @@ export default function StationsSidebar({
     }, [stations]);
 
     return (
-        <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-105">
+        <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-full">
             <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
                 <div>
                     <div className="text-sm font-semibold text-gray-900">Tankstellen</div>

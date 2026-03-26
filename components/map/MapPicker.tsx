@@ -15,7 +15,6 @@ import { pricePerLiterToPerGallon } from "@/lib/units";
 import {
     ensureMapLibreDeps,
     getMapLibre,
-    type MapLibreGlobal,
     type MapLibreMap,
     type MapLibreMarker,
 } from "@/components/map/maplibre/ensureMapLibre";
@@ -195,13 +194,25 @@ function createUserLocationElement(): HTMLElement {
     return wrapper;
 }
 
-function buildBoundsFromPoints(maplibre: MapLibreGlobal, points: Array<[number, number]>) {
-    const b = new maplibre.LngLatBounds();
+function boundsLikeFromLatLon(points: Array<[number, number]>): [[number, number], [number, number]] | null {
+    let minLat = Infinity;
+    let minLon = Infinity;
+    let maxLat = -Infinity;
+    let maxLon = -Infinity;
+
     for (const [lat, lon] of points) {
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-        b.extend([lon, lat]);
+        minLat = Math.min(minLat, lat);
+        minLon = Math.min(minLon, lon);
+        maxLat = Math.max(maxLat, lat);
+        maxLon = Math.max(maxLon, lon);
     }
-    return b;
+
+    if (!Number.isFinite(minLat) || !Number.isFinite(minLon) || !Number.isFinite(maxLat) || !Number.isFinite(maxLon)) {
+        return null;
+    }
+
+    return [[minLon, minLat], [maxLon, maxLat]];
 }
 
 export default function MapPicker({
@@ -498,7 +509,6 @@ export default function MapPicker({
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-        const maplibre = getMapLibre();
 
         const validRoute = routeGeometry.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
@@ -538,9 +548,9 @@ export default function MapPicker({
         }
 
         try {
-            const bounds = buildBoundsFromPoints(maplibre, points);
-            if (typeof bounds?.isEmpty === "function" && bounds.isEmpty()) return;
-            map.fitBounds(bounds, { padding: 30, duration: 650 });
+            const boundsLike = boundsLikeFromLatLon(points);
+            if (!boundsLike) return;
+            map.fitBounds(boundsLike, { padding: 30, duration: 650 });
         } catch {}
     }, [start, end, routeGeometry]);
 
@@ -870,7 +880,6 @@ export default function MapPicker({
     function handleRecenter() {
         const map = mapRef.current;
         if (!map) return;
-        const maplibre = getMapLibre();
 
         const validRoute = routeGeometry.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
@@ -891,8 +900,9 @@ export default function MapPicker({
                 map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration: 650 });
                 return;
             }
-            const bounds = buildBoundsFromPoints(maplibre, points);
-            map.fitBounds(bounds, { padding: 30, duration: 650 });
+            const boundsLike = boundsLikeFromLatLon(points);
+            if (!boundsLike) return;
+            map.fitBounds(boundsLike, { padding: 30, duration: 650 });
         } catch {}
     }
 

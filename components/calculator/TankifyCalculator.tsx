@@ -756,7 +756,7 @@ export default function TankifyCalculator() {
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
                 <div
                     className={
-                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-480 h-full min-w-0 gap-6"
+                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-480 h-full min-w-0 gap-6 overflow-hidden"
                     }
                 >
                     <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
@@ -779,7 +779,7 @@ export default function TankifyCalculator() {
                         <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
 
-                    <section className="flex-1 min-w-0 h-full flex flex-col">
+                    <section className="flex-1 min-w-0 h-full min-h-0 flex flex-col">
                         <div
                             className={
                                 "rounded-3xl bg-white shadow-sm overflow-hidden transition-[height] duration-300 ease-out grow"
@@ -862,7 +862,7 @@ export default function TankifyCalculator() {
                             {stationsQueried && desktopStationsMounted ? (
                                     <div
                                         className={
-                                            "self-start overflow-hidden transition-[width,opacity,transform] duration-300 ease-out " +
+                                            "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col " +
                                             (desktopStationsOpen && !desktopStationsEntering
                                                 ? "w-105 opacity-100 translate-x-0"
                                                 : "w-0 opacity-0 translate-x-6 pointer-events-none")
