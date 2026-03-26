@@ -995,7 +995,7 @@ export default function MapPicker({
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full" />
 
-            <div className="pointer-events-none absolute right-3 top-3 z-1000 flex flex-col gap-2">
+            <div className="pointer-events-none absolute left-3 top-3 z-1000 flex flex-col gap-2">
                 <button
                     type="button"
                     onClick={handleRecenter}

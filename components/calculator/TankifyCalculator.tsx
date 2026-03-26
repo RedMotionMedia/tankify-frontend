@@ -745,10 +745,14 @@ export default function TankifyCalculator() {
             <main className="h-screen overflow-x-hidden bg-white md:bg-neutral-100">
                 <div
                     className={
-                        "mx-auto hidden p-4 lg:flex lg:flex-row lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden"
+                        "mx-auto hidden lg:flex lg:flex-row lg:gap-6 lg:items-start w-full max-w-480 h-full min-w-0 overflow-hidden"
                     }
                 >
-                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col mr-6">
+                    <div className="h-full pt-5 pl-5 pb-5">
+                    <section className="self-start rounded-3xl bg-white p-6 shadow-sm flex-none w-105 max-h-full flex flex-col">
+
+
+
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <h1 className="text-3xl font-bold">{t.app.title}</h1>
@@ -767,11 +771,11 @@ export default function TankifyCalculator() {
 
                         <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
                     </section>
+                    </div>
 
                     <section
                         className={
-                            "relative flex-1 min-w-0 h-full min-h-0 flex flex-col transition-[margin-right] duration-300 ease-out " +
-                            (stationsQueried && (desktopStationsOpen || desktopStationsEntering) ? "mr-6" : "mr-0")
+                            "relative flex-1 min-w-0 h-full min-h-0 flex flex-col transition-[margin-right] duration-300 ease-out pb-5 pt-5 "
                         }
                     >
                         <div
@@ -821,11 +825,11 @@ export default function TankifyCalculator() {
                                         <button
                                             type="button"
                                             onClick={() => setDesktopResultsOpen(false)}
-                                            className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                                            className="absolute right-5 top-0 grid rounded-b-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95 h-10 w-10 place-items-center"
                                             aria-label={t.actions.close}
                                             title={t.actions.close}
                                         >
-                                            <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                            <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
                                                 <path
                                                     d="M5 7.5l5 5 5-5"
                                                     fill="none"
@@ -866,12 +870,12 @@ export default function TankifyCalculator() {
                             <button
                                 type="button"
                                 onClick={() => setDesktopResultsOpen(true)}
-                                className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95"
+                                className="absolute bottom-0 right-5 z-50 rounded-t-full border border-gray-200 bg-white text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 grid h-12 w-12 place-items-center"
                                 aria-label="Expand results"
                                 title="Expand results"
                             >
                                 <span className="inline-flex items-center gap-2">
-                                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                    <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
                                         <path
                                             d="M5 12.5l5-5 5 5"
                                             fill="none"
@@ -889,9 +893,9 @@ export default function TankifyCalculator() {
                             {stationsQueried && desktopStationsMounted ? (
                                     <div
                                         className={
-                                            "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col " +
+                                            "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col  " +
                                             (desktopStationsOpen && !desktopStationsEntering
-                                                ? "w-105 opacity-100 translate-x-0"
+                                                ? "w-105 opacity-100 translate-x-0 pt-5 pb-5 pr-5"
                                                 : "w-0 opacity-0 translate-x-6 pointer-events-none")
                                         }
                                     >
@@ -918,11 +922,11 @@ export default function TankifyCalculator() {
                                 <button
                                     type="button"
                                     onClick={() => setDesktopStationsOpen(true)}
-                                    className="fixed right-3 top-1/2 z-50 -translate-y-1/2 rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95"
+                                    className="fixed right-0 top-15 z-50 -translate-y-1/2 rounded-l-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 h-12 w-12 place-items-center"
                                     aria-label="Expand stations"
                                     title="Expand stations"
                                 >
-                                    <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                                    <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
                                         <path
                                             d="M12.5 5l-5 5 5 5"
                                             fill="none"

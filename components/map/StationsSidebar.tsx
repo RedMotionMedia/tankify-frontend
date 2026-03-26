@@ -90,24 +90,16 @@ export default function StationsSidebar({
 
     return (
         <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-full">
-            <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
-                <div>
-                    <div className="text-sm font-semibold text-gray-900">Tankstellen</div>
-                    <div className="text-xs text-gray-500">
-                        {sortedStations.length > 0
-                            ? `${sortedStations.length} ${t.route.stationsLoaded}`
-                            : t.route.noStationsFound}
-                    </div>
-                </div>
+            <div className="flex items-center gap-3 border-b border-gray-100 pt-5 pb-3">
                 {onClose ? (
                     <button
                         type="button"
                         onClick={onClose}
-                        className="grid h-9 w-9 place-items-center rounded-full border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                        className="left-0 h-10 w-10 place-items-center rounded-r-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
                         aria-label={t.actions.close}
                         title={t.actions.close}
                     >
-                        <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                        <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
                             <path
                                 d="M7.5 5l5 5-5 5"
                                 fill="none"
@@ -119,6 +111,15 @@ export default function StationsSidebar({
                         </svg>
                     </button>
                 ) : null}
+                <div className="w-auto">
+                    <div className="text-sm font-semibold text-gray-900">Tankstellen</div>
+                    <div className="text-xs text-gray-500">
+                        {sortedStations.length > 0
+                            ? `${sortedStations.length} ${t.route.stationsLoaded}`
+                            : t.route.noStationsFound}
+                    </div>
+                </div>
+
             </div>
 
             {/* Inset the scroll container from the bottom so the scrollbar doesn't touch the panel edge. */}
