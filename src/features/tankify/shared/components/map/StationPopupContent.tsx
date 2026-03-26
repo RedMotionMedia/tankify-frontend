@@ -176,50 +176,9 @@ export default function StationPopupContent({
     })();
 
     return (
-        <div className="w-full max-w-[70vw] select-text">
-            <div className="flex items-start gap-3">
-                <div
-                    className={
-                        `relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 bg-white shadow-sm ${
-                            selectedPrice != null ? "station-logo--ok" : "station-logo--missing"
-                        }`
-                    }
-                >
-                    <div className="absolute inset-0 grid place-items-center text-xs font-extrabold tracking-tight text-gray-700">
-                        {initials}
-                    </div>
-                    {logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={logoUrl}
-                            alt=""
-                            referrerPolicy="no-referrer"
-                            className="absolute inset-0 h-full w-full rounded-full object-contain"
-                            onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = "none";
-                            }}
-                        />
-                    ) : null}
-                </div>
+        <div className="w-full select-text">
 
-                <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-extrabold tracking-tight text-gray-900">
-                        {station.name}
-                    </div>
-
-                    <div className="mt-1 space-y-0.5 text-xs text-gray-600">
-                        {station.address ? <div>{station.address}</div> : null}
-                        {station.postalCode || station.city ? (
-                            <div className="text-gray-500">
-                                {(station.postalCode ? `${station.postalCode} ` : "") +
-                                    (station.city ?? "")}
-                            </div>
-                        ) : null}
-                    </div>
-                </div>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px]">
+            <div className="flex flex-wrap items-center gap-1 text-[11px]">
                 {distanceKm != null ? (
                     <span className="rounded-full bg-gray-50 px-2 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
                         {t.station.distance}:{" "}

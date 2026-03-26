@@ -11,7 +11,7 @@ import {
 import ResultsPanel from "@/features/tankify/shared/components/calculator/ResultsPanel";
 import WorthPanel from "@/features/tankify/shared/components/calculator/WorthPanel";
 import { TankifyCalculation } from "@/features/tankify/shared/lib/calc";
-import StationsSidebar from "@/features/tankify/desktop/components/StationsSidebar";
+import MobileStationsSidebar from "@/features/tankify/mobile/components/MobileStationsSidebar";
 
 type ProfitLevel = {
     labelKey: "notWorthIt" | "barelyWorthIt" | "worthIt" | "veryWorthIt";
@@ -253,14 +253,14 @@ export default function MobileBottomSheet({
                         {t.app.mobileTitle}
                     </h2>
 
-                    <p className="mt-2 text-center text-sm text-gray-600">
+                    <p className="text-center text-xs text-gray-600">
                         {t.app.mobileSubtitle}
                     </p>
                 </div>
 
                 {/* Keep the toggle bar outside the scrollable area so scrolling/swiping starts below it. */}
-                <div className="w-screen shrink-0 px-4 pt-4" data-no-sheet-drag>
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="w-screen shrink-0 px-3 py-2" data-no-sheet-drag>
+                    <div className=" flex items-center justify-between gap-3">
                         <div className="inline-flex rounded-full bg-gray-100 p-1">
                             <button
                                 type="button"
@@ -312,7 +312,7 @@ export default function MobileBottomSheet({
                     >
                         <div
                             ref={calcScrollRef}
-                            className="h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4"
+                            className="h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-3"
                         >
                             <div className="space-y-6 pb-10">
                                 {showResults ? (
@@ -344,9 +344,9 @@ export default function MobileBottomSheet({
                             </div>
                         </div>
 
-                        <div className="h-full w-full shrink-0 snap-start overflow-hidden px-4">
-                            <div className="h-full w-full rounded-3xl border border-gray-200 bg-white p-3 shadow-sm">
-                                <StationsSidebar
+                        <div className="h-full w-full shrink-0 snap-start overflow-hidden">
+                            <div className="flex h-full min-h-0 w-full flex-col px-3">
+                                <MobileStationsSidebar
                                     stations={stations}
                                     selectedStationId={selectedStationId}
                                     onToggleStation={onToggleStation}

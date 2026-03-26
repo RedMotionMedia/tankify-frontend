@@ -82,7 +82,7 @@ function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: num
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export default function StationsSidebar({
+export default function MobileStationsSidebar({
     stations,
     selectedStationId,
     onToggleStation,
@@ -96,7 +96,6 @@ export default function StationsSidebar({
     t,
     onSelectStationAsStart,
     onSelectStationAsDestination,
-    onClose,
     scrollContainerRef,
 }: {
     stations: Station[];
@@ -117,7 +116,6 @@ export default function StationsSidebar({
         station: Station;
         autoCalculate?: boolean;
     }) => void;
-    onClose?: () => void;
     scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -204,39 +202,8 @@ export default function StationsSidebar({
     };
 
     return (
-        <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-full">
-            <div className="flex items-center gap-3 border-b border-gray-100 pt-5 pb-3 pr-5">
-                {onClose ? (
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="grid h-10 w-10 place-items-center rounded-r-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
-                        aria-label={t.actions.close}
-                        title={t.actions.close}
-                    >
-                        <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
-                            <path
-                                d="M7.5 5l5 5-5 5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </button>
-                ) : null}
-                <div className="w-auto">
-                    <div className="text-sm font-semibold text-gray-900">Tankstellen</div>
-                    <div className="text-xs text-gray-500">
-                        {sortedStations.length > 0
-                            ? `${sortedStations.length} ${t.route.stationsLoaded}`
-                            : t.route.noStationsFound}
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex flex-row items-center gap-2 py-2 px-5">
+        <div className="flex h-full min-h-0 w-full flex-col">
+            <div className="flex flex-row flex-wrap items-center gap-2 pb-2">
                 <button
                     type="button"
                     onClick={() => setOpenFirst((v) => !v)}
@@ -281,9 +248,15 @@ export default function StationsSidebar({
                 </button>
             </div>
 
-            <div className="min-h-0 flex-1 pb-5 flex flex-col">
-                <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-auto px-5">
-                    <div ref={scrollRef} className="min-h-0 space-y-3">
+            <div className="min-h-0 flex-1 pb-2 flex flex-col">
+                <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-auto">
+                    <div ref={scrollRef} className="min-h-0 space-y-2">
+                        {sortedStations.length === 0 ? (
+                            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">
+                                {t.route.noStationsFound}
+                            </div>
+                        ) : null}
+
                         {sortedStations.map((station) => {
                             const isOpen = station.id === selectedStationId;
                             const priceEur = fuelType === "diesel" ? station.diesel : station.super95;
@@ -294,7 +267,7 @@ export default function StationsSidebar({
                                     key={station.id}
                                     id={`station-row-${station.id}`}
                                     className={
-                                        "rounded-2xl border p-3 transition " +
+                                        "rounded-2xl border p-2 transition " +
                                         (isOpen
                                             ? "border-blue-200 bg-blue-50/30"
                                             : "border-gray-100 bg-white hover:bg-gray-50")
