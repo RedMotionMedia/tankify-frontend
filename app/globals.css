@@ -419,6 +419,58 @@ input {
   transition: all 0.15s ease;
 }
 
+.tankify-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+.tankify-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 9999px;
+}
+
+.tankify-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -4px; /* centers thumb on 10px track */
+  border-radius: 9999px;
+  background: #111827;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.tankify-range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.18),
+    0 0 0 4px rgba(37, 99, 235, 0.35);
+}
+
+.tankify-range::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.tankify-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #111827;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.tankify-range:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.18),
+    0 0 0 4px rgba(37, 99, 235, 0.35);
+}
+
 .btn {
   @apply rounded-2xl px-4 py-3 text-white transition cursor-pointer active:scale-95;
 }

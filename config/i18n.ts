@@ -1,6 +1,10 @@
 import { Language } from "@/types/tankify";
 
 export type TranslationSchema = {
+    onboarding: {
+        title: string;
+        note: string;
+    };
     settings: {
         title: string;
         language: string;
@@ -44,6 +48,7 @@ export type TranslationSchema = {
         myLocation: string;
         currentLocation: string;
         searchHere: string;
+        searchHereLong: string;
         loading: string;
         tapSearchHere: string;
         areaChanged: string;
@@ -159,6 +164,10 @@ export type TranslationSchema = {
 
 export const translations: Record<Language, TranslationSchema> = {
     de: {
+        onboarding: {
+            title: "Schnelle Einrichtung",
+            note: "Diese Angaben kannst du später jederzeit in den Einstellungen ändern.",
+        },
         settings: {
             title: "Einstellungen",
             language: "Sprache",
@@ -205,6 +214,7 @@ export const translations: Record<Language, TranslationSchema> = {
             myLocation: "Standort",
             currentLocation: "Aktueller Standort",
             searchHere: "Hier suchen",
+            searchHereLong: "Tankstellen hier suchen",
             loading: "Lädt ...",
             tapSearchHere: "Tippe auf „Hier suchen“ für Tankstellen.",
             areaChanged: "Kartenausschnitt geändert – „Hier suchen“ drücken.",
@@ -216,7 +226,7 @@ export const translations: Record<Language, TranslationSchema> = {
         },
         pricing: {
             title: "Preise",
-            description: "Vergleiche den Preis zuhause mit dem Preis am Ziel.",
+            description: "Vergleiche den Preis Vorort mit dem Preis am Ziel.",
             fuelType: "Kraftstoff",
             localPrice: "Preis Vorort",
             destinationPrice: "Preis am Ziel",
@@ -320,6 +330,10 @@ export const translations: Record<Language, TranslationSchema> = {
         },
     },
     en: {
+        onboarding: {
+            title: "Quick setup",
+            note: "You can change these values later in Settings.",
+        },
         settings: {
             title: "Settings",
             language: "Language",
@@ -366,6 +380,7 @@ export const translations: Record<Language, TranslationSchema> = {
             myLocation: "My location",
             currentLocation: "Current location",
             searchHere: "Search here",
+            searchHereLong: "Search gas stations here",
             loading: "Loading ...",
             tapSearchHere: 'Tap "Search here" for gas stations.',
             areaChanged: 'Map area changed – press "Search here".',

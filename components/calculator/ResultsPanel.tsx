@@ -1,8 +1,9 @@
-import {TranslationSchema} from "@/config/i18n";
-import {CurrencySystem, MeasurementSystem} from "@/types/tankify";
-import {formatCurrency, formatDuration} from "@/lib/format";
+import { TranslationSchema } from "@/config/i18n";
+import { CurrencySystem, MeasurementSystem } from "@/types/tankify";
+import { formatCurrency, formatDuration } from "@/lib/format";
 import StatCard from "@/components/ui/StatCard";
-import {TankifyCalculation} from "@/lib/calc";
+import { TankifyCalculation } from "@/lib/calc";
+import { eurToQuote } from "@/lib/fx";
 
 type ProfitLevel = {
     labelKey: "notWorthIt" | "barelyWorthIt" | "worthIt" | "veryWorthIt";
@@ -14,6 +15,7 @@ type ProfitLevel = {
 type Props = {
     t: TranslationSchema;
     currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     measurementSystem: MeasurementSystem;
     profit: ProfitLevel;
     routeLoading: boolean;
@@ -21,64 +23,49 @@ type Props = {
 };
 
 export default function ResultsPanel({
-                                         t,
-                                         currencySystem,
-                                         measurementSystem,
-                                         profit,
-                                         routeLoading,
-                                         calculation,
-                                     }: Props) {
+    t,
+    currencySystem,
+    eurToCurrencyRate,
+    measurementSystem,
+    profit,
+    routeLoading,
+    calculation,
+}: Props) {
     const distanceValue =
         measurementSystem === "metric"
             ? {
-                oneWay: calculation.oneWayDistanceKm,
-                roundTrip: calculation.roundTripDistanceKm,
-                unit: t.units.km,
-            }
+                  oneWay: calculation.oneWayDistanceKm,
+                  roundTrip: calculation.roundTripDistanceKm,
+                  unit: t.units.km,
+              }
             : {
-                oneWay: calculation.oneWayDistanceMiles,
-                roundTrip: calculation.roundTripDistanceMiles,
-                unit: t.units.miles,
-            };
+                  oneWay: calculation.oneWayDistanceMiles,
+                  roundTrip: calculation.roundTripDistanceMiles,
+                  unit: t.units.miles,
+              };
 
-    const priceDifferenceValue =
-        measurementSystem === "metric"
-            ? {
-                value: calculation.priceDifferencePerLiter,
-                unit:
-                    currencySystem === "eur"
-                        ? "€/L"
-                        : "$/L",
-            }
-            : {
-                value: calculation.priceDifferencePerGallon,
-                unit:
-                    currencySystem === "eur"
-                        ? "€/gal"
-                        : "$/gal",
-            };
+    const unit = measurementSystem === "metric" ? "/L" : "/gal";
 
-    const breakEvenValue =
+    const priceDiff =
         measurementSystem === "metric"
-            ? {
-                value: calculation.breakEvenDiffPerLiter * 100,
-                unit: t.units.centPerLiter,
-            }
-            : {
-                value: calculation.breakEvenDiffPerGallon * 100,
-                unit: t.units.centPerGallon,
-            };
+            ? eurToQuote(calculation.priceDifferencePerLiter, eurToCurrencyRate)
+            : eurToQuote(calculation.priceDifferencePerGallon, eurToCurrencyRate);
+
+    const breakEven =
+        measurementSystem === "metric"
+            ? eurToQuote(calculation.breakEvenDiffPerLiter, eurToCurrencyRate) * 100
+            : eurToQuote(calculation.breakEvenDiffPerGallon, eurToCurrencyRate) * 100;
+    const breakEvenUnit =
+        measurementSystem === "metric" ? t.units.centPerLiter : t.units.centPerGallon;
 
     const maxConsumptionValue =
         measurementSystem === "metric"
-            ? {
-                value: calculation.maxConsumptionLPer100Km,
-                unit: t.units.litersPer100Km,
-            }
-            : {
-                value: calculation.maxConsumptionMpg,
-                unit: t.units.mpg,
-            };
+            ? { value: calculation.maxConsumptionLPer100Km, unit: t.units.litersPer100Km }
+            : { value: calculation.maxConsumptionMpg, unit: t.units.mpg };
+
+    const tripCost = eurToQuote(calculation.tripCost, eurToCurrencyRate);
+    const grossSavingFullTank = eurToQuote(calculation.grossSavingFullTank, eurToCurrencyRate);
+    const netSaving = eurToQuote(calculation.netSaving, eurToCurrencyRate);
 
     return (
         <section className="space-y-6">
@@ -103,11 +90,11 @@ export default function ResultsPanel({
                     />
                     <StatCard
                         title={t.pricing.priceDifference}
-                        value={`${priceDifferenceValue.value.toFixed(3)} ${priceDifferenceValue.unit}`}
+                        value={`${priceDiff.toFixed(3)} ${currencySystem}${unit}`}
                     />
                     <StatCard
                         title={t.result.tripCost}
-                        value={formatCurrency(calculation.tripCost, currencySystem)}
+                        value={formatCurrency(tripCost, currencySystem)}
                     />
                     <StatCard
                         title={t.result.oneWayDuration}
@@ -127,11 +114,11 @@ export default function ResultsPanel({
                     />
                     <StatCard
                         title={t.result.fullTankSaving}
-                        value={formatCurrency(calculation.grossSavingFullTank, currencySystem)}
+                        value={formatCurrency(grossSavingFullTank, currencySystem)}
                     />
                     <StatCard
                         title={t.result.netSaving}
-                        value={formatCurrency(calculation.netSaving, currencySystem)}
+                        value={formatCurrency(netSaving, currencySystem)}
                         valueClassName={profit.colorClass}
                     />
                 </div>
@@ -142,7 +129,7 @@ export default function ResultsPanel({
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                     <StatCard
                         title={t.pricing.breakEvenDiff}
-                        value={`${breakEvenValue.value.toFixed(1)} ${breakEvenValue.unit}`}
+                        value={`${breakEven.toFixed(1)} ${breakEvenUnit}`}
                     />
                     <StatCard
                         title={t.vehicle.maxConsumption}

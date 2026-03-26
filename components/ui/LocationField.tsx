@@ -25,49 +25,132 @@ export default function LocationField({
                                           mapLabel,
                                           myLocationLabel,
                                       }: Props) {
-    return (
-        <div>
-            <label className="mb-2 block text-sm font-medium">{label}</label>
+    const hasMyLocation = Boolean(onUseMyLocation && myLocationLabel);
+    const inputRightPadding = hasMyLocation ? "pr-32" : "pr-24";
 
-            <div className="flex gap-2 flex-col">
+    return (
+        <div className="space-y-2">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600">
+                {label}
+            </label>
+
+            <div className="relative">
                 <input
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={(e) => {
                         if (e.key === "Enter") onSearch();
                     }}
-                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 outline-none"
+                    placeholder={label}
+                    className={
+                        "w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 outline-none shadow-sm " +
+                        "focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 " +
+                        inputRightPadding
+                    }
                 />
-                <div className="flex flex-row gap-2 w-full">
-                    <button
-                        type="button"
-                        onClick={onSearch}
-                        className="rounded-2xl bg-black px-4 py-3 text-white transition active:scale-95 hover:opacity-80 flex-auto"
-                    >
-                        {loading ? "..." : searchLabel}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onPickOnMap}
-                        className={`rounded-2xl px-4 py-3 text-white transition active:scale-95 flex-auto ${
-                            pickActive
-                                ? "bg-blue-600 hover:bg-blue-700"
-                                : "bg-gray-700 hover:bg-gray-800"
-                        }`}
-                    >
-                        {mapLabel}
-                    </button>
-                    {onUseMyLocation && myLocationLabel ? (
+
+                <div className="absolute inset-y-0 right-2 flex items-center gap-1">
+                    {hasMyLocation ? (
                         <button
                             type="button"
                             onClick={onUseMyLocation}
-                            className="rounded-2xl bg-blue-600 px-4 py-3 text-white transition active:scale-95 hover:bg-blue-700 flex-auto"
                             title={myLocationLabel}
                             aria-label={myLocationLabel}
+                            className="grid h-10 w-10 place-items-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
                         >
-                            {myLocationLabel}
+                            <svg
+                                viewBox="0 0 24 24"
+                                className="h-6 w-6"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path d="M12 2l7 19-7-3-7 3 7-19z" fill="currentColor" />
+                            </svg>
                         </button>
                     ) : null}
+
+                    <button
+                        type="button"
+                        onClick={onPickOnMap}
+                        title={mapLabel}
+                        aria-label={mapLabel}
+                        className={
+                            "grid h-10 w-10 place-items-center rounded-full shadow-sm transition active:scale-95 " +
+                            (pickActive
+                                ? "bg-gray-900 text-white hover:bg-gray-800"
+                                : "bg-gray-100 text-gray-800 hover:bg-gray-200")
+                        }
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            className="h-5 w-5"
+                            aria-hidden="true"
+                            focusable="false"
+                        >
+                            <path
+                                d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinejoin="round"
+                            />
+                            <path
+                                d="M9 3v15M15 6v15"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                            />
+                        </svg>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onSearch}
+                        title={searchLabel}
+                        aria-label={searchLabel}
+                        className="grid h-10 w-10 place-items-center rounded-full bg-black text-white shadow-sm transition hover:bg-gray-900 active:scale-95"
+                    >
+                        {loading ? (
+                            <svg
+                                viewBox="0 0 20 20"
+                                className="h-5 w-5 animate-spin"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path
+                                    d="M10 2a8 8 0 1 0 8 8"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                        ) : (
+                            <svg
+                                viewBox="0 0 20 20"
+                                className="h-5 w-5"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path
+                                    d="M12.5 12.5l4 4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
+                                <circle
+                                    cx="8.5"
+                                    cy="8.5"
+                                    r="5.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                />
+                            </svg>
+                        )}
+                    </button>
                 </div>
             </div>
         </div>

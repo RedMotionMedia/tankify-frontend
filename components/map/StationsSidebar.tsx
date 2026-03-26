@@ -10,22 +10,26 @@ import {
     Point,
     Station,
 } from "@/types/tankify";
+import { eurToQuote } from "@/lib/fx";
 import { pricePerLiterToPerGallon } from "@/lib/units";
 import StationPopupContent from "@/components/map/StationPopupContent";
 
-type UserLocation = { lat: number; lon: number };
-
 function formatPrice(
-    value: number | null | undefined,
+    valueEurPerLiter: number | null | undefined,
     measurementSystem: MeasurementSystem,
-    currencySystem: CurrencySystem
+    currencySystem: CurrencySystem,
+    eurToCurrencyRate: number
 ): string {
-    if (value === null || value === undefined) return "-";
-    const converted =
-        measurementSystem === "metric" ? value : pricePerLiterToPerGallon(value);
-    const ccy = currencySystem === "eur" ? "EUR" : "USD";
+    if (valueEurPerLiter === null || valueEurPerLiter === undefined) return "-";
+
+    const perUnit =
+        measurementSystem === "metric"
+            ? valueEurPerLiter
+            : pricePerLiterToPerGallon(valueEurPerLiter);
+    const inCurrency = eurToQuote(perUnit, eurToCurrencyRate);
     const unit = measurementSystem === "metric" ? "/L" : "/gal";
-    return `${converted.toFixed(3)} ${ccy}${unit}`;
+
+    return `${inCurrency.toFixed(3)} ${currencySystem}${unit}`;
 }
 
 export default function StationsSidebar({
@@ -35,6 +39,7 @@ export default function StationsSidebar({
     fuelType,
     measurementSystem,
     currencySystem,
+    eurToCurrencyRate,
     language,
     debugMode,
     userLocation,
@@ -49,9 +54,10 @@ export default function StationsSidebar({
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     language: Language;
     debugMode: boolean;
-    userLocation: UserLocation | null;
+    userLocation: { lat: number; lon: number } | null;
     t: TranslationSchema;
     onSelectStationAsStart: (payload: { point: Point; price?: number | null; station: Station }) => void;
     onSelectStationAsDestination: (payload: {
@@ -83,10 +89,7 @@ export default function StationsSidebar({
         } catch {}
     }, [selectedStationId]);
 
-    const sortedStations = useMemo(() => {
-        // Preserve backend sort order; just return a stable reference.
-        return stations;
-    }, [stations]);
+    const sortedStations = useMemo(() => stations, [stations]);
 
     return (
         <div className="self-start flex flex-col max-h-full min-h-0 rounded-3xl bg-white shadow-sm w-full">
@@ -95,7 +98,7 @@ export default function StationsSidebar({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="left-0 h-10 w-10 place-items-center rounded-r-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                        className="grid h-10 w-10 place-items-center rounded-r-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
                         aria-label={t.actions.close}
                         title={t.actions.close}
                     >
@@ -119,17 +122,14 @@ export default function StationsSidebar({
                             : t.route.noStationsFound}
                     </div>
                 </div>
-
             </div>
 
-            {/* Inset the scroll container from the bottom so the scrollbar doesn't touch the panel edge. */}
             <div className="min-h-0 flex-1 pb-5 flex flex-col">
                 <div className="min-h-0 flex-1 overflow-auto px-5 pt-5">
-                    {/* Keep scrollbars at the container edge, while content keeps consistent padding. */}
                     <div ref={scrollRef} className="min-h-0 space-y-3">
                         {sortedStations.map((station) => {
                             const isOpen = station.id === selectedStationId;
-                            const price = fuelType === "diesel" ? station.diesel : station.super95;
+                            const priceEur = fuelType === "diesel" ? station.diesel : station.super95;
 
                             return (
                                 <div
@@ -142,14 +142,14 @@ export default function StationsSidebar({
                                             : "border-gray-100 bg-white hover:bg-gray-50")
                                     }
                                 >
-                                <button
-                                    type="button"
-                                    className="flex w-full items-center gap-3 text-left"
-                                    onClick={() => onToggleStation(station.id)}
-                                >
-                                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
-                                        {station.logoUrl ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
+                                    <button
+                                        type="button"
+                                        className="flex w-full items-center gap-3 text-left"
+                                        onClick={() => onToggleStation(station.id)}
+                                    >
+                                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white">
+                                            {station.logoUrl ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
                                                 <img
                                                     src={station.logoUrl}
                                                     alt=""
@@ -160,53 +160,58 @@ export default function StationsSidebar({
                                                             "none";
                                                     }}
                                                 />
-                                        ) : (
-                                            <div className="grid h-full w-full place-items-center text-xs font-bold text-gray-600">
-                                                {station.name.slice(0, 2).toUpperCase()}
+                                            ) : (
+                                                <div className="grid h-full w-full place-items-center text-xs font-bold text-gray-600">
+                                                    {station.name.slice(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                            <div className="truncate text-sm font-semibold text-gray-900">
+                                                {station.name}
                                             </div>
-                                        )}
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                        <div className="truncate text-sm font-semibold text-gray-900">
-                                            {station.name}
+                                            <div className="truncate text-xs text-gray-500">
+                                                {[station.postalCode, station.city].filter(Boolean).join(" ")}
+                                            </div>
                                         </div>
-                                        <div className="truncate text-xs text-gray-500">
-                                            {[station.postalCode, station.city].filter(Boolean).join(" ")}
-                                        </div>
-                                    </div>
 
-                                    <div className="shrink-0 text-right">
-                                        <div className="text-sm font-semibold text-gray-900">
-                                            {formatPrice(price, measurementSystem, currencySystem)}
+                                        <div className="shrink-0 text-right">
+                                            <div className="text-sm font-semibold text-gray-900">
+                                                {formatPrice(
+                                                    priceEur,
+                                                    measurementSystem,
+                                                    currencySystem,
+                                                    eurToCurrencyRate
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                </button>
+                                    </button>
 
-                                {isOpen ? (
-                                    <div className="mt-3 border-t border-blue-100 pt-3">
-                                        <StationPopupContent
-                                            station={station}
-                                            selectedPrice={price}
-                                            measurementSystem={measurementSystem}
-                                            currencySystem={currencySystem}
-                                            language={language}
-                                            debugMode={debugMode}
-                                            logoCacheBust={logoCacheBust}
-                                            userLocation={userLocation}
-                                            t={t}
-                                            onSelectStationAsStart={onSelectStationAsStart}
-                                            onSelectStationAsDestination={onSelectStationAsDestination}
-                                        />
-                                    </div>
-                                ) : null}
+                                    {isOpen ? (
+                                        <div className="mt-3 border-t border-blue-100 pt-3">
+                                            <StationPopupContent
+                                                station={station}
+                                                selectedPrice={priceEur}
+                                                measurementSystem={measurementSystem}
+                                                currencySystem={currencySystem}
+                                                eurToCurrencyRate={eurToCurrencyRate}
+                                                language={language}
+                                                debugMode={debugMode}
+                                                logoCacheBust={logoCacheBust}
+                                                userLocation={userLocation}
+                                                t={t}
+                                                onSelectStationAsStart={onSelectStationAsStart}
+                                                onSelectStationAsDestination={onSelectStationAsDestination}
+                                            />
+                                        </div>
+                                    ) : null}
                                 </div>
                             );
                         })}
                     </div>
                 </div>
             </div>
-
         </div>
     );
 }

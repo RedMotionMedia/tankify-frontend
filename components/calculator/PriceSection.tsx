@@ -1,6 +1,7 @@
-import {TranslationSchema} from "@/config/i18n";
-import {CurrencySystem, MeasurementSystem,} from "@/types/tankify";
+import { TranslationSchema } from "@/config/i18n";
+import { CurrencySystem, MeasurementSystem } from "@/types/tankify";
 import SliderNumberField from "@/components/ui/SliderNumberField";
+import { eurToQuote } from "@/lib/fx";
 
 type Props = {
     t: TranslationSchema;
@@ -9,23 +10,23 @@ type Props = {
     destinationPrice: number;
     setDestinationPrice: (value: number) => void;
     currencySystem: CurrencySystem;
+    eurToCurrencyRate: number;
     measurementSystem: MeasurementSystem;
 };
 
 export default function PriceSection({
-                                         t,
-                                         localPrice,
-                                         setLocalPrice,
-                                         destinationPrice,
-                                         setDestinationPrice,
-                                         currencySystem,
-                                         measurementSystem,
-                                     }: Props) {
-    const currencySymbol = currencySystem === "eur" ? "€" : "$";
-    const unit =
-        measurementSystem === "metric"
-            ? `${currencySymbol}/L`
-            : `${currencySymbol}/gal`;
+    t,
+    localPrice,
+    setLocalPrice,
+    destinationPrice,
+    setDestinationPrice,
+    currencySystem,
+    eurToCurrencyRate,
+    measurementSystem,
+}: Props) {
+    const unit = measurementSystem === "metric" ? `${currencySystem}/L` : `${currencySystem}/gal`;
+    const min = eurToQuote(1, eurToCurrencyRate);
+    const max = eurToQuote(5, eurToCurrencyRate);
 
     return (
         <section className="space-y-4">
@@ -36,8 +37,8 @@ export default function PriceSection({
 
             <SliderNumberField
                 label={t.pricing.localPrice}
-                min={1}
-                max={measurementSystem === "metric" ? 5 : 20}
+                min={min}
+                max={max}
                 step={0.001}
                 value={localPrice}
                 onChange={setLocalPrice}
@@ -46,8 +47,8 @@ export default function PriceSection({
 
             <SliderNumberField
                 label={t.pricing.destinationPrice}
-                min={1}
-                max={measurementSystem === "metric" ? 5 : 20}
+                min={min}
+                max={max}
                 step={0.001}
                 value={destinationPrice}
                 onChange={setDestinationPrice}

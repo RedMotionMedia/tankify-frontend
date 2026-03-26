@@ -7,7 +7,7 @@ import PriceSection from "./PriceSection";
 import ResultsPanel from "./ResultsPanel";
 import MobileBottomSheet from "./MobileBottomSheet";
 import SettingsModal from "./SettingsModal";
-import VehicleModal from "./VehicleModal";
+import OnboardingModal from "./OnboardingModal";
 import {getTranslations} from "@/config/i18n";
 import {calculateTankify, getProfitLevel} from "@/lib/calc";
 import {geocode} from "@/lib/geocode";
@@ -23,6 +23,7 @@ import {
     pricePerGallonToPerLiter,
     pricePerLiterToPerGallon,
 } from "@/lib/units";
+import { eurToQuote, quoteToEur } from "@/lib/fx";
 import {
     CurrencySystem,
     FuelType,
@@ -46,7 +47,8 @@ export default function TankifyCalculator() {
         if (typeof window === "undefined") return true;
         return window.matchMedia("(min-width: 1024px)").matches;
     });
-    const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("eur");
+    const [currencySystem, setCurrencySystem] = useState<CurrencySystem>("EUR");
+    const [eurToCurrencyRate, setEurToCurrencyRate] = useState(1);
     const [measurementSystem, setMeasurementSystem] =
         useState<MeasurementSystem>("metric");
     const [storageReady, setStorageReady] = useState(false);
@@ -133,6 +135,41 @@ export default function TankifyCalculator() {
     }, []);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const quote = (currencySystem ?? "EUR").toUpperCase();
+        if (quote === "EUR") {
+            setEurToCurrencyRate(1);
+            return;
+        }
+
+        let cancelled = false;
+        const ac = new AbortController();
+
+        (async () => {
+            try {
+                const res = await fetch(`/api/fx/rate?base=EUR&quote=${encodeURIComponent(quote)}`, {
+                    signal: ac.signal,
+                });
+                if (!res.ok) throw new Error(`FX_RATE_HTTP_${res.status}`);
+                const json = (await res.json()) as { rate?: unknown };
+                const rate = typeof json.rate === "number" ? json.rate : Number.NaN;
+                if (cancelled) return;
+                setEurToCurrencyRate(Number.isFinite(rate) && rate > 0 ? rate : 1);
+            } catch {
+                if (cancelled) return;
+                setEurToCurrencyRate(1);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            try {
+                ac.abort();
+            } catch {}
+        };
+    }, [currencySystem]);
+
+    useEffect(() => {
 
 
         const savedLanguage = window.localStorage.getItem("tankify-language");
@@ -146,8 +183,11 @@ export default function TankifyCalculator() {
             setLanguage(savedLanguage);
         }
 
-        if (savedCurrency === "eur" || savedCurrency === "usd") {
-            setCurrencySystem(savedCurrency);
+        if (savedCurrency) {
+            const trimmed = savedCurrency.trim();
+            if (trimmed === "eur") setCurrencySystem("EUR");
+            else if (trimmed === "usd") setCurrencySystem("USD");
+            else if (/^[A-Za-z]{3}$/.test(trimmed)) setCurrencySystem(trimmed.toUpperCase());
         }
 
         if (savedMeasurement === "metric" || savedMeasurement === "imperial") {
@@ -198,8 +238,11 @@ export default function TankifyCalculator() {
     useEffect(() => {
         if (!storageReady) return;
         try {
-            const key = "tankify-vehicle-onboarded-v1";
-            if (window.localStorage.getItem(key) !== "1") {
+            const legacyKey = "tankify-vehicle-onboarded-v1";
+            const key = "tankify-onboarded-v1";
+            const legacyDone = window.localStorage.getItem(legacyKey) === "1";
+            const done = window.localStorage.getItem(key) === "1";
+            if (!done && !legacyDone) {
                 setVehicleModalOpen(true);
             }
         } catch {
@@ -288,12 +331,13 @@ export default function TankifyCalculator() {
     const tankSizeGallons = litersToGallons(tankSizeLiters);
     const avgSpeedMph = kmhToMph(avgSpeedKmh);
 
-    const localPriceDisplay =
+    const localPriceDisplayEur =
         measurementSystem === "metric" ? localPricePerLiter : localPricePerGallon;
-    const destinationPriceDisplay =
-        measurementSystem === "metric"
-            ? destinationPricePerLiter
-            : destinationPricePerGallon;
+    const destinationPriceDisplayEur =
+        measurementSystem === "metric" ? destinationPricePerLiter : destinationPricePerGallon;
+
+    const localPriceDisplay = eurToQuote(localPriceDisplayEur, eurToCurrencyRate);
+    const destinationPriceDisplay = eurToQuote(destinationPriceDisplayEur, eurToCurrencyRate);
     const consumptionDisplay =
         measurementSystem === "metric" ? consumptionLPer100Km : consumptionMpg;
     const tankSizeDisplay =
@@ -301,14 +345,16 @@ export default function TankifyCalculator() {
     const avgSpeedDisplay = measurementSystem === "metric" ? avgSpeedKmh : avgSpeedMph;
 
     const setLocalPrice = (value: number) => {
+        const valueEur = quoteToEur(value, eurToCurrencyRate);
         setLocalPricePerLiter(
-            measurementSystem === "metric" ? value : pricePerGallonToPerLiter(value)
+            measurementSystem === "metric" ? valueEur : pricePerGallonToPerLiter(valueEur)
         );
     };
 
     const setDestinationPrice = (value: number) => {
+        const valueEur = quoteToEur(value, eurToCurrencyRate);
         setDestinationPricePerLiter(
-            measurementSystem === "metric" ? value : pricePerGallonToPerLiter(value)
+            measurementSystem === "metric" ? valueEur : pricePerGallonToPerLiter(valueEur)
         );
     };
 
@@ -688,6 +734,7 @@ export default function TankifyCalculator() {
                 destinationPrice={destinationPriceDisplay}
                 setDestinationPrice={setDestinationPrice}
                 currencySystem={currencySystem}
+                eurToCurrencyRate={eurToCurrencyRate}
                 measurementSystem={measurementSystem}
             />
 
@@ -721,10 +768,17 @@ export default function TankifyCalculator() {
 
     return (
         <>
-            <VehicleModal
+            <OnboardingModal
                 open={vehicleModalOpen}
                 t={t}
+                language={language}
+                setLanguage={setLanguage}
+                currencySystem={currencySystem}
+                setCurrencySystem={setCurrencySystem}
                 measurementSystem={measurementSystem}
+                setMeasurementSystem={setMeasurementSystem}
+                fuelType={fuelType}
+                setFuelType={setFuelType}
                 consumption={consumptionDisplay}
                 setConsumption={setConsumption}
                 tankSize={tankSizeDisplay}
@@ -733,6 +787,7 @@ export default function TankifyCalculator() {
                 setAvgSpeed={setAvgSpeed}
                 onConfirm={() => {
                     try {
+                        window.localStorage.setItem("tankify-onboarded-v1", "1");
                         window.localStorage.setItem("tankify-vehicle-onboarded-v1", "1");
                     } catch {}
                     setVehicleModalOpen(false);
@@ -770,20 +825,48 @@ export default function TankifyCalculator() {
 
 
 
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h1 className="text-3xl font-bold">{t.app.title}</h1>
-                                <p className="mt-2 text-sm text-gray-600">{t.app.subtitle}</p>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-row items-center">
+                                <h1 className="text-3xl font-bold w-full">{t.app.title}</h1>
+                                <div className="w-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSettingsOpen(true)}
+                                        className="h-14 w-14 place-items-center rounded-2xl border border-gray-200 shadow-sm transition hover:bg-gray-50 active:scale-95 text-[0px]"
+                                        aria-label="Open settings"
+                                    >
+                                        <svg
+                                            viewBox="0 0 64 64"
+                                            className="h-10 w-10 text-gray-900"
+                                            aria-hidden="true"
+                                            focusable="false"
+                                        >
+                                            <path
+                                                d="M45,14.67l-2.76,2a1,1,0,0,1-1,.11L37.65,15.3a1,1,0,0,1-.61-.76l-.66-3.77a1,1,0,0,0-1-.84H30.52a1,1,0,0,0-1,.77l-.93,3.72a1,1,0,0,1-.53.65l-3.3,1.66a1,1,0,0,1-1-.08l-3-2.13a1,1,0,0,0-1.31.12l-3.65,3.74a1,1,0,0,0-.13,1.26l1.87,2.88a1,1,0,0,1,.1.89L16.34,27a1,1,0,0,1-.68.63l-3.85,1.06a1,1,0,0,0-.74,1v4.74a1,1,0,0,0,.8,1l3.9.8a1,1,0,0,1,.72.57l1.42,3.15a1,1,0,0,1-.05.92l-2.13,3.63a1,1,0,0,0,.17,1.24L19.32,49a1,1,0,0,0,1.29.09L23.49,47a1,1,0,0,1,1-.1l3.74,1.67a1,1,0,0,1,.59.75l.66,3.79a1,1,0,0,0,1,.84h4.89a1,1,0,0,0,1-.86l.58-4a1,1,0,0,1,.58-.77l3.58-1.62a1,1,0,0,1,1,.09l3.14,2.12a1,1,0,0,0,1.3-.15L50,45.06a1,1,0,0,0,.09-1.27l-2.08-3a1,1,0,0,1-.09-1l1.48-3.43a1,1,0,0,1,.71-.59L53.77,35a1,1,0,0,0,.8-1V29.42a1,1,0,0,0-.8-1l-3.72-.78a1,1,0,0,1-.73-.62l-1.45-3.65a1,1,0,0,1,.11-.94l2.15-3.14A1,1,0,0,0,50,18l-3.71-3.25A1,1,0,0,0,45,14.67Z"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="3"
+                                                strokeLinejoin="round"
+                                                strokeLinecap="round"
+                                            />
+                                            <circle
+                                                cx="32.82"
+                                                cy="31.94"
+                                                r="9.94"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="3"
+                                            />
+                                        </svg>
+                                        ⚙️
+                                    </button>
+                                </div>
+
+
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => setSettingsOpen(true)}
-                                className="rounded-2xl border border-gray-200 px-3 py-2 text-lg shadow-sm transition hover:bg-gray-50"
-                                aria-label="Open settings"
-                            >
-                                ⚙️
-                            </button>
+                            <p className="text-sm text-gray-600">{t.app.subtitle}</p>
+
                         </div>
 
                         <div className="mt-6 min-h-0 overflow-auto">{routeControls}</div>
@@ -811,6 +894,8 @@ export default function TankifyCalculator() {
                                     pickMode={mapPickMode}
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
+                                    currencySystem={currencySystem}
+                                    eurToCurrencyRate={eurToCurrencyRate}
                                     debugMode={debugMode}
                                     t={t}
                                     defaultLocationEnabled
@@ -871,13 +956,15 @@ export default function TankifyCalculator() {
                                                 <WorthPanel
                                                     t={t}
                                                     currencySystem={currencySystem}
+                                                    eurToCurrencyRate={eurToCurrencyRate}
                                                     profit={profit}
-                                                    netSaving={calculation.netSaving}
+                                                    netSavingEur={calculation.netSaving}
                                                 />
                                                 <div className="rounded-2xl border border-gray-100 p-4">
                                                     <ResultsPanel
                                                         t={t}
                                                         currencySystem={currencySystem}
+                                                        eurToCurrencyRate={eurToCurrencyRate}
                                                         measurementSystem={measurementSystem}
                                                         profit={profit}
                                                         routeLoading={routeLoading}
@@ -931,6 +1018,7 @@ export default function TankifyCalculator() {
                                 fuelType={fuelType}
                                 measurementSystem={measurementSystem}
                                 currencySystem={currencySystem}
+                                eurToCurrencyRate={eurToCurrencyRate}
                                 language={language}
                                 debugMode={debugMode}
                                 userLocation={userLocation}
@@ -976,6 +1064,8 @@ export default function TankifyCalculator() {
                             pickMode={mapPickMode}
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
+                            currencySystem={currencySystem}
+                            eurToCurrencyRate={eurToCurrencyRate}
                             debugMode={debugMode}
                             t={t}
                             defaultLocationEnabled
@@ -1008,9 +1098,32 @@ export default function TankifyCalculator() {
                         <button
                             type="button"
                             onClick={() => setSettingsOpen(true)}
-                            className="rounded-full bg-white/90 px-3 py-2 text-lg shadow-md backdrop-blur"
+                            className="grid h-10 w-10 place-items-center rounded-full bg-white/90 shadow-md backdrop-blur transition hover:bg-white active:scale-95 text-[0px]"
                             aria-label="Open settings"
                         >
+                            <svg
+                                viewBox="0 0 64 64"
+                                className="h-5 w-5 text-gray-900"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path
+                                    d="M45,14.67l-2.76,2a1,1,0,0,1-1,.11L37.65,15.3a1,1,0,0,1-.61-.76l-.66-3.77a1,1,0,0,0-1-.84H30.52a1,1,0,0,0-1,.77l-.93,3.72a1,1,0,0,1-.53.65l-3.3,1.66a1,1,0,0,1-1-.08l-3-2.13a1,1,0,0,0-1.31.12l-3.65,3.74a1,1,0,0,0-.13,1.26l1.87,2.88a1,1,0,0,1,.1.89L16.34,27a1,1,0,0,1-.68.63l-3.85,1.06a1,1,0,0,0-.74,1v4.74a1,1,0,0,0,.8,1l3.9.8a1,1,0,0,1,.72.57l1.42,3.15a1,1,0,0,1-.05.92l-2.13,3.63a1,1,0,0,0,.17,1.24L19.32,49a1,1,0,0,0,1.29.09L23.49,47a1,1,0,0,1,1-.1l3.74,1.67a1,1,0,0,1,.59.75l.66,3.79a1,1,0,0,0,1,.84h4.89a1,1,0,0,0,1-.86l.58-4a1,1,0,0,1,.58-.77l3.58-1.62a1,1,0,0,1,1,.09l3.14,2.12a1,1,0,0,0,1.3-.15L50,45.06a1,1,0,0,0,.09-1.27l-2.08-3a1,1,0,0,1-.09-1l1.48-3.43a1,1,0,0,1,.71-.59L53.77,35a1,1,0,0,0,.8-1V29.42a1,1,0,0,0-.8-1l-3.72-.78a1,1,0,0,1-.73-.62l-1.45-3.65a1,1,0,0,1,.11-.94l2.15-3.14A1,1,0,0,0,50,18l-3.71-3.25A1,1,0,0,0,45,14.67Z"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    strokeLinejoin="round"
+                                    strokeLinecap="round"
+                                />
+                                <circle
+                                    cx="32.82"
+                                    cy="31.94"
+                                    r="9.94"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                />
+                            </svg>
                             ⚙️
                         </button>
                     </div>
@@ -1018,6 +1131,7 @@ export default function TankifyCalculator() {
                     <MobileBottomSheet
                         t={t}
                         currencySystem={currencySystem}
+                        eurToCurrencyRate={eurToCurrencyRate}
                         measurementSystem={measurementSystem}
                         sheetContentRef={sheetContentRef}
                         sheetY={sheetY}
