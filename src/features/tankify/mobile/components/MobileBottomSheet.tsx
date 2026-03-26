@@ -144,12 +144,8 @@ export default function MobileBottomSheet({
                     </p>
                 </div>
 
-                <div
-                    ref={sheetContentRef}
-                    className="flex-1 overflow-y-auto overscroll-contain pb-10"
-                    onTouchStartCapture={onTouchStartContent}
-                >
-                    <div className="mt-5 px-4">
+                {/* Keep the toggle bar outside the scrollable area so scrolling/swiping starts below it. */}
+                <div className="w-screen shrink-0 px-4 pt-4" data-no-sheet-drag>
                     <div className="mb-4 flex items-center justify-between gap-3">
                         <div className="inline-flex rounded-full bg-gray-100 p-1">
                             <button
@@ -185,7 +181,14 @@ export default function MobileBottomSheet({
                             />
                         </div>
                     </div>
+                </div>
 
+                <div
+                    ref={sheetContentRef}
+                    className="flex-1 overflow-y-auto overscroll-contain pb-10"
+                    onTouchStartCapture={onTouchStartContent}
+                >
+                    <div className="px-4">
                     <div
                         ref={carouselRef}
                         className="flex w-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
