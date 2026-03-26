@@ -93,7 +93,21 @@ export default function MobileBottomSheet({
         startX: number;
         startY: number;
         startScrollLeft: number;
-    }>({ active: false, axis: "undecided", startX: 0, startY: 0, startScrollLeft: 0 });
+        startIndex: 0 | 1;
+        startTimeMs: number;
+        lastX: number;
+        lastTimeMs: number;
+    }>({
+        active: false,
+        axis: "undecided",
+        startX: 0,
+        startY: 0,
+        startScrollLeft: 0,
+        startIndex: 0,
+        startTimeMs: 0,
+        lastX: 0,
+        lastTimeMs: 0,
+    });
     const [page, setPage] = useState<0 | 1>(0);
 
     useEffect(() => {
@@ -125,11 +139,18 @@ export default function MobileBottomSheet({
         if (!el) return;
 
         const t0 = e.touches[0];
+        const now = performance.now();
+        const w = el.clientWidth || 1;
+        const startIndex = Math.max(0, Math.min(1, Math.round(el.scrollLeft / w))) as 0 | 1;
         carouselSwipeRef.current.active = true;
         carouselSwipeRef.current.axis = "undecided";
         carouselSwipeRef.current.startX = t0.clientX;
         carouselSwipeRef.current.startY = t0.clientY;
         carouselSwipeRef.current.startScrollLeft = el.scrollLeft;
+        carouselSwipeRef.current.startIndex = startIndex;
+        carouselSwipeRef.current.startTimeMs = now;
+        carouselSwipeRef.current.lastX = t0.clientX;
+        carouselSwipeRef.current.lastTimeMs = now;
     }
 
     function onCarouselTouchMove(e: React.TouchEvent) {
@@ -142,6 +163,8 @@ export default function MobileBottomSheet({
         const t0 = e.touches[0];
         const dx = t0.clientX - state.startX;
         const dy = t0.clientY - state.startY;
+        state.lastX = t0.clientX;
+        state.lastTimeMs = performance.now();
 
         if (state.axis === "undecided") {
             const threshold = 6;
@@ -170,7 +193,23 @@ export default function MobileBottomSheet({
         const el = carouselRef.current;
         if (state.active && state.axis === "horizontal" && el) {
             const w = el.clientWidth || 1;
-            const idx = Math.max(0, Math.min(1, Math.round(el.scrollLeft / w))) as 0 | 1;
+
+            const dxTotal = state.lastX - state.startX;
+            const dt = Math.max(1, state.lastTimeMs - state.startTimeMs);
+            const v = Math.abs(dxTotal) / dt; // px/ms
+
+            // Make swipe easier: a short flick should switch pages without needing half-screen travel.
+            const minSwipePx = 34;
+            const minFlickVelocity = 0.65; // ~650px/s
+
+            let idx: 0 | 1;
+            if (Math.abs(dxTotal) >= minSwipePx || v >= minFlickVelocity) {
+                const dir = dxTotal < 0 ? 1 : -1; // finger left => next page, finger right => prev page
+                idx = Math.max(0, Math.min(1, state.startIndex + dir)) as 0 | 1;
+            } else {
+                idx = Math.max(0, Math.min(1, Math.round(el.scrollLeft / w))) as 0 | 1;
+            }
+
             el.scrollTo({ left: idx * w, behavior: "smooth" });
             setPage(idx);
         }
