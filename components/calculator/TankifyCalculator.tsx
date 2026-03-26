@@ -94,6 +94,7 @@ export default function TankifyCalculator() {
     const [desktopStationsOpen, setDesktopStationsOpen] = useState(true);
     const [desktopStationsMounted, setDesktopStationsMounted] = useState(false);
     const [desktopStationsEntering, setDesktopStationsEntering] = useState(false);
+    const desktopStationsUnmountTimerRef = useRef<number | null>(null);
     const [desktopResultsOpen, setDesktopResultsOpen] = useState(true);
     const [desktopResultsMounted, setDesktopResultsMounted] = useState(false);
     const [desktopResultsEntering, setDesktopResultsEntering] = useState(false);
@@ -549,8 +550,30 @@ export default function TankifyCalculator() {
 
     function handleStationsChange(stations: Station[]) {
         setStationsQueried(true);
-        setVisibleStations(stations);
-        openDesktopStationsPanel();
+
+        if (desktopStationsUnmountTimerRef.current != null) {
+            window.clearTimeout(desktopStationsUnmountTimerRef.current);
+            desktopStationsUnmountTimerRef.current = null;
+        }
+
+        if (stations.length > 0) {
+            setVisibleStations(stations);
+            openDesktopStationsPanel();
+            return;
+        }
+
+        // No stations found: collapse/unmount the panel (and do not auto-open it just because "Search here" was clicked).
+        setDesktopStationsOpen(false);
+
+        if (desktopStationsMounted) {
+            desktopStationsUnmountTimerRef.current = window.setTimeout(() => {
+                desktopStationsUnmountTimerRef.current = null;
+                setDesktopStationsMounted(false);
+                setVisibleStations([]);
+            }, PANEL_ANIM_MS);
+        } else {
+            setVisibleStations([]);
+        }
     }
 
     function handleSelectStationAsStart({
@@ -1013,7 +1036,7 @@ export default function TankifyCalculator() {
                         ) : null}
                     </section>
 
-                            {stationsQueried && desktopStationsMounted ? (
+                            {desktopStationsMounted ? (
                                     <div
                                         className={
                                             "self-start h-full min-h-0 overflow-hidden transition-[width,opacity,transform] duration-300 ease-out flex flex-col  " +
@@ -1042,7 +1065,7 @@ export default function TankifyCalculator() {
 
                             ) : null}
 
-                            {stationsQueried && !desktopStationsOpen ? (
+                            {desktopStationsMounted && !desktopStationsOpen ? (
                                 <button
                                     type="button"
                                     onClick={() => setDesktopStationsOpen(true)}

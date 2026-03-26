@@ -197,36 +197,6 @@ async function tryLoadLocalLogo(key: string): Promise<CacheEntry | null> {
     return null;
 }
 
-async function tryResolveLocalLogoUrl(origin: string, key: string): Promise<string | null> {
-    // In some production setups (notably serverless), the API runtime cannot read `public/` from disk,
-    // even though the static asset is still served by the platform/CDN. As a fallback, probe the static
-    // URL and redirect to it if it exists.
-    const now = Date.now();
-    const cached = localRedirectCache.get(key);
-    if (cached && cached.expiresAt > now) return cached.url;
-
-    const neg = localRedirectNegativeCache.get(key);
-    if (neg && neg > now) return null;
-
-    const exts = ["webp", "png", "svg", "jpg", "jpeg", "ico"] as const;
-    for (const ext of exts) {
-        const url = new URL(`/resources/logos/stations/${key}.${ext}`, origin).toString();
-        try {
-            const res = await fetch(url, { method: "HEAD" });
-            if (res.ok) {
-                localRedirectCache.set(key, { url, expiresAt: now + LOCAL_REDIRECT_TTL_MS });
-                localRedirectNegativeCache.delete(key);
-                return url;
-            }
-        } catch {
-            // ignore
-        }
-    }
-
-    localRedirectNegativeCache.set(key, now + LOCAL_REDIRECT_NEGATIVE_TTL_MS);
-    return null;
-}
-
 function putCache(domain: string, entry: CacheEntry) {
     cache.set(domain, entry);
 
@@ -332,32 +302,6 @@ export async function GET(req: NextRequest) {
             putCache(localKey, local);
             return respond(local);
         }
-
-        // const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, domainKey);
-        // if (localUrl) {
-        //     // If we can reach the static asset, cache it as a normal CacheEntry to avoid redirect + extra client roundtrip.
-        //     const p =
-        //         inflight.get(localKey) ??
-        //         fetchByUrlAndCache(localUrl).finally(() => {
-        //             inflight.delete(localKey);
-        //         });
-        //
-        //     inflight.set(localKey, p);
-        //
-        //     try {
-        //         const entry = await p;
-        //         putCache(localKey, entry);
-        //         return respond(entry);
-        //     } catch {
-        //         // Fall back to redirect if fetching fails for any reason.
-        //         const res = NextResponse.redirect(localUrl, { status: 307 });
-        //         res.headers.set(
-        //             "Cache-Control",
-        //             "public, max-age=604800, stale-while-revalidate=86400"
-        //         );
-        //         return res;
-        //     }
-        // }
     }
 
     if (nameKey) {
@@ -370,30 +314,6 @@ export async function GET(req: NextRequest) {
             putCache(localKey, local);
             return respond(local);
         }
-
-        // const localUrl = await tryResolveLocalLogoUrl(req.nextUrl.origin, nameKey);
-        // if (localUrl) {
-        //     const p =
-        //         inflight.get(localKey) ??
-        //         fetchByUrlAndCache(localUrl).finally(() => {
-        //             inflight.delete(localKey);
-        //         });
-        //
-        //     inflight.set(localKey, p);
-        //
-        //     try {
-        //         const entry = await p;
-        //         putCache(localKey, entry);
-        //         return respond(entry);
-        //     } catch {
-        //         const res = NextResponse.redirect(localUrl, { status: 307 });
-        //         res.headers.set(
-        //             "Cache-Control",
-        //             "public, max-age=604800, stale-while-revalidate=86400"
-        //         );
-        //         return res;
-        //     }
-        // }
     }
 
     // 2) Name lookup (logo.dev name endpoint; token required).
