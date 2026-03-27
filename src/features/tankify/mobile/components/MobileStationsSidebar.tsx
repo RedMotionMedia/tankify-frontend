@@ -449,13 +449,6 @@ export default function MobileStationsSidebar({
                                                             (station.city ?? "")}
                                                     </div>
                                                 ) : null}
-                                                {distanceKm != null ? (
-                                                    <div className="text-gray-500">
-                                                        {distanceLabel}:{" "}
-                                                        {(measurementSystem === "imperial" ? kmToMiles(distanceKm) : distanceKm).toFixed(2)}{" "}
-                                                        {measurementSystem === "imperial" ? t.units.miles : t.units.km}
-                                                    </div>
-                                                ) : null}
                                             </div>
                                         </div>
 

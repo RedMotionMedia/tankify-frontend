@@ -542,8 +542,17 @@ export default function TankifyCalculator() {
             setStartText(label);
         }
 
+        function handleUserLocationDisabled() {
+            // Keep any already chosen start/end points, but remove "live location" UI signals (distance sorting, labels, etc.).
+            setUserLocation(null);
+        }
+
         window.addEventListener("tankify:user-location", handleUserLocation);
-        return () => window.removeEventListener("tankify:user-location", handleUserLocation);
+        window.addEventListener("tankify:user-location-disabled", handleUserLocationDisabled);
+        return () => {
+            window.removeEventListener("tankify:user-location", handleUserLocation);
+            window.removeEventListener("tankify:user-location-disabled", handleUserLocationDisabled);
+        };
     }, [draftStartPoint, t]);
 
     function handleSwapStartEnd() {

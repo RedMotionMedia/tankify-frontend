@@ -45,6 +45,7 @@ type Props = {
 };
 
 type UserLocation = { lat: number; lon: number };
+type GeoPermissionState = PermissionState | "unsupported" | "unavailable";
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM = 12;
@@ -326,8 +327,16 @@ export default function MapPicker({
         Boolean(defaultLocationEnabled)
     );
     const locationEnabledRef = useRef(Boolean(defaultLocationEnabled));
+    const prevLocationEnabledRef = useRef(Boolean(defaultLocationEnabled));
+    const didAutoEnableLocationRef = useRef(Boolean(defaultLocationEnabled));
     const [locationError, setLocationError] = useState<string | null>(null);
     const [locationAttempt, setLocationAttempt] = useState(0);
+    const [geoPermission, setGeoPermission] = useState<GeoPermissionState>(() => {
+        if (typeof window === "undefined") return "unsupported";
+        if (!window.isSecureContext) return "unavailable";
+        if (!navigator.geolocation) return "unavailable";
+        return "unsupported";
+    });
 
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<MapLibreMap | null>(null);
@@ -363,6 +372,83 @@ export default function MapPicker({
 
     useEffect(() => {
         locationEnabledRef.current = locationEnabled;
+    }, [locationEnabled]);
+
+    // Detect existing permission state without triggering a browser prompt.
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (!window.isSecureContext || !navigator.geolocation) {
+            setGeoPermission("unavailable");
+            setLocationEnabled(false);
+            return;
+        }
+
+        const permissions = navigator.permissions;
+        if (!permissions?.query) {
+            setGeoPermission("unsupported");
+            return;
+        }
+
+        let cancelled = false;
+        let status: PermissionStatus | null = null;
+
+        permissions
+            .query({ name: "geolocation" as PermissionName })
+            .then((s) => {
+                status = s;
+                if (cancelled) return;
+
+                const apply = () => {
+                    const state = status?.state ?? "prompt";
+                    setGeoPermission(state);
+
+                    // Auto-enable only once, and only if permission is already granted.
+                    if (!didAutoEnableLocationRef.current && state === "granted") {
+                        didAutoEnableLocationRef.current = true;
+                        setLocationEnabled(true);
+                    }
+
+                    // If permission becomes denied, force off (and show a helpful hint via locationError).
+                    if (state === "denied") {
+                        setLocationEnabled(false);
+                        setLocationError("Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren.");
+                    }
+                };
+
+                apply();
+                status.onchange = apply;
+            })
+            .catch(() => {
+                if (cancelled) return;
+                setGeoPermission("unsupported");
+            });
+
+        return () => {
+            cancelled = true;
+            if (status) status.onchange = null;
+        };
+    }, []);
+
+    useEffect(() => {
+        const prev = prevLocationEnabledRef.current;
+        prevLocationEnabledRef.current = locationEnabled;
+
+        // When turning off, behave like "no location available":
+        // stop showing distance UI in the app by clearing the live location signal.
+        if (prev && !locationEnabled) {
+            setUserLocation(null);
+            setLocationError(null);
+            didCenterOnEnableRef.current = false;
+
+            const dispatch = () => {
+                try {
+                    window.dispatchEvent(new CustomEvent("tankify:user-location-disabled"));
+                } catch {}
+            };
+
+            if (typeof queueMicrotask === "function") queueMicrotask(dispatch);
+            else Promise.resolve().then(dispatch);
+        }
     }, [locationEnabled]);
 
     useEffect(() => {
@@ -1257,10 +1343,25 @@ export default function MapPicker({
                 <button
                     type="button"
                     onClick={() => {
-                        if (!canUseGeolocation()) return;
+                        if (!canUseGeolocation()) {
+                            setLocationError(
+                                typeof window !== "undefined" && !window.isSecureContext
+                                    ? "Geolocation requires HTTPS (or localhost)."
+                                    : "Geolocation not available."
+                            );
+                            return;
+                        }
+
+                        // If the browser has geolocation but permission is denied, we can't trigger a prompt.
+                        // Show a clear hint instead of starting the watch which will just error immediately.
+                        if (!locationEnabled && geoPermission === "denied") {
+                            setLocationError(
+                                "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
+                            );
+                            return;
+                        }
                         setLocationEnabled((v) => !v);
                     }}
-                    disabled={!canUseGeolocation()}
                     title={
                         !canUseGeolocation()
                             ? "Geolocation not available"
@@ -1271,12 +1372,13 @@ export default function MapPicker({
                                     : "Standort einschalten"
                     }
                     aria-pressed={locationEnabled}
+                    aria-disabled={!canUseGeolocation()}
                     className={
                         "pointer-events-auto relative grid h-11 w-11 place-items-center rounded-full shadow-lg transition active:scale-95 " +
                         (locationEnabled
                             ? "bg-blue-600 text-white hover:bg-blue-700"
                             : "bg-white text-gray-900 hover:bg-gray-50") +
-                        (!canUseGeolocation() ? " opacity-60" : "")
+                        (!canUseGeolocation() ? " opacity-60 cursor-not-allowed" : "")
                     }
                 >
                     <svg
@@ -1293,6 +1395,12 @@ export default function MapPicker({
                     </svg>
                 </button>
             </div>
+
+            {locationError ? (
+                <div className="pointer-events-none absolute right-3 top-16 z-1000 max-w-[70vw] rounded-2xl border border-gray-200 bg-white/90 px-3 py-2 text-[11px] font-semibold text-gray-900 shadow-lg backdrop-blur md:right-4 md:top-20 md:max-w-sm md:text-xs">
+                    {locationError}
+                </div>
+            ) : null}
 
             {!hideSearchOverlay ? (
                 <div className="pointer-events-none absolute bottom-1/12 left-1/2 z-1000 -translate-x-1/2 md:bottom-1">
