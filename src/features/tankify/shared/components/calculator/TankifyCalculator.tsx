@@ -885,12 +885,12 @@ export default function TankifyCalculator() {
                                     <button
                                         type="button"
                                         onClick={() => setSettingsOpen(true)}
-                                        className="h-14 w-14 place-items-center rounded-2xl border border-gray-200 shadow-sm transition hover:bg-gray-50 active:scale-95 text-[0px]"
+                                        className="h-11 w-11 place-items-center rounded-full border border-gray-200 shadow-sm transition hover:bg-gray-50 active:scale-95 text-[0px]"
                                         aria-label="Open settings"
                                     >
                                         <svg
                                             viewBox="0 0 64 64"
-                                            className="h-10 w-10 text-gray-900"
+                                            className="h-6 w-6 text-gray-900"
                                             aria-hidden="true"
                                             focusable="false"
                                         >
