@@ -158,10 +158,11 @@ export default function StationPopupContent({
             : null;
 
     const distance = (() => {
+        // Without a live user location we don't show distances at all (otherwise it's unclear "from where").
+        if (!userLocation) return null;
         if (normalizedDriveKm != null) return { km: normalizedDriveKm, label: t.station.distanceDrive };
         if (airDistanceKm != null) return { km: airDistanceKm, label: t.station.distanceAir };
-        const v = station.distanceKm;
-        return typeof v === "number" && Number.isFinite(v) && v >= 0 ? { km: v, label: t.station.distance } : null;
+        return null;
     })();
 
     return (

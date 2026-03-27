@@ -127,7 +127,11 @@ export default function MobileStationsSidebar({
         Record<string, Record<string, number | null>>
     >({});
     const driveFetchAbortRef = useRef<AbortController | null>(null);
-    const driveFetchTimerRef = useRef<number | null>(null);
+    const [driveFetchPayload, setDriveFetchPayload] = useState<{
+        originKey: string;
+        origin: { lat: number; lon: number };
+        destinations: Array<{ id: string; lat: number; lon: number }>;
+    } | null>(null);
 
     useEffect(() => {
         if (!selectedStationId) return;
@@ -138,16 +142,27 @@ export default function MobileStationsSidebar({
         } catch {}
     }, [selectedStationId]);
 
-    const originKey = userLocation ? `${userLocation.lat.toFixed(4)}:${userLocation.lon.toFixed(4)}` : "no-origin";
+    const currentOriginKey = userLocation
+        ? `${userLocation.lat.toFixed(4)}:${userLocation.lon.toFixed(4)}`
+        : "no-origin";
+
+    // While distance sorting is active, keep using the snapshot origin that triggered the fetch.
+    // This prevents live location updates from invalidating the drive-distance map (and avoids re-fetch pressure).
+    const driveOriginKeyForUi =
+        distanceSort === "off" ? currentOriginKey : (driveFetchPayload?.originKey ?? currentOriginKey);
+
     const driveDistanceById = useMemo(
-        () => driveDistancesByOriginKey[originKey] ?? {},
-        [driveDistancesByOriginKey, originKey]
+        () => driveDistancesByOriginKey[driveOriginKeyForUi] ?? {},
+        [driveDistancesByOriginKey, driveOriginKeyForUi]
     );
 
+    const distanceOrigin =
+        userLocation && distanceSort !== "off" && driveFetchPayload?.origin
+            ? driveFetchPayload.origin
+            : userLocation;
+
     useEffect(() => {
-        if (!userLocation) return;
-        if (stations.length === 0) return;
-        if (distanceSort === "off") return;
+        if (!driveFetchPayload) return;
 
         if (driveFetchAbortRef.current) {
             try {
@@ -155,61 +170,46 @@ export default function MobileStationsSidebar({
             } catch {}
             driveFetchAbortRef.current = null;
         }
-        if (driveFetchTimerRef.current != null) {
-            window.clearTimeout(driveFetchTimerRef.current);
-            driveFetchTimerRef.current = null;
-        }
 
         const ac = new AbortController();
         driveFetchAbortRef.current = ac;
 
-        driveFetchTimerRef.current = window.setTimeout(() => {
-            driveFetchTimerRef.current = null;
-
-            const topN = 15;
-            const ranked = [...stations]
-                .map((s) => ({ s, d: haversineKm(userLocation, s) }))
-                .sort((a, b) => a.d - b.d)
-                .slice(0, topN)
-                .map((x) => x.s);
-
-            fetch("/api/drive-distances", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    origin: userLocation,
-                    destinations: ranked.map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })),
-                }),
-                signal: ac.signal,
-            })
-                .then(async (res) => {
-                    if (!res.ok) throw new Error(`DRIVE_HTTP_${res.status}`);
-                    const json = (await res.json()) as unknown;
-                    const rec =
-                        typeof json === "object" && json !== null && "distances" in json
-                            ? ((json as { distances?: unknown }).distances as unknown)
+        fetch("/api/drive-distances", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                origin: driveFetchPayload.origin,
+                destinations: driveFetchPayload.destinations,
+            }),
+            signal: ac.signal,
+        })
+            .then(async (res) => {
+                if (!res.ok) throw new Error(`DRIVE_HTTP_${res.status}`);
+                const json = (await res.json()) as unknown;
+                const rec =
+                    typeof json === "object" && json !== null && "distances" in json
+                        ? ((json as { distances?: unknown }).distances as unknown)
+                        : null;
+                const distancesRec =
+                    rec && typeof rec === "object" && !Array.isArray(rec)
+                        ? (rec as Record<string, unknown>)
+                        : {};
+                const next: Record<string, number | null> = {};
+                for (const [id, v] of Object.entries(distancesRec)) {
+                    const km =
+                        typeof v === "object" && v !== null && "distanceKm" in v
+                            ? (v as { distanceKm?: unknown }).distanceKm
                             : null;
-                    const distancesRec =
-                        rec && typeof rec === "object" && !Array.isArray(rec)
-                            ? (rec as Record<string, unknown>)
-                            : {};
-                    const next: Record<string, number | null> = {};
-                    for (const [id, v] of Object.entries(distancesRec)) {
-                        const km =
-                            typeof v === "object" && v !== null && "distanceKm" in v
-                                ? (v as { distanceKm?: unknown }).distanceKm
-                                : null;
-                        next[id] = typeof km === "number" && Number.isFinite(km) && km >= 0 ? km : null;
-                    }
-                    setDriveDistancesByOriginKey((prev) => ({
-                        ...prev,
-                        [originKey]: { ...(prev[originKey] ?? {}), ...next },
-                    }));
-                })
-                .catch(() => {
-                    // ignore
-                });
-        }, 350);
+                    next[id] = typeof km === "number" && Number.isFinite(km) && km >= 0 ? km : null;
+                }
+                setDriveDistancesByOriginKey((prev) => ({
+                    ...prev,
+                    [driveFetchPayload.originKey]: { ...(prev[driveFetchPayload.originKey] ?? {}), ...next },
+                }));
+            })
+            .catch(() => {
+                // ignore
+            });
 
         return () => {
             if (driveFetchAbortRef.current === ac) {
@@ -218,12 +218,8 @@ export default function MobileStationsSidebar({
                 } catch {}
                 driveFetchAbortRef.current = null;
             }
-            if (driveFetchTimerRef.current != null) {
-                window.clearTimeout(driveFetchTimerRef.current);
-                driveFetchTimerRef.current = null;
-            }
         };
-    }, [userLocation, originKey, stations, distanceSort]);
+    }, [driveFetchPayload]);
 
     const hasDistanceData = Boolean(userLocation);
 
@@ -236,13 +232,10 @@ export default function MobileStationsSidebar({
         };
 
         const getDistanceKm = (s: Station): number | null => {
-            if (!userLocation) {
-                const v = s.distanceKm;
-                return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
-            }
+            if (!distanceOrigin) return null;
             const drive = driveDistanceById[s.id];
             if (typeof drive === "number" && Number.isFinite(drive) && drive >= 0) return drive;
-            return haversineKm(userLocation, s);
+            return haversineKm(distanceOrigin, s);
         };
 
         const indexed = stations.map((s, idx) => ({ s, idx }));
@@ -279,7 +272,7 @@ export default function MobileStationsSidebar({
         });
 
         return indexed.map((x) => x.s);
-    }, [stations, fuelType, priceSort, distanceSort, userLocation, openFirst, driveDistanceById]);
+    }, [stations, fuelType, priceSort, distanceSort, userLocation, distanceOrigin, openFirst, driveDistanceById]);
 
     const cycleSort = (dir: SortDir): SortDir => {
         if (dir === "off") return "asc";
@@ -316,22 +309,41 @@ export default function MobileStationsSidebar({
                     Preis
                 </button>
 
-                <button
-                    type="button"
-                    onClick={() => setDistanceSort((v) => cycleSort(v))}
-                    disabled={!hasDistanceData}
-                    className={
-                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition active:scale-95 " +
-                        (hasDistanceData
-                            ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                            : "border-gray-200 bg-white text-gray-400 opacity-60")
-                    }
-                    title={hasDistanceData ? "Distanz sortieren" : "Distanz nur mit Standort verfuegbar"}
-                    aria-label="Distanz sortieren"
-                >
-                    <SortIcon dir={hasDistanceData ? distanceSort : "off"} />
-                    {t.station.distance}
-                </button>
+                {hasDistanceData ? (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const wasOff = distanceSort === "off";
+                            const next = cycleSort(distanceSort);
+                            setDistanceSort(next);
+
+                            // Only fetch drive distances when the user explicitly enables distance sorting.
+                            if (!userLocation) return;
+                            if (!wasOff) return;
+                            if (next === "off") return;
+                            if (stations.length === 0) return;
+
+                            const topN = 15;
+                            const ranked = [...stations]
+                                .map((s) => ({ s, d: haversineKm(userLocation, s) }))
+                                .sort((a, b) => a.d - b.d)
+                                .slice(0, topN)
+                                .map((x) => x.s);
+
+                            setDriveFetchPayload({
+                                originKey: currentOriginKey,
+                                origin: userLocation,
+                                destinations: ranked.map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })),
+                            });
+                        }}
+                        className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-95"
+                        title="Distanz sortieren"
+                        aria-label="Distanz sortieren"
+                    >
+                        <SortIcon dir={distanceSort} />
+                        {t.station.distance}
+                    </button>
+                ) : null}
             </div>
 
             <div className="min-h-0 flex-1 pb-2 flex flex-col">
@@ -350,21 +362,19 @@ export default function MobileStationsSidebar({
                             const navUrl = getSystemNavigationUrl(station);
 
                             const driveKm = driveDistanceById[station.id];
-                            const airKm = userLocation ? haversineKm(userLocation, station) : null;
+                            const airKm = distanceOrigin ? haversineKm(distanceOrigin, station) : null;
                             const distanceKm =
-                                typeof driveKm === "number" && Number.isFinite(driveKm) && driveKm >= 0
-                                    ? driveKm
-                                    : airKm != null
-                                      ? airKm
-                                      : typeof station.distanceKm === "number" && Number.isFinite(station.distanceKm) && station.distanceKm >= 0
-                                        ? station.distanceKm
-                                        : null;
+                                userLocation
+                                    ? typeof driveKm === "number" && Number.isFinite(driveKm) && driveKm >= 0
+                                        ? driveKm
+                                        : airKm
+                                    : null;
                             const distanceLabel =
-                                typeof driveKm === "number" && Number.isFinite(driveKm) && driveKm >= 0
-                                    ? t.station.distanceDrive
-                                    : airKm != null
-                                      ? t.station.distanceAir
-                                      : t.station.distance;
+                                userLocation
+                                    ? typeof driveKm === "number" && Number.isFinite(driveKm) && driveKm >= 0
+                                        ? t.station.distanceDrive
+                                        : t.station.distanceAir
+                                    : "";
 
                             return (
                                 <div
