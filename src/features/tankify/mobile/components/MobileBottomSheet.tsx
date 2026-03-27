@@ -143,7 +143,6 @@ export default function MobileBottomSheet({
         const desiredLeft = targetPage * w;
         if (Math.abs(el.scrollLeft - desiredLeft) <= 2) return;
         el.scrollTo({ left: desiredLeft, behavior: "smooth" });
-        setVisualPage(targetPage);
     }, [isControlled, targetPage]);
 
     useEffect(() => {

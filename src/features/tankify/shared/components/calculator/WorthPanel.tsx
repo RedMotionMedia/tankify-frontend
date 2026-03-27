@@ -59,7 +59,7 @@ export default function WorthPanel({
                         style={{ left: `${profit.percent}%` }}
                         aria-hidden="true"
                     >
-                        ^
+                        ▲
                     </div>
                 </div>
 
