@@ -128,12 +128,18 @@ export function useBottomSheet() {
 
     function decideAxis(dx: number, dy: number): "undecided" | "horizontal" | "vertical" {
         const threshold = 6;
+        const bias = 8; // avoid accidental horizontal classification on diagonal swipes
         const adx = Math.abs(dx);
         const ady = Math.abs(dy);
 
         if (axisRef.current === "undecided") {
             if (adx < threshold && ady < threshold) return "undecided"; // not enough signal yet
-            axisRef.current = adx > ady ? "horizontal" : "vertical";
+            // Prefer staying undecided unless the intent is clear.
+            // This prevents quick vertical swipes (with tiny diagonal drift) from being misclassified as horizontal,
+            // which would hand the gesture to the carousel and potentially switch pages.
+            if (adx > ady + bias) axisRef.current = "horizontal";
+            else if (ady > adx + bias) axisRef.current = "vertical";
+            else return "undecided";
         }
 
         return axisRef.current;

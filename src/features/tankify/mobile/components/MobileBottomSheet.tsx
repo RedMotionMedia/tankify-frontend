@@ -102,6 +102,7 @@ export default function MobileBottomSheet({
         startIndex: 0 | 1;
         startTimeMs: number;
         lastX: number;
+        lastY: number;
         lastTimeMs: number;
     }>({
         active: false,
@@ -112,6 +113,7 @@ export default function MobileBottomSheet({
         startIndex: 0,
         startTimeMs: 0,
         lastX: 0,
+        lastY: 0,
         lastTimeMs: 0,
     });
     const [uncontrolledPage, setUncontrolledPage] = useState<0 | 1>(0);
@@ -186,6 +188,8 @@ export default function MobileBottomSheet({
     }, [visualPage, attemptCalcScrollToTop]);
 
     function onCarouselTouchStart(e: React.TouchEvent) {
+        // If the sheet is currently being dragged, ignore horizontal carousel swipes.
+        if (dragging) return;
         const target = e.target as HTMLElement | null;
         if (target?.closest("input, textarea, select, [data-no-carousel-swipe]")) return;
 
@@ -204,12 +208,20 @@ export default function MobileBottomSheet({
         carouselSwipeRef.current.startIndex = startIndex;
         carouselSwipeRef.current.startTimeMs = now;
         carouselSwipeRef.current.lastX = t0.clientX;
+        carouselSwipeRef.current.lastY = t0.clientY;
         carouselSwipeRef.current.lastTimeMs = now;
     }
 
     function onCarouselTouchMove(e: React.TouchEvent) {
         const state = carouselSwipeRef.current;
         if (!state.active) return;
+
+        // If the sheet drag took over (vertical gesture), cancel carousel swipe.
+        if (dragging) {
+            state.active = false;
+            state.axis = "undecided";
+            return;
+        }
 
         const el = carouselRef.current;
         if (!el) return;
@@ -218,14 +230,27 @@ export default function MobileBottomSheet({
         const dx = t0.clientX - state.startX;
         const dy = t0.clientY - state.startY;
         state.lastX = t0.clientX;
+        state.lastY = t0.clientY;
         state.lastTimeMs = performance.now();
 
         if (state.axis === "undecided") {
             const threshold = 6;
+            const bias = 8; // require clearer intent to avoid accidental horizontal swipes during vertical drags
             const adx = Math.abs(dx);
             const ady = Math.abs(dy);
             if (adx < threshold && ady < threshold) return;
-            state.axis = adx > ady ? "horizontal" : "vertical";
+
+            // Strong vertical intent: cancel carousel early so a tiny diagonal doesn't nudge scrollLeft.
+            if (ady >= 10 && ady > adx) {
+                state.axis = "vertical";
+                state.active = false;
+                state.axis = "undecided";
+                return;
+            }
+
+            if (adx > ady + bias) state.axis = "horizontal";
+            else if (ady > adx + bias) state.axis = "vertical";
+            else return; // keep waiting for clearer intent
 
             if (state.axis === "vertical") {
                 // Let the page-specific scroll container handle it.
@@ -249,15 +274,26 @@ export default function MobileBottomSheet({
             const w = el.clientWidth || 1;
 
             const dxTotal = state.lastX - state.startX;
+            const dyTotal = state.lastY - state.startY;
             const dt = Math.max(1, state.lastTimeMs - state.startTimeMs);
             const v = Math.abs(dxTotal) / dt; // px/ms
 
             // Make swipe easier: a short flick should switch pages without needing half-screen travel.
             const minSwipePx = 34;
+            const minFlickPx = 16;
             const minFlickVelocity = 0.65; // ~650px/s
+            const horizontalDominanceRatio = 1.25; // require clearly more horizontal than vertical
 
             let idx: 0 | 1;
-            if (Math.abs(dxTotal) >= minSwipePx || v >= minFlickVelocity) {
+            const adx = Math.abs(dxTotal);
+            const ady = Math.abs(dyTotal);
+            const isClearlyHorizontal =
+                adx >= minFlickPx && adx >= ady * horizontalDominanceRatio;
+
+            if (
+                isClearlyHorizontal &&
+                (adx >= minSwipePx || (adx >= minFlickPx && v >= minFlickVelocity))
+            ) {
                 const dir = dxTotal < 0 ? 1 : -1; // finger left => next page, finger right => prev page
                 idx = Math.max(0, Math.min(1, state.startIndex + dir)) as 0 | 1;
             } else {
@@ -361,7 +397,7 @@ export default function MobileBottomSheet({
                     <div
                         ref={carouselRef}
                         className="flex h-full w-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
-                        style={{ WebkitOverflowScrolling: "touch" }}
+                        style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
                         onTouchStartCapture={onCarouselTouchStart}
                         onTouchMoveCapture={onCarouselTouchMove}
                         onTouchEndCapture={onCarouselTouchEnd}
