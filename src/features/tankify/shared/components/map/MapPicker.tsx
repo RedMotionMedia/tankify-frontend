@@ -524,7 +524,7 @@ export default function MapPicker({
                 try {
                     if (maplibre.AttributionControl && typeof map.addControl === "function") {
                         map.addControl(
-                            new maplibre.AttributionControl({ compact: false }),
+                            new maplibre.AttributionControl({ compact: true }),
                             "bottom-left"
                         );
                     }
@@ -1173,7 +1173,7 @@ export default function MapPicker({
                 >
                     <svg
                         viewBox="0 0 24 24"
-                        className="h-5 w-5"
+                        className="h-6 w-6"
                         aria-hidden="true"
                         focusable="false"
                     >

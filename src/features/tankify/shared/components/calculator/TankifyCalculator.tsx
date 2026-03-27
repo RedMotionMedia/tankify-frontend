@@ -1144,28 +1144,28 @@ export default function TankifyCalculator() {
                         />
                     </div>
 
-                    <div className="fixed left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
+                    <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2">
                         <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
                             <Image
                                 src="/resources/logos/tankify-logo.png"
                                 alt="Tankify logo"
-                                width={22}
-                                height={22}
+                                width={30}
+                                height={30}
                                 priority
-                                className="h-[22px] w-[22px]"
                             />
                             <h1 className="text-lg font-bold">{t.app.title}</h1>
                         </div>
-
+                    </div>
+                    <div className="absolute right-3 top-3 z-20">
                         <button
                             type="button"
                             onClick={() => setSettingsOpen(true)}
-                            className="grid h-10 w-10 place-items-center rounded-full bg-white/90 shadow-md backdrop-blur transition hover:bg-white active:scale-95 text-[0px]"
+                            className="grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow-md backdrop-blur transition hover:bg-white active:scale-95 text-[0px]"
                             aria-label="Open settings"
                         >
                             <svg
                                 viewBox="0 0 64 64"
-                                className="h-5 w-5 text-gray-900"
+                                className="h-6 w-6 text-gray-900"
                                 aria-hidden="true"
                                 focusable="false"
                             >
