@@ -38,6 +38,7 @@ type Props = {
     stationFocusRequestId?: number;
     onStationSelect?: (station: Station) => void;
     defaultLocationEnabled?: boolean;
+    hideSearchOverlayRequestId?: number;
 };
 
 type UserLocation = { lat: number; lon: number };
@@ -281,6 +282,7 @@ export default function MapPicker({
     stationFocusRequestId,
     onStationSelect,
     defaultLocationEnabled,
+    hideSearchOverlayRequestId,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -296,6 +298,8 @@ export default function MapPicker({
         getTapSearchHereHint(t, t.route.searchHereLong ?? t.route.searchHere)
     );
     const [needsSearchHere, setNeedsSearchHere] = useState(true);
+    const [hideSearchOverlay, setHideSearchOverlay] = useState(false);
+    const lastHideReqIdRef = useRef<number | null>(null);
 
     const [locationEnabled, setLocationEnabled] = useState(
         Boolean(defaultLocationEnabled)
@@ -333,6 +337,13 @@ export default function MapPicker({
     }, [locationEnabled]);
 
     useEffect(() => {
+        if (hideSearchOverlayRequestId == null) return;
+        if (lastHideReqIdRef.current === hideSearchOverlayRequestId) return;
+        lastHideReqIdRef.current = hideSearchOverlayRequestId;
+        setHideSearchOverlay(true);
+    }, [hideSearchOverlayRequestId]);
+
+    useEffect(() => {
         try {
             setSearchHereSeen(window.localStorage.getItem(SEARCH_HERE_SEEN_KEY) === "1");
         } catch {
@@ -366,6 +377,9 @@ export default function MapPicker({
         const last = lastResizeSizeRef.current;
         if (last && last.w === w && last.h === h) return;
         lastResizeSizeRef.current = { w, h };
+
+        // If the map size changes (e.g. due to panel transitions), allow the overlay to appear again.
+        setHideSearchOverlay(false);
 
         // During layout transitions (panels sliding/collapsing) frequent resizes can cause visible "shaking"
         // due to ongoing camera animations + rounding. Freeze the current camera around the resize.
@@ -537,8 +551,15 @@ export default function MapPicker({
                         : t.route.searchHereLong ?? t.route.searchHere;
                     setSearchHint(getAreaChangedHint(t, label));
                 };
-                map.on("movestart", onMoveStart);
-                map.on("zoomstart", onMoveStart);
+                const onMoveStartAny = (e: unknown) => {
+                    onMoveStart();
+                    const isUserInitiated = Boolean((e as { originalEvent?: unknown } | null)?.originalEvent);
+                    if (isUserInitiated) {
+                        setHideSearchOverlay(false);
+                    }
+                };
+                map.on("movestart", onMoveStartAny);
+                map.on("zoomstart", onMoveStartAny);
 
                 const onZoomVisibility = () => {
                     applyStationMarkerVisibility(
@@ -652,8 +673,8 @@ export default function MapPicker({
                         window.clearTimeout(pendingRecenterClearTimerRef.current);
                         pendingRecenterClearTimerRef.current = null;
                     }
-                    map.off("movestart", onMoveStart);
-                    map.off("zoomstart", onMoveStart);
+                    map.off("movestart", onMoveStartAny);
+                    map.off("zoomstart", onMoveStartAny);
                     map.off("zoom", onZoomVisibility);
                 };
             } catch (e) {
@@ -761,6 +782,12 @@ export default function MapPicker({
         if (points.length === 0) return;
 
         try {
+            if (validRoute.length > 0 || (start && end)) {
+                // When we auto-recenter for a calculated route (geometry may arrive slightly later),
+                // hide the overlay until the user moves the map or the map resizes.
+                setHideSearchOverlay(true);
+            }
+
             // Apply immediately, but also re-apply once after any layout-driven resize settles.
             setPendingRecenter(points);
             window.requestAnimationFrame(() => {
@@ -1130,6 +1157,8 @@ export default function MapPicker({
                 ];
         if (points.length === 0) return;
         try {
+            setHideSearchOverlay(true);
+
             // If a layout transition resizes the map right after recentering,
             // the resulting view can look "off". Keep one pending recenter to re-apply after resize.
             setPendingRecenter(points);
@@ -1236,55 +1265,57 @@ export default function MapPicker({
                 </button>
             </div>
 
-            <div className="pointer-events-none absolute bottom-1/12 left-1/2 z-1000 -translate-x-1/2 md:bottom-1">
-                <div className="flex flex-col items-center gap-1">
-                    {(() => {
-                        const label = searchHereSeen ? t.route.searchHere : (t.route.searchHereLong ?? t.route.searchHere);
-                        return (
-                    <button
-                        type="button"
-                        onClick={handleSearchHere}
-                        aria-label={label}
-                        title={label}
-                        className={
-                            "pointer-events-auto flex items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 " +
-                            (!searchLoading && needsSearchHere
-                                ? "ring-4 ring-blue-200 ring-offset-2 ring-offset-white"
-                                : "")
-                        }
-                    >
-                        <svg
-                            viewBox="0 0 20 20"
-                            className="h-4 w-4"
-                            aria-hidden="true"
-                            focusable="false"
-                        >
-                            <path
-                                d="M12.5 12.5l4 4"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                            />
-                            <circle
-                                cx="8.5"
-                                cy="8.5"
-                                r="5.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                            />
-                        </svg>
-                        {searchLoading ? t.route.loading : label}
-                    </button>
-                        );
-                    })()}
+            {!hideSearchOverlay ? (
+                <div className="pointer-events-none absolute bottom-1/12 left-1/2 z-1000 -translate-x-1/2 md:bottom-1">
+                    <div className="flex flex-col items-center gap-1">
+                        {(() => {
+                            const label = searchHereSeen ? t.route.searchHere : (t.route.searchHereLong ?? t.route.searchHere);
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={handleSearchHere}
+                                    aria-label={label}
+                                    title={label}
+                                    className={
+                                        "pointer-events-auto flex items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 " +
+                                        (!searchLoading && needsSearchHere
+                                            ? "ring-4 ring-blue-200 ring-offset-2 ring-offset-white"
+                                            : "")
+                                    }
+                                >
+                                    <svg
+                                        viewBox="0 0 20 20"
+                                        className="h-4 w-4"
+                                        aria-hidden="true"
+                                        focusable="false"
+                                    >
+                                        <path
+                                            d="M12.5 12.5l4 4"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                        />
+                                        <circle
+                                            cx="8.5"
+                                            cy="8.5"
+                                            r="5.5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                        />
+                                    </svg>
+                                    {searchLoading ? t.route.loading : label}
+                                </button>
+                            );
+                        })()}
 
-                    <div className="w-72 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-center text-[11px] text-gray-800 shadow backdrop-blur md:w-auto md:text-xs">
-                        {searchHint}
+                        <div className="w-72 rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-center text-[11px] text-gray-800 shadow backdrop-blur md:w-auto md:text-xs">
+                            {searchHint}
+                        </div>
                     </div>
                 </div>
-            </div>
+            ) : null}
         </div>
     );
 }

@@ -98,6 +98,7 @@ export default function TankifyCalculator() {
     const [stationFocusRequestId, setStationFocusRequestId] = useState(0);
     const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
     const [stationsQueried, setStationsQueried] = useState(false);
+    const [hideSearchOverlayReqId, setHideSearchOverlayReqId] = useState(0);
     const [desktopStationsOpen, setDesktopStationsOpen] = useState(true);
     const [desktopStationsMounted, setDesktopStationsMounted] = useState(false);
     const [desktopStationsEntering, setDesktopStationsEntering] = useState(false);
@@ -719,6 +720,7 @@ export default function TankifyCalculator() {
             return;
         }
 
+        setHideSearchOverlayReqId((v) => v + 1);
         commitRoute(draftStartPoint, draftEndPoint);
     }
 
@@ -952,6 +954,7 @@ export default function TankifyCalculator() {
                                     debugMode={debugMode}
                                     t={t}
                                     defaultLocationEnabled
+                                    hideSearchOverlayRequestId={hideSearchOverlayReqId}
                                     onStationsChange={handleStationsChange}
                                     selectedStationId={selectedStationId}
                                     stationFocusRequestId={stationFocusRequestId}
@@ -1121,6 +1124,7 @@ export default function TankifyCalculator() {
                             eurToCurrencyRate={eurToCurrencyRate}
                             debugMode={debugMode}
                             t={t}
+                            hideSearchOverlayRequestId={hideSearchOverlayReqId}
                             defaultLocationEnabled
                             onStationsChange={handleStationsChange}
                             selectedStationId={selectedStationId}
