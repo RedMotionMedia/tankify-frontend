@@ -341,6 +341,9 @@ export default function MapPicker({
         if (!navigator.geolocation) return "unavailable";
         return "unsupported";
     });
+    // Safari (especially iOS) can report incorrect geolocation permission state via the Permissions API.
+    // We only "trust" denied once we observed a real GeolocationPositionError(code=1) at runtime.
+    const geoDeniedConfirmedRef = useRef(false);
 
     const containerRef = useRef<HTMLDivElement | null>(null);
     const mapRef = useRef<MapLibreMap | null>(null);
@@ -412,8 +415,9 @@ export default function MapPicker({
                         setLocationEnabled(true);
                     }
 
-                    // If permission becomes denied, force off (and show a helpful hint via locationError).
-                    if (state === "denied") {
+                    // If permission becomes denied, force off only if this "denied" was confirmed via
+                    // the geolocation API itself. (Avoid false negatives on Safari iOS.)
+                    if (state === "denied" && geoDeniedConfirmedRef.current) {
                         setLocationEnabled(false);
                         setLocationError("Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren.");
                     }
@@ -533,6 +537,11 @@ export default function MapPicker({
     const didCenterOnEnableRef = useRef(false);
     const watchIdRef = useRef<number | null>(null);
     const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Track whether the current geolocation enable attempt was initiated by an explicit user gesture
+    // (clicking our UI button). Safari can behave differently for "auto" requests on page load.
+    const geoEnableUserGestureRef = useRef(false);
+    // True once we have successfully received at least one position fix in this session.
+    const geoEverGrantedRef = useRef(false);
 
     const markerBucketRef = useRef<{
         start: MapLibreMarker | null;
@@ -540,6 +549,22 @@ export default function MapPicker({
         user: MapLibreMarker | null;
         stations: MapLibreMarker[];
     }>({ start: null, end: null, user: null, stations: [] });
+
+    function upsertUserLocationMarker(map: MapLibreMap, loc: { lat: number; lon: number }) {
+        const bucket = markerBucketRef.current;
+        try {
+            bucket.user?.remove?.();
+        } catch {}
+        bucket.user = null;
+
+        try {
+            const maplibre = getMapLibre();
+            const el = createUserLocationElement();
+            bucket.user = new maplibre.Marker({ element: el, anchor: "center" })
+                .setLngLat([loc.lon, loc.lat])
+                .addTo(map);
+        } catch {}
+    }
 
     // If start/end are represented by a station marker (route point markers hidden),
     // keep those station markers visible even when we hide non-essential markers at low zoom.
@@ -716,6 +741,15 @@ export default function MapPicker({
                     } catch {
                         // ignore
                     }
+
+                    // If geolocation resolves before the map is ready, the "user marker" effect can miss.
+                    // Ensure the marker is created once the map finishes loading.
+                    try {
+                        const loc = userLocationRef.current;
+                        if (locationEnabledRef.current && loc) {
+                            upsertUserLocationMarker(map, loc);
+                        }
+                    } catch {}
                 });
 
                 const ro = new ResizeObserver(() => {
@@ -1042,7 +1076,6 @@ export default function MapPicker({
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
-        const maplibre = getMapLibre();
 
         const bucket = markerBucketRef.current;
         try {
@@ -1051,10 +1084,7 @@ export default function MapPicker({
         bucket.user = null;
 
         if (locationEnabled && userLocation) {
-            const el = createUserLocationElement();
-            bucket.user = new maplibre.Marker({ element: el, anchor: "center" })
-                .setLngLat([userLocation.lon, userLocation.lat])
-                .addTo(map);
+            upsertUserLocationMarker(map, userLocation);
         }
     }, [locationEnabled, userLocation]);
 
@@ -1092,43 +1122,6 @@ export default function MapPicker({
             timeout: 9000,
         };
 
-        // Fast initial fix.
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const lat = pos.coords.latitude;
-                const lon = pos.coords.longitude;
-                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-                setUserLocation({ lat, lon });
-                setLocationError(null);
-                try {
-                    window.dispatchEvent(
-                        new CustomEvent("tankify:user-location", { detail: { lat, lon } })
-                    );
-                } catch {}
-                try {
-                    window.localStorage.setItem(
-                        "tankify-last-location",
-                        JSON.stringify({ lat, lon, ts: Date.now() })
-                    );
-                } catch {}
-
-                if (!didCenterOnEnableRef.current && map) {
-                    didCenterOnEnableRef.current = true;
-                    try {
-                        map.easeTo({
-                            center: [lon, lat],
-                            // Don't zoom in on enable; keep whatever zoom the map currently has.
-                            zoom: map.getZoom(),
-                            duration: 750,
-                        });
-                    } catch {}
-                }
-            },
-            (err) => setLocationError(err.message || "Location error"),
-            commonOptions
-        );
-
         if (watchIdRef.current != null) {
             try {
                 navigator.geolocation.clearWatch(watchIdRef.current);
@@ -1142,6 +1135,11 @@ export default function MapPicker({
                 const lon = pos.coords.longitude;
                 if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
+                geoEnableUserGestureRef.current = false;
+                geoEverGrantedRef.current = true;
+                geoDeniedConfirmedRef.current = false;
+                setGeoPermission("granted");
+                userLocationRef.current = { lat, lon };
                 setUserLocation({ lat, lon });
                 setLocationError(null);
                 try {
@@ -1169,9 +1167,31 @@ export default function MapPicker({
                 }
             },
             (err) => {
+                const code = (err as GeolocationPositionError | undefined)?.code;
+                if (code === 1) {
+                    if (!geoEnableUserGestureRef.current && !geoEverGrantedRef.current) {
+                        geoEnableUserGestureRef.current = false;
+                        setGeoPermission("prompt");
+                        setLocationEnabled(false);
+                        setLocationError(
+                            'Standort konnte nicht automatisch aktiviert werden. Bitte tippen Sie auf "Standort einschalten" und erlauben Sie den Zugriff in Safari.'
+                        );
+                        return;
+                    }
+
+                    geoEnableUserGestureRef.current = false;
+                    geoDeniedConfirmedRef.current = true;
+                    setGeoPermission("denied");
+                    setLocationEnabled(false);
+                    setLocationError(
+                        "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
+                    );
+                    return;
+                }
+
                 setLocationError(err.message || "Location error");
                 if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-                if ((err as GeolocationPositionError).code !== 1) {
+                if (code !== 1) {
                     retryTimerRef.current = setTimeout(() => {
                         setLocationAttempt((v) => v + 1);
                     }, 3000);
@@ -1363,14 +1383,22 @@ export default function MapPicker({
                             return;
                         }
 
-                        // If the browser has geolocation but permission is denied, we can't trigger a prompt.
-                        // Show a clear hint instead of starting the watch which will just error immediately.
-                        if (!locationEnabled && geoPermission === "denied") {
+                        // If we *know* permission is denied (confirmed via geolocation error code=1),
+                        // we can't trigger a prompt. Show a clear hint instead.
+                        if (
+                            !locationEnabled &&
+                            geoPermission === "denied" &&
+                            geoDeniedConfirmedRef.current
+                        ) {
                             setLocationError(
                                 "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
                             );
                             return;
                         }
+
+                        // Clear stale errors when user explicitly retries.
+                        if (!locationEnabled) setLocationError(null);
+                        if (!locationEnabled) geoEnableUserGestureRef.current = true;
                         setLocationEnabled((v) => !v);
                     }}
                     title={
