@@ -29,6 +29,7 @@ ENV ENABLE_DEBUG_MODE=$ENABLE_DEBUG_MODE
 ENV NEXT_PUBLIC_ENABLE_DEBUG_MODE=$NEXT_PUBLIC_ENABLE_DEBUG_MODE
 
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=deps /app/node_modules ./node_modules
