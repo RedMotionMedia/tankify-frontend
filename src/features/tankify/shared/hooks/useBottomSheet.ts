@@ -5,7 +5,7 @@ export function useBottomSheet() {
 
     const snapTopMultiplicator = 0;
     const snapMidMultiplicator = 0.4;
-    const snapWorthMultiplicator = 0.3;
+    const snapWorthMultiplicator = 0.17;
     const snapBottomMultiplicator = 0.82;
 
     function getViewportHeight() {

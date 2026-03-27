@@ -113,8 +113,10 @@ export default function MobileBottomSheet({
         lastTimeMs: 0,
     });
     const [uncontrolledPage, setUncontrolledPage] = useState<0 | 1>(0);
-    const page = controlledPage ?? uncontrolledPage;
-    const setPage = onPageChange ?? setUncontrolledPage;
+    const isControlled = controlledPage != null;
+    const targetPage = (controlledPage ?? uncontrolledPage) as 0 | 1;
+    const setTargetPage = onPageChange ?? setUncontrolledPage;
+    const [visualPage, setVisualPage] = useState<0 | 1>(0);
 
     useEffect(() => {
         const el = carouselRef.current;
@@ -124,28 +126,30 @@ export default function MobileBottomSheet({
         function onScroll() {
             const w = node.clientWidth || 1;
             const idx = node.scrollLeft > w * 0.5 ? 1 : 0;
-            setPage(idx as 0 | 1);
+            setVisualPage(idx as 0 | 1);
+            if (!isControlled) setUncontrolledPage(idx as 0 | 1);
         }
 
         onScroll();
         el.addEventListener("scroll", onScroll, { passive: true });
         return () => el.removeEventListener("scroll", onScroll);
-    }, []);
+    }, [isControlled]);
 
     useEffect(() => {
-        if (controlledPage == null) return;
+        if (!isControlled) return;
         const el = carouselRef.current;
         if (!el) return;
         const w = el.clientWidth || 1;
-        const desiredLeft = page * w;
+        const desiredLeft = targetPage * w;
         if (Math.abs(el.scrollLeft - desiredLeft) <= 2) return;
         el.scrollTo({ left: desiredLeft, behavior: "smooth" });
-    }, [controlledPage, page]);
+        setVisualPage(targetPage);
+    }, [isControlled, targetPage]);
 
     useEffect(() => {
         // Tell the BottomSheet hook which element is currently the active vertical scroll container.
-        sheetContentRef.current = page === 0 ? calcScrollRef.current : stationsScrollRef.current;
-    }, [page, sheetContentRef]);
+        sheetContentRef.current = visualPage === 0 ? calcScrollRef.current : stationsScrollRef.current;
+    }, [visualPage, sheetContentRef]);
 
     function onCarouselTouchStart(e: React.TouchEvent) {
         const target = e.target as HTMLElement | null;
@@ -227,7 +231,8 @@ export default function MobileBottomSheet({
             }
 
             el.scrollTo({ left: idx * w, behavior: "smooth" });
-            setPage(idx);
+            setTargetPage(idx);
+            setVisualPage(idx);
         }
         carouselSwipeRef.current.active = false;
         carouselSwipeRef.current.axis = "undecided";
@@ -238,6 +243,8 @@ export default function MobileBottomSheet({
         if (!el) return;
         const w = el.clientWidth || 1;
         el.scrollTo({ left: next * w, behavior: "smooth" });
+        setTargetPage(next);
+        setVisualPage(next);
     }
 
     return (
@@ -283,7 +290,7 @@ export default function MobileBottomSheet({
                                 onClick={() => goTo(0)}
                                 className={
                                     "rounded-full px-4 py-2 text-sm font-semibold transition " +
-                                    (page === 0 ? "bg-white shadow-sm text-gray-900" : "text-gray-600")
+                                    (visualPage === 0 ? "bg-white shadow-sm text-gray-900" : "text-gray-600")
                                 }
                             >
                                 Rechner
@@ -293,7 +300,7 @@ export default function MobileBottomSheet({
                                 onClick={() => goTo(1)}
                                 className={
                                     "rounded-full px-4 py-2 text-sm font-semibold transition " +
-                                    (page === 1 ? "bg-white shadow-sm text-gray-900" : "text-gray-600")
+                                    (visualPage === 1 ? "bg-white shadow-sm text-gray-900" : "text-gray-600")
                                 }
                             >
                                 Tankstellen
@@ -302,11 +309,11 @@ export default function MobileBottomSheet({
 
                         <div className="flex items-center gap-2">
                             <span
-                                className={"h-2 w-2 rounded-full " + (page === 0 ? "bg-gray-900" : "bg-gray-300")}
+                                className={"h-2 w-2 rounded-full " + (visualPage === 0 ? "bg-gray-900" : "bg-gray-300")}
                                 aria-hidden="true"
                             />
                             <span
-                                className={"h-2 w-2 rounded-full " + (page === 1 ? "bg-gray-900" : "bg-gray-300")}
+                                className={"h-2 w-2 rounded-full " + (visualPage === 1 ? "bg-gray-900" : "bg-gray-300")}
                                 aria-hidden="true"
                             />
                         </div>
