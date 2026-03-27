@@ -49,14 +49,14 @@ export default function LocationField({
                     }
                 />
 
-                <div className="absolute inset-y-0 right-2 flex items-center gap-1">
+                <div className="absolute inset-y-0 right-2 flex items-center gap-2">
                     {hasMyLocation ? (
                         <button
                             type="button"
                             onClick={onUseMyLocation}
                             title={myLocationLabel}
                             aria-label={myLocationLabel}
-                            className="grid h-10 w-10 place-items-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
+                            className="grid h-9 w-9 place-items-center rounded-full bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
                         >
                             <svg
                                 viewBox="0 0 24 24"
@@ -75,7 +75,7 @@ export default function LocationField({
                         title={mapLabel}
                         aria-label={mapLabel}
                         className={
-                            "grid h-10 w-10 place-items-center rounded-full shadow-sm transition active:scale-95 " +
+                            "grid h-9 w-9 place-items-center rounded-full shadow-sm transition active:scale-95 " +
                             (pickActive
                                 ? "bg-gray-900 text-white hover:bg-gray-800"
                                 : "bg-gray-100 text-gray-800 hover:bg-gray-200")
@@ -109,7 +109,7 @@ export default function LocationField({
                         onClick={onSearch}
                         title={searchLabel}
                         aria-label={searchLabel}
-                        className="grid h-10 w-10 place-items-center rounded-full bg-black text-white shadow-sm transition hover:bg-gray-900 active:scale-95"
+                        className="grid h-9 w-9 place-items-center rounded-full bg-black text-white shadow-sm transition hover:bg-gray-900 active:scale-95"
                     >
                         {loading ? (
                             <svg
