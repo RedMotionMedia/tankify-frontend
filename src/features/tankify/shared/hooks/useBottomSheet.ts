@@ -165,12 +165,30 @@ export function useBottomSheet() {
 
         const content = sheetContentRef.current;
         const atTop = !content || content.scrollTop <= 0;
+        const atBottom = Boolean(
+            content &&
+            content.scrollTop + content.clientHeight >= content.scrollHeight - 2
+        );
+        const canScrollDown = Boolean(
+            content && content.scrollHeight - content.clientHeight > 2
+        );
+        const canScrollMoreDown = Boolean(
+            content &&
+            content.scrollHeight - content.clientHeight > 2 &&
+            content.scrollTop + content.clientHeight < content.scrollHeight - 2
+        );
 
         // If this is a content gesture and we haven't actually started a sheet drag yet,
         // decide whether this should become a sheet drag at all.
         if (!draggingRef.current && pendingContentDragRef.current) {
             const shouldStartDrag =
-                atTop && ((dy > 0) || (dy < 0 && sheetY > 0));
+                (
+                    // Pulling down at the top should collapse the sheet.
+                    (dy > 0 && atTop) ||
+                    // Pulling up should expand the sheet when the content cannot scroll further down
+                    // (either because there is no scroll or we're already at the bottom).
+                    (dy < 0 && sheetY > 0 && (!canScrollDown || !canScrollMoreDown))
+                );
 
             if (!shouldStartDrag) {
                 // Let the content scroll naturally. Don't turn this gesture into a sheet drag mid-stream.
@@ -191,8 +209,8 @@ export function useBottomSheet() {
             return;
         }
 
-        // Drag up to expand while we're not fully expanded yet and the content is at the top.
-        if (dy < 0 && sheetY > 0 && atTop) {
+        // Drag up to expand while we're not fully expanded yet and the content cannot scroll further down.
+        if (dy < 0 && sheetY > 0 && (!canScrollDown || atBottom)) {
             setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
         }
     }
