@@ -112,6 +112,7 @@ export default function TankifyCalculator() {
         sheetY,
         dragging,
         isSheetReady,
+        snapMidMultiplicator,
         snapWorthMultiplicator,
         onTouchStartHandle,
         onTouchStartContent,
@@ -1140,6 +1141,11 @@ export default function TankifyCalculator() {
                             t={t}
                             hideSearchOverlayRequestId={hideSearchOverlayReqId}
                             defaultLocationEnabled
+                            onSearchHereStart={() => {
+                                setMobileSheetPage(1);
+                                const h = window.visualViewport?.height ?? window.innerHeight;
+                                setBottomSheet(h * snapMidMultiplicator);
+                            }}
                             onStationsChange={handleStationsChange}
                             selectedStationId={selectedStationId}
                             stationFocusRequestId={stationFocusRequestId}

@@ -256,6 +256,7 @@ export function useBottomSheet() {
         sheetY,
         dragging,
         isSheetReady,
+        snapMidMultiplicator,
         snapWorthMultiplicator,
         onTouchStartHandle,
         onTouchStartContent,

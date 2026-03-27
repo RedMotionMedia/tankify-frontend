@@ -42,6 +42,7 @@ type Props = {
     onStationSelect?: (station: Station) => void;
     defaultLocationEnabled?: boolean;
     hideSearchOverlayRequestId?: number;
+    onSearchHereStart?: () => void;
 };
 
 type UserLocation = { lat: number; lon: number };
@@ -305,6 +306,7 @@ export default function MapPicker({
     onStationSelect,
     defaultLocationEnabled,
     hideSearchOverlayRequestId,
+    onSearchHereStart,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -1203,6 +1205,8 @@ export default function MapPicker({
             onStationsChange?.([]);
             return;
         }
+
+        onSearchHereStart?.();
 
         // After the first usage, keep the label short for this user.
         if (!searchHereSeenRef.current) {
