@@ -13,6 +13,7 @@ import {
 import { eurToQuote } from "@/features/tankify/shared/lib/fx";
 import { pricePerLiterToPerGallon } from "@/features/tankify/shared/lib/units";
 import StationPopupContent from "@/features/tankify/shared/components/map/StationPopupContent";
+import { getSystemNavigationUrl } from "@/features/tankify/shared/lib/navigationClient";
 
 function formatPrice(
     valueEurPerLiter: number | null | undefined,
@@ -261,6 +262,7 @@ export default function MobileStationsSidebar({
                             const isOpen = station.id === selectedStationId;
                             const priceEur = fuelType === "diesel" ? station.diesel : station.super95;
                             const deemphasize = openFirst && station.open !== true;
+                            const navUrl = getSystemNavigationUrl(station);
 
                             return (
                                 <div
@@ -274,17 +276,30 @@ export default function MobileStationsSidebar({
                                     }
                                     style={deemphasize ? { opacity: 0.55 } : undefined}
                                 >
-                                    <button
-                                        type="button"
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         className="flex w-full items-center gap-3 text-left"
                                         onClick={() => onToggleStation(station.id)}
+                                        onKeyDown={(e) => {
+                                            if (e.key !== "Enter" && e.key !== " ") return;
+                                            e.preventDefault();
+                                            onToggleStation(station.id);
+                                        }}
                                     >
-                                        <div
+                                        <a
                                             className={
-                                                `relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 bg-white shadow-sm ${
+                                                `group relative h-11 w-11 shrink-0 overflow-hidden rounded-full border-2 bg-white shadow-sm transition active:scale-[0.98] ${
                                                     priceEur != null ? "station-logo--ok" : "station-logo--missing"
                                                 }`
                                             }
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                            }}
+                                            aria-label="Navigation oeffnen"
+                                            href={navUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
                                         >
                                             {station.logoUrl ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
@@ -298,7 +313,17 @@ export default function MobileStationsSidebar({
                                                     }}
                                                 />
                                             ) : null}
-                                        </div>
+                                            <div className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition group-hover:opacity-100 group-active:opacity-100">
+                                                <div className="grid h-full w-full place-items-center bg-black/35">
+                                                    <svg viewBox="0 0 24 24" className="h-6 w-6 text-white" aria-hidden="true">
+                                                        <path
+                                                            d="M12 2l7 19-7-3-7 3 7-19z"
+                                                            fill="currentColor"
+                                                        />
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        </a>
 
                                         <div className="min-w-0 flex-1">
                                             <div className="truncate text-sm font-semibold text-gray-900">
@@ -325,7 +350,7 @@ export default function MobileStationsSidebar({
                                                 )}
                                             </div>
                                         </div>
-                                    </button>
+                                    </div>
 
                                     {isOpen ? (
                                         <div className="pt-3 w-full">
