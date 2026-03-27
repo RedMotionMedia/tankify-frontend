@@ -115,7 +115,6 @@ export default function TankifyCalculator() {
         snapWorthMultiplicator,
         onTouchStartHandle,
         onTouchStartContent,
-        onTouchMoveHandle,
         onTouchMoveContent,
         onTouchEnd,
         minimizeBottomSheet,
@@ -1212,7 +1211,6 @@ export default function TankifyCalculator() {
                         isSheetReady={isSheetReady}
                         onTouchStartHandle={onTouchStartHandle}
                         onTouchStartContent={onTouchStartContent}
-                        onTouchMoveHandle={onTouchMoveHandle}
                         onTouchMoveContent={onTouchMoveContent}
                         onTouchEnd={onTouchEnd}
                         controls={routeControls}

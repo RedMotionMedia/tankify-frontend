@@ -33,7 +33,6 @@ type Props = {
     isSheetReady: boolean;
     onTouchStartHandle: (e: React.TouchEvent) => void;
     onTouchStartContent: (e: React.TouchEvent) => void;
-    onTouchMoveHandle: (e: React.TouchEvent) => void;
     onTouchMoveContent: (e: React.TouchEvent) => void;
     onTouchEnd: () => void;
     controls: React.ReactNode;
@@ -70,7 +69,6 @@ export default function MobileBottomSheet({
                                               isSheetReady,
                                               onTouchStartHandle,
                                               onTouchStartContent,
-                                              onTouchMoveHandle,
                                               onTouchMoveContent,
                                               onTouchEnd,
                                               controls,

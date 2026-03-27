@@ -11,7 +11,7 @@ import {
     Station,
 } from "@/features/tankify/shared/types/tankify";
 import { eurToQuote } from "@/features/tankify/shared/lib/fx";
-import { pricePerLiterToPerGallon } from "@/features/tankify/shared/lib/units";
+import { kmToMiles, pricePerLiterToPerGallon } from "@/features/tankify/shared/lib/units";
 import StationPopupContent from "@/features/tankify/shared/components/map/StationPopupContent";
 import { getSystemNavigationUrl } from "@/features/tankify/shared/lib/navigationClient";
 
@@ -122,19 +122,14 @@ export default function StationsSidebar({
     scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
     const scrollRef = useRef<HTMLDivElement | null>(null);
-    const [logoCacheBust, setLogoCacheBust] = useState(0);
     const [priceSort, setPriceSort] = useState<SortDir>("off");
     const [distanceSort, setDistanceSort] = useState<SortDir>("off");
     const [openFirst, setOpenFirst] = useState(false);
-
-    useEffect(() => {
-        function handleLogoCacheCleared() {
-            setLogoCacheBust((v) => v + 1);
-        }
-        window.addEventListener("tankify:logo-cache-cleared", handleLogoCacheCleared);
-        return () =>
-            window.removeEventListener("tankify:logo-cache-cleared", handleLogoCacheCleared);
-    }, []);
+    const [driveDistancesByOriginKey, setDriveDistancesByOriginKey] = useState<
+        Record<string, Record<string, number | null>>
+    >({});
+    const driveFetchAbortRef = useRef<AbortController | null>(null);
+    const driveFetchTimerRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!selectedStationId) return;
@@ -144,6 +139,94 @@ export default function StationsSidebar({
             node.scrollIntoView({ block: "nearest" });
         } catch {}
     }, [selectedStationId]);
+
+    const originKey = userLocation ? `${userLocation.lat.toFixed(4)}:${userLocation.lon.toFixed(4)}` : "no-origin";
+    const driveDistanceById = useMemo(
+        () => driveDistancesByOriginKey[originKey] ?? {},
+        [driveDistancesByOriginKey, originKey]
+    );
+
+    useEffect(() => {
+        if (!userLocation) return;
+        if (stations.length === 0) return;
+        if (distanceSort === "off") return;
+
+        if (driveFetchAbortRef.current) {
+            try {
+                driveFetchAbortRef.current.abort();
+            } catch {}
+            driveFetchAbortRef.current = null;
+        }
+        if (driveFetchTimerRef.current != null) {
+            window.clearTimeout(driveFetchTimerRef.current);
+            driveFetchTimerRef.current = null;
+        }
+
+        const ac = new AbortController();
+        driveFetchAbortRef.current = ac;
+
+        // Debounce to avoid spamming on frequent location updates.
+        driveFetchTimerRef.current = window.setTimeout(() => {
+            driveFetchTimerRef.current = null;
+
+            const topN = 15;
+            const ranked = [...stations]
+                .map((s) => ({ s, d: haversineKm(userLocation, s) }))
+                .sort((a, b) => a.d - b.d)
+                .slice(0, topN)
+                .map((x) => x.s);
+
+            fetch("/api/drive-distances", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    origin: userLocation,
+                    destinations: ranked.map((s) => ({ id: s.id, lat: s.lat, lon: s.lon })),
+                }),
+                signal: ac.signal,
+            })
+                .then(async (res) => {
+                    if (!res.ok) throw new Error(`DRIVE_HTTP_${res.status}`);
+                    const json = (await res.json()) as unknown;
+                    const rec =
+                        typeof json === "object" && json !== null && "distances" in json
+                            ? ((json as { distances?: unknown }).distances as unknown)
+                            : null;
+                    const distancesRec =
+                        rec && typeof rec === "object" && !Array.isArray(rec)
+                            ? (rec as Record<string, unknown>)
+                            : {};
+                    const next: Record<string, number | null> = {};
+                    for (const [id, v] of Object.entries(distancesRec)) {
+                        const km =
+                            typeof v === "object" && v !== null && "distanceKm" in v
+                                ? (v as { distanceKm?: unknown }).distanceKm
+                                : null;
+                        next[id] = typeof km === "number" && Number.isFinite(km) && km >= 0 ? km : null;
+                    }
+                    setDriveDistancesByOriginKey((prev) => ({
+                        ...prev,
+                        [originKey]: { ...(prev[originKey] ?? {}), ...next },
+                    }));
+                })
+                .catch(() => {
+                    // ignore
+                });
+        }, 350);
+
+        return () => {
+            if (driveFetchAbortRef.current === ac) {
+                try {
+                    ac.abort();
+                } catch {}
+                driveFetchAbortRef.current = null;
+            }
+            if (driveFetchTimerRef.current != null) {
+                window.clearTimeout(driveFetchTimerRef.current);
+                driveFetchTimerRef.current = null;
+            }
+        };
+    }, [userLocation, originKey, stations, distanceSort]);
 
     const hasDistanceData = Boolean(userLocation);
 
@@ -160,7 +243,8 @@ export default function StationsSidebar({
                 const v = s.distanceKm;
                 return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
             }
-            // Prefer computing distance from the user's location. The API-provided distanceKm is relative to the map center.
+            const drive = driveDistanceById[s.id];
+            if (typeof drive === "number" && Number.isFinite(drive) && drive >= 0) return drive;
             return haversineKm(userLocation, s);
         };
 
@@ -198,7 +282,7 @@ export default function StationsSidebar({
         });
 
         return indexed.map((x) => x.s);
-    }, [stations, fuelType, priceSort, distanceSort, userLocation, openFirst]);
+    }, [stations, fuelType, priceSort, distanceSort, userLocation, openFirst, driveDistanceById]);
 
     const cycleSort = (dir: SortDir): SortDir => {
         if (dir === "off") return "asc";
@@ -293,6 +377,23 @@ export default function StationsSidebar({
                             const deemphasize = openFirst && station.open !== true;
                             const navUrl = getSystemNavigationUrl(station);
 
+                            const driveKm = driveDistanceById[station.id];
+                            const airKm = userLocation ? haversineKm(userLocation, station) : null;
+                            const distanceKm =
+                                typeof driveKm === "number" && Number.isFinite(driveKm) && driveKm >= 0
+                                    ? driveKm
+                                    : airKm != null
+                                      ? airKm
+                                      : typeof station.distanceKm === "number" && Number.isFinite(station.distanceKm) && station.distanceKm >= 0
+                                        ? station.distanceKm
+                                        : null;
+                            const distanceLabel =
+                                typeof driveKm === "number" && Number.isFinite(driveKm) && driveKm >= 0
+                                    ? t.station.distanceDrive
+                                    : airKm != null
+                                      ? t.station.distanceAir
+                                      : t.station.distance;
+
                             return (
                                 <div
                                     key={station.id}
@@ -386,12 +487,12 @@ export default function StationsSidebar({
                                             <StationPopupContent
                                                 station={station}
                                                 selectedPrice={priceEur}
+                                                driveDistanceKm={driveDistanceById[station.id]}
                                                 measurementSystem={measurementSystem}
                                                 currencySystem={currencySystem}
                                                 eurToCurrencyRate={eurToCurrencyRate}
                                                 language={language}
                                                 debugMode={debugMode}
-                                                logoCacheBust={logoCacheBust}
                                                 userLocation={userLocation}
                                                 t={t}
                                                 onSelectStationAsStart={onSelectStationAsStart}

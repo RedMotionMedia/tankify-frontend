@@ -15,22 +15,6 @@ import { kmToMiles, pricePerLiterToPerGallon } from "@/features/tankify/shared/l
 
 type UserLocation = { lat: number; lon: number };
 
-function withCacheBuster(url: string, cacheBust: number): string {
-    if (!url) return url;
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}v=${cacheBust}`;
-}
-
-function getStationInitials(name: string | undefined): string {
-    const value = (name ?? "").trim();
-    if (!value) return "?";
-
-    const parts = value.split(/\s+/).filter(Boolean);
-    const first = parts[0]?.[0] ?? "?";
-    const second = parts[1]?.[0] ?? "";
-    return (first + second).toUpperCase();
-}
-
 function formatDisplayPrice(
     valueEurPerLiter: number | null | undefined,
     measurementSystem: MeasurementSystem,
@@ -102,12 +86,12 @@ function is24Hours(from: string | null, to: string | null): boolean {
 export default function StationPopupContent({
     station,
     selectedPrice,
+    driveDistanceKm,
     measurementSystem,
     currencySystem,
     eurToCurrencyRate,
     language,
     debugMode,
-    logoCacheBust,
     userLocation,
     t,
     onSelectStationAsStart,
@@ -115,12 +99,12 @@ export default function StationPopupContent({
 }: {
     station: Station;
     selectedPrice: number | null | undefined; // EUR/L from E-Control
+    driveDistanceKm?: number | null;
     measurementSystem: MeasurementSystem;
     currencySystem: CurrencySystem;
     eurToCurrencyRate: number;
     language: Language;
     debugMode: boolean;
-    logoCacheBust: number;
     userLocation: UserLocation | null;
     t: TranslationSchema;
     onSelectStationAsStart: (payload: {
@@ -135,9 +119,7 @@ export default function StationPopupContent({
         autoCalculate?: boolean;
     }) => void;
 }) {
-    const initials = getStationInitials(station.brandName ?? station.name);
     const openingHours = Array.isArray(station.openingHours) ? station.openingHours : [];
-    const logoUrl = station.logoUrl ? withCacheBuster(station.logoUrl, logoCacheBust) : null;
     const payment = station.paymentMethods ?? null;
 
     const paymentBubbles: string[] = [];
@@ -169,20 +151,27 @@ export default function StationPopupContent({
             ? [...WEEKDAY_ORDER]
             : [...WEEKDAY_ORDER.slice(todayIdx), ...WEEKDAY_ORDER.slice(0, todayIdx)];
 
-    const distanceKm = (() => {
-        if (userLocation) return haversineKm(userLocation, station);
+    const airDistanceKm = userLocation ? haversineKm(userLocation, station) : null;
+    const normalizedDriveKm =
+        typeof driveDistanceKm === "number" && Number.isFinite(driveDistanceKm) && driveDistanceKm >= 0
+            ? driveDistanceKm
+            : null;
+
+    const distance = (() => {
+        if (normalizedDriveKm != null) return { km: normalizedDriveKm, label: t.station.distanceDrive };
+        if (airDistanceKm != null) return { km: airDistanceKm, label: t.station.distanceAir };
         const v = station.distanceKm;
-        return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
+        return typeof v === "number" && Number.isFinite(v) && v >= 0 ? { km: v, label: t.station.distance } : null;
     })();
 
     return (
         <div className="w-full select-text">
 
             <div className="flex flex-wrap items-center gap-1 text-[11px]">
-                {distanceKm != null ? (
+                {distance != null ? (
                     <span className="rounded-full bg-gray-50 px-2 py-0.5 font-medium text-gray-600 ring-1 ring-gray-200">
-                        {t.station.distance}:{" "}
-                        {(measurementSystem === "imperial" ? kmToMiles(distanceKm) : distanceKm).toFixed(
+                        {distance.label}:{" "}
+                        {(measurementSystem === "imperial" ? kmToMiles(distance.km) : distance.km).toFixed(
                             2
                         )}{" "}
                         {measurementSystem === "imperial" ? t.units.miles : t.units.km}
@@ -387,7 +376,17 @@ export default function StationPopupContent({
                             <span className="flex-auto">{t.station.rawData}</span>
                         </summary>
                         <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-xl bg-gray-50 p-2 text-[11px] leading-snug text-gray-700">
-                            {JSON.stringify(station, null, 2)}
+                            {JSON.stringify(
+                                {
+                                    ...station,
+                                    __computed: {
+                                        airDistanceKm,
+                                        driveDistanceKm: normalizedDriveKm,
+                                    },
+                                },
+                                null,
+                                2
+                            )}
                         </pre>
                     </details>
                 ) : null}

@@ -111,6 +111,8 @@ export type TranslationSchema = {
         cityMissing: string;
         postalCode: string;
         distance: string;
+        distanceAir: string;
+        distanceDrive: string;
         contact: string;
         phone: string;
         fax: string;
@@ -277,9 +279,11 @@ export const translations: Record<Language, TranslationSchema> = {
             unknown: "Öffnungsstatus unbekannt",
             addressMissing: "Keine Adresse verfügbar",
             cityMissing: "Kein Ort verfügbar",
-            postalCode: "PLZ",
-            distance: "Distanz",
-            contact: "Kontakt",
+        postalCode: "PLZ",
+        distance: "Distanz",
+        distanceAir: "Luftlinie",
+        distanceDrive: "Fahrdistanz",
+        contact: "Kontakt",
             phone: "Telefon",
             fax: "Fax",
             mail: "E-Mail",
@@ -442,9 +446,11 @@ export const translations: Record<Language, TranslationSchema> = {
             unknown: "Opening status unknown",
             addressMissing: "No address available",
             cityMissing: "No city available",
-            postalCode: "Postal code",
-            distance: "Distance",
-            contact: "Contact",
+        postalCode: "Postal code",
+        distance: "Distance",
+        distanceAir: "Air distance",
+        distanceDrive: "Driving distance",
+        contact: "Contact",
             phone: "Phone",
             fax: "Fax",
             mail: "E-mail",
