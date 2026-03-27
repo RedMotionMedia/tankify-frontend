@@ -25,6 +25,9 @@ type Props = {
     start: Point | null;
     end: Point | null;
     routeGeometry: [number, number][];
+    // Height in pixels that is visually covered at the bottom (e.g. mobile BottomSheet).
+    // Used to keep recenter/fitBounds results within the visible viewport.
+    viewportBottomInsetPx?: number;
     pickMode: MapPickMode;
     fuelType: FuelType;
     measurementSystem: MeasurementSystem;
@@ -248,27 +251,45 @@ function boundsLikeFromLatLon(points: Array<[number, number]>): [[number, number
 function recenterToPoints(
     map: MapLibreMap,
     points: Array<[number, number]>,
-    duration: number
+    duration: number,
+    viewportBottomInsetPx: number
 ) {
     if (points.length === 0) return;
+    const bottomInset = Math.max(0, viewportBottomInsetPx || 0);
 
     // With only one point (start OR end), fitBounds zooms in aggressively.
     // Keep the current zoom and just pan to the point.
     if (points.length === 1) {
         const [lat, lon] = points[0];
+        const canProject = typeof map.project === "function" && typeof map.unproject === "function";
+        if (canProject && bottomInset > 0) {
+            try {
+                const p = map.project!([lon, lat]);
+                const shifted = map.unproject!({ x: p.x, y: p.y + bottomInset / 3 });
+                map.easeTo({ center: [shifted.lng, shifted.lat], zoom: map.getZoom(), duration });
+                return;
+            } catch {}
+        }
+
         map.easeTo({ center: [lon, lat], zoom: map.getZoom(), duration });
         return;
     }
 
     const boundsLike = boundsLikeFromLatLon(points);
     if (!boundsLike) return;
-    map.fitBounds(boundsLike, { padding: 30, duration });
+    if (bottomInset <= 0) {
+        map.fitBounds(boundsLike, { padding: 30, duration });
+        return;
+    }
+
+    map.fitBounds(boundsLike, { padding: { top: 90, right: 30, bottom: bottomInset -60, left: 30 }, duration });
 }
 
 export default function MapPicker({
     start,
     end,
     routeGeometry,
+    viewportBottomInsetPx,
     pickMode,
     fuelType,
     measurementSystem,
@@ -319,6 +340,14 @@ export default function MapPicker({
     const resizeDebounceTimerRef = useRef<number | null>(null);
     const resizeRafRef = useRef<number | null>(null);
     const lastResizeSizeRef = useRef<{ w: number; h: number } | null>(null);
+    const viewportBottomInsetRef = useRef(0);
+
+    useEffect(() => {
+        viewportBottomInsetRef.current =
+            typeof viewportBottomInsetPx === "number" && Number.isFinite(viewportBottomInsetPx)
+                ? Math.max(0, viewportBottomInsetPx)
+                : 0;
+    }, [viewportBottomInsetPx]);
 
     useEffect(() => {
         userLocationRef.current = userLocation;
@@ -653,7 +682,7 @@ export default function MapPicker({
                         }
                         // Snap (no animation) after resize settle to avoid "shaking" during panel transitions.
                         try {
-                            recenterToPoints(map, pending, 0);
+                            recenterToPoints(map, pending, 0, viewportBottomInsetRef.current);
                         } catch {}
                     }, 140);
                 });
@@ -795,7 +824,7 @@ export default function MapPicker({
                     map.resize();
                 } catch {}
                 try {
-                    recenterToPoints(map, points, 650);
+                    recenterToPoints(map, points, 650, viewportBottomInsetRef.current);
                 } catch {}
             });
         } catch {}
@@ -879,7 +908,7 @@ export default function MapPicker({
             setPendingRecenter(points);
             window.requestAnimationFrame(() => {
                 try {
-                    recenterToPoints(map, points, 650);
+                    recenterToPoints(map, points, 650, viewportBottomInsetRef.current);
                 } catch {}
             });
         } catch {}
@@ -1168,7 +1197,7 @@ export default function MapPicker({
                 const container = containerRef.current;
                 if (container) safeResizePreserveView(map, container);
                 try {
-                    recenterToPoints(map, points, 650);
+                    recenterToPoints(map, points, 650, viewportBottomInsetRef.current);
                 } catch {}
             });
         } catch {}

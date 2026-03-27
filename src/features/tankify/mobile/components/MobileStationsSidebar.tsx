@@ -154,9 +154,11 @@ export default function MobileStationsSidebar({
         };
 
         const getDistanceKm = (s: Station): number | null => {
-            const v = s.distanceKm;
-            if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
-            if (!userLocation) return null;
+            if (!userLocation) {
+                const v = s.distanceKm;
+                return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
+            }
+            // Prefer computing distance from the user's location. The API-provided distanceKm is relative to the map center.
             return haversineKm(userLocation, s);
         };
 

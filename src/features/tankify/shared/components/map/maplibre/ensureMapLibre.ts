@@ -21,8 +21,18 @@ export type MapLibreMap = {
         getNorthEast: () => MapLibreLngLat;
     };
     getCenter: () => MapLibreLngLat;
-    fitBounds: (bounds: MapLibreBoundsLike, options: { padding: number; duration?: number }) => void;
+    fitBounds: (
+        bounds: MapLibreBoundsLike,
+        options: {
+            padding:
+                | number
+                | { top: number; right: number; bottom: number; left: number };
+            duration?: number;
+        }
+    ) => void;
     easeTo: (options: { center: [number, number]; zoom: number; duration?: number }) => void;
+    project?: (lngLat: [number, number]) => { x: number; y: number };
+    unproject?: (point: { x: number; y: number } | [number, number]) => MapLibreLngLat;
     jumpTo?: (options: {
         center: [number, number];
         zoom?: number;

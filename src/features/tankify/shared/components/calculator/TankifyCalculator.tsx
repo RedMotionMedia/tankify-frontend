@@ -122,6 +122,11 @@ export default function TankifyCalculator() {
         setBottomSheet,
     } = useBottomSheet();
 
+    const mobileMapBottomInsetPx =
+        !isDesktop && typeof window !== "undefined"
+            ? Math.max(0, (window.visualViewport?.height ?? window.innerHeight) - sheetY)
+            : 0;
+
     const [mobileSheetPage, setMobileSheetPage] = useState<0 | 1>(0);
 
     const {routeData, routeLoading, routeError} = useRoute(
@@ -1117,6 +1122,7 @@ export default function TankifyCalculator() {
                             start={draftStartPoint}
                             end={draftEndPoint}
                             routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                            viewportBottomInsetPx={mobileMapBottomInsetPx}
                             pickMode={mapPickMode}
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}

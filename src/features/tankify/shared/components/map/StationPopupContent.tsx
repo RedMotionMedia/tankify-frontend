@@ -170,9 +170,9 @@ export default function StationPopupContent({
             : [...WEEKDAY_ORDER.slice(todayIdx), ...WEEKDAY_ORDER.slice(0, todayIdx)];
 
     const distanceKm = (() => {
+        if (userLocation) return haversineKm(userLocation, station);
         const v = station.distanceKm;
-        if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
-        return userLocation ? haversineKm(userLocation, station) : null;
+        return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
     })();
 
     return (
