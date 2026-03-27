@@ -128,6 +128,8 @@ export default function TankifyCalculator() {
             : 0;
 
     const [mobileSheetPage, setMobileSheetPage] = useState<0 | 1>(0);
+    const [mobileCalcScrollToTopReqId, setMobileCalcScrollToTopReqId] = useState(0);
+    const [mobileRecenterReqId, setMobileRecenterReqId] = useState(0);
 
     const {routeData, routeLoading, routeError} = useRoute(
         calcStartPoint,
@@ -655,6 +657,8 @@ export default function TankifyCalculator() {
             if (!isDesktop) {
                 setMobileSheetPage(0);
                 setBottomSheet(window.innerHeight * snapWorthMultiplicator);
+                setMobileCalcScrollToTopReqId((v) => v + 1);
+                setMobileRecenterReqId((v) => v + 1);
             }
         }
     }
@@ -736,6 +740,14 @@ export default function TankifyCalculator() {
 
         setHideSearchOverlayReqId((v) => v + 1);
         commitRoute(draftStartPoint, draftEndPoint);
+
+        if (!isDesktop) {
+            setMobileSheetPage(0);
+            const h = window.visualViewport?.height ?? window.innerHeight;
+            setBottomSheet(h * snapWorthMultiplicator);
+            setMobileCalcScrollToTopReqId((v) => v + 1);
+            setMobileRecenterReqId((v) => v + 1);
+        }
     }
 
     const calculation = useMemo(() => {
@@ -1141,6 +1153,7 @@ export default function TankifyCalculator() {
                             t={t}
                             hideSearchOverlayRequestId={hideSearchOverlayReqId}
                             defaultLocationEnabled
+                            recenterRequestId={mobileRecenterReqId}
                             onSearchHereStart={() => {
                                 setMobileSheetPage(1);
                                 const h = window.visualViewport?.height ?? window.innerHeight;
@@ -1242,6 +1255,7 @@ export default function TankifyCalculator() {
                         userLocation={userLocation}
                         onSelectStationAsStart={handleSelectStationAsStart}
                         onSelectStationAsDestination={handleSelectStationAsDestination}
+                        calcScrollToTopRequestId={mobileCalcScrollToTopReqId}
                     />
                 </div>
                 ) : null}

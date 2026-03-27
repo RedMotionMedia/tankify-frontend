@@ -159,6 +159,9 @@ export function useBottomSheet() {
 
         if (dragSourceRef.current === "handle") {
             if (!draggingRef.current) return;
+            // Prevent viewport/page scrolling while dragging the sheet.
+            e.preventDefault();
+            e.stopPropagation();
             setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
             return;
         }
@@ -205,12 +208,16 @@ export function useBottomSheet() {
 
         // Drag down to collapse when the content is at the top.
         if (dy > 0 && atTop) {
+            e.preventDefault();
+            e.stopPropagation();
             setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
             return;
         }
 
         // Drag up to expand while we're not fully expanded yet and the content cannot scroll further down.
         if (dy < 0 && sheetY > 0 && (!canScrollDown || atBottom)) {
+            e.preventDefault();
+            e.stopPropagation();
             setSheetYThrottled(Math.max(0, startOffsetRef.current + dy));
         }
     }

@@ -43,6 +43,7 @@ type Props = {
     defaultLocationEnabled?: boolean;
     hideSearchOverlayRequestId?: number;
     onSearchHereStart?: () => void;
+    recenterRequestId?: number;
 };
 
 type UserLocation = { lat: number; lon: number };
@@ -307,6 +308,7 @@ export default function MapPicker({
     defaultLocationEnabled,
     hideSearchOverlayRequestId,
     onSearchHereStart,
+    recenterRequestId,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -1260,7 +1262,7 @@ export default function MapPicker({
         }
     }
 
-    function handleRecenter() {
+    const handleRecenter = useCallback(() => {
         const map = mapRef.current;
         if (!map) return;
 
@@ -1291,7 +1293,12 @@ export default function MapPicker({
                 } catch {}
             });
         } catch {}
-    }
+    }, [start, end, routeGeometry]);
+
+    useEffect(() => {
+        if (recenterRequestId == null) return;
+        handleRecenter();
+    }, [recenterRequestId, handleRecenter]);
 
     function canUseGeolocation(): boolean {
         if (typeof window === "undefined") return false;

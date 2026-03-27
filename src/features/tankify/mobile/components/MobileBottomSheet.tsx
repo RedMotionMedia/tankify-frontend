@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { TranslationSchema } from "@/features/tankify/shared/config/i18n";
 import {
     CurrencySystem,
@@ -54,6 +54,7 @@ type Props = {
         station: Station;
         autoCalculate?: boolean;
     }) => void;
+    calcScrollToTopRequestId?: number;
 };
 
 export default function MobileBottomSheet({
@@ -85,10 +86,13 @@ export default function MobileBottomSheet({
                                               userLocation,
                                               onSelectStationAsStart,
                                               onSelectStationAsDestination,
+                                              calcScrollToTopRequestId,
                                           }: Props) {
     const carouselRef = useRef<HTMLDivElement | null>(null);
     const calcScrollRef = useRef<HTMLDivElement | null>(null);
     const stationsScrollRef = useRef<HTMLDivElement | null>(null);
+    const pendingCalcScrollToTopRef = useRef(false);
+    const lastCalcScrollToTopReqIdRef = useRef<number | null>(null);
     const carouselSwipeRef = useRef<{
         active: boolean;
         axis: "undecided" | "horizontal" | "vertical";
@@ -147,6 +151,39 @@ export default function MobileBottomSheet({
         // Tell the BottomSheet hook which element is currently the active vertical scroll container.
         sheetContentRef.current = visualPage === 0 ? calcScrollRef.current : stationsScrollRef.current;
     }, [visualPage, sheetContentRef]);
+
+    const attemptCalcScrollToTop = useCallback(() => {
+        if (!pendingCalcScrollToTopRef.current) return;
+        if (visualPage !== 0) return;
+        const el = calcScrollRef.current;
+        if (!el) return;
+
+        // Wait for layout + carousel scroll to settle.
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                pendingCalcScrollToTopRef.current = false;
+                try {
+                    el.scrollTo({ top: 0, behavior: "auto" });
+                } catch {
+                    try {
+                        el.scrollTop = 0;
+                    } catch {}
+                }
+            });
+        });
+    }, [visualPage]);
+
+    useEffect(() => {
+        if (calcScrollToTopRequestId == null) return;
+        if (lastCalcScrollToTopReqIdRef.current === calcScrollToTopRequestId) return;
+        lastCalcScrollToTopReqIdRef.current = calcScrollToTopRequestId;
+        pendingCalcScrollToTopRef.current = true;
+        attemptCalcScrollToTop();
+    }, [calcScrollToTopRequestId, attemptCalcScrollToTop]);
+
+    useEffect(() => {
+        attemptCalcScrollToTop();
+    }, [visualPage, attemptCalcScrollToTop]);
 
     function onCarouselTouchStart(e: React.TouchEvent) {
         const target = e.target as HTMLElement | null;
