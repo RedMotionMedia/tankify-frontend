@@ -1,0 +1,487 @@
+@import "tailwindcss";
+
+/* =========================
+   Base Layout
+========================= */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+  color: #111827;
+  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  overflow-x: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* =========================
+   Selection Behavior
+========================= */
+
+.no-select,
+.no-select * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+select,
+.leaflet-popup-content,
+.leaflet-popup-content * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* =========================
+   Cursor Fixes (GLOBAL)
+========================= */
+
+button,
+[role="button"],
+select,
+summary,
+a[href] {
+  cursor: pointer;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+/* =========================
+   Leaflet Fixes
+========================= */
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* Force pointer inside popups */
+.leaflet-popup-content button,
+.leaflet-popup-content select {
+  cursor: pointer !important;
+}
+
+/* Prevent map from overriding cursor */
+.leaflet-container button {
+  cursor: pointer !important;
+}
+
+/* =========================
+   Price Badge Marker
+========================= */
+
+.price-badge-marker {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none;
+}
+
+.price-badge-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  white-space: nowrap;
+}
+
+/* =========================
+   Station Logo Marker
+========================= */
+
+.station-marker {
+  position: relative;
+  transform-origin: center center;
+}
+
+.station-marker--selected {
+  /* Intentionally do not scale/transform the marker to avoid anchor jumps. */
+}
+
+.station-marker--selected .station-logo {
+  border-color: #1d4ed8;
+  /* Add a ring instead of extra shadow to avoid the "floating" feel while panning. */
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), 0 0 0 3px rgba(37, 99, 235, 0.55);
+}
+
+/* Price badge sits above the logo marker */
+.station-marker__badge {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+
+.station-logo-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.station-logo {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  border: 2px solid #e5e7eb;
+}
+
+.station-logo--ok {
+  border-color: #2563eb;
+}
+
+.station-logo--missing {
+  border-color: #dc2626;
+}
+
+.station-logo__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #374151;
+}
+
+.station-logo__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0;
+}
+
+/* =========================
+   Station Popup (Leaflet)
+========================= */
+
+.station-popup .leaflet-popup-content-wrapper {
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.station-popup .leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+/* Make the Leaflet close button match the app's rounded button language */
+.station-popup .leaflet-popup-close-button {
+  margin: 7px;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9999px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.station-popup .leaflet-popup-close-button:hover {
+  background: #0b1220;
+}
+
+.station-popup .leaflet-popup-close-button:active {
+  transform: scale(0.96);
+}
+
+.station-popup .leaflet-popup-close-button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+/* =========================
+   Station Popup (MapLibre)
+========================= */
+
+.station-popup .maplibregl-popup-content {
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+  padding: 12px 14px;
+}
+
+.station-popup .maplibregl-popup-close-button {
+  margin: 7px;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9999px;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.station-popup .maplibregl-popup-close-button:hover {
+  background: #0b1220;
+}
+
+.station-popup .maplibregl-popup-close-button:active {
+  transform: scale(0.96);
+}
+
+.station-popup .maplibregl-popup-close-button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+/* =========================
+   User Location (Leaflet)
+========================= */
+
+.user-location-marker {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none;
+}
+
+.user-location {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.user-location__dot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #2563eb;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.user-location__pulse {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.22);
+  animation: user-location-pulse 1.6s ease-out infinite;
+}
+
+@keyframes user-location-pulse {
+  0% {
+    transform: scale(0.65);
+    opacity: 0.85;
+  }
+  70% {
+    transform: scale(1.65);
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+/* =========================
+   Start/End Marker (Leaflet)
+========================= */
+
+.route-point-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.route-point {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+}
+
+.route-point::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid currentColor;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
+}
+
+.route-point__label {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.route-point-marker--start .route-point {
+  background: #2563eb;
+  color: #2563eb;
+}
+
+.route-point-marker--end .route-point {
+  background: #111827;
+  color: #111827;
+}
+
+/* =========================
+   Mobile Bottom Sheet
+========================= */
+
+.mobile-sheet {
+  width: 100vw;
+  height: 90dvh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+}
+
+/* Drag Handle */
+.sheet-handle {
+  touch-action: none;
+  cursor: grab;
+}
+
+/* Optional nicer UX */
+.sheet-handle:active {
+  cursor: grabbing;
+}
+
+/* =========================
+   Optional UI Polish
+========================= */
+
+/* Hover Feedback */
+button:hover {
+  filter: brightness(0.96);
+}
+
+/* Smooth interactions */
+button,
+select,
+input {
+  transition: all 0.15s ease;
+}
+
+.tankify-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+.tankify-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 9999px;
+}
+
+.tankify-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -4px; /* centers thumb on 10px track */
+  border-radius: 9999px;
+  background: #111827;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.tankify-range:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.18),
+    0 0 0 4px rgba(37, 99, 235, 0.35);
+}
+
+.tankify-range::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.tankify-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #111827;
+  border: 3px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.tankify-range:focus-visible::-moz-range-thumb {
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.18),
+    0 0 0 4px rgba(37, 99, 235, 0.35);
+}
+
+.btn {
+  @apply rounded-2xl px-4 py-3 text-white transition cursor-pointer active:scale-95;
+}
+
+.btn-primary {
+  @apply bg-black hover:bg-gray-800;
+}
+
+.btn-secondary {
+  @apply bg-gray-700 hover:bg-gray-800;
+}
