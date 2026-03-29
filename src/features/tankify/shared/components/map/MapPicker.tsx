@@ -10,7 +10,7 @@ import {
     Point,
     Station,
 } from "@/features/tankify/shared/types/tankify";
-import { geocode, reverseGeocode } from "@/features/tankify/shared/lib/geocode";
+import { geocode, geocodeSuggestions, reverseGeocode } from "@/features/tankify/shared/lib/geocode";
 import { fetchStationsForVisibleMap } from "@/features/tankify/shared/lib/route";
 import { pricePerLiterToPerGallon } from "@/features/tankify/shared/lib/units";
 import { eurToQuote } from "@/features/tankify/shared/lib/fx";
@@ -575,6 +575,10 @@ export default function MapPicker({
     const [startupManualQuery, setStartupManualQuery] = useState("");
     const [startupManualLoading, setStartupManualLoading] = useState(false);
     const [startupManualError, setStartupManualError] = useState<string | null>(null);
+    const [startupManualSuggestions, setStartupManualSuggestions] = useState<Point[]>([]);
+    const [startupManualSuggestionsLoading, setStartupManualSuggestionsLoading] = useState(false);
+    const [startupManualSelected, setStartupManualSelected] = useState<Point | null>(null);
+    const startupSuggestAbortRef = useRef<AbortController | null>(null);
     const [startupAttempt, setStartupAttempt] = useState(0);
     const startupReqIdRef = useRef(0);
     const ipAbortRef = useRef<AbortController | null>(null);
@@ -750,7 +754,7 @@ export default function MapPicker({
         try {
             // Cancel any in-flight startup attempt (GPS/IP).
             startupReqIdRef.current += 1;
-            const point = await geocode(q);
+            const point = startupManualSelected ?? (await geocode(q));
             if (!point) {
                 setStartupManualError("Ort nicht gefunden.");
                 return;
@@ -767,7 +771,47 @@ export default function MapPicker({
         } finally {
             setStartupManualLoading(false);
         }
-    }, [startupManualQuery]);
+    }, [startupManualQuery, startupManualSelected]);
+
+    useEffect(() => {
+        // Only fetch suggestions when the manual entry UI is visible.
+        if (!startupCenterError) return;
+
+        const q = startupManualQuery.trim();
+        setStartupManualSelected(null);
+        if (q.length < 3) {
+            startupSuggestAbortRef.current?.abort();
+            setStartupManualSuggestions([]);
+            setStartupManualSuggestionsLoading(false);
+            return;
+        }
+
+        startupSuggestAbortRef.current?.abort();
+        const controller = new AbortController();
+        startupSuggestAbortRef.current = controller;
+
+        setStartupManualSuggestionsLoading(true);
+        const t = window.setTimeout(() => {
+            void (async () => {
+                try {
+                    const results = await geocodeSuggestions(q, 5);
+                    if (controller.signal.aborted) return;
+                    setStartupManualSuggestions(results);
+                } catch {
+                    if (controller.signal.aborted) return;
+                    setStartupManualSuggestions([]);
+                } finally {
+                    if (controller.signal.aborted) return;
+                    setStartupManualSuggestionsLoading(false);
+                }
+            })();
+        }, 250);
+
+        return () => {
+            window.clearTimeout(t);
+            controller.abort();
+        };
+    }, [startupCenterError, startupManualQuery]);
 
     function upsertUserLocationMarker(map: MapLibreMap, loc: { lat: number; lon: number }) {
         const bucket = markerBucketRef.current;
@@ -1600,6 +1644,40 @@ export default function MapPicker({
                                         {startupManualLoading ? "Suchen..." : "Suchen"}
                                     </button>
                                 </form>
+                                {startupManualSuggestionsLoading ? (
+                                    <div className="mt-2 text-[11px] font-medium text-gray-600">
+                                        Vorschlaege werden geladen...
+                                    </div>
+                                ) : null}
+                                {startupManualSuggestions.length > 0 ? (
+                                    <div className="mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left">
+                                        {startupManualSuggestions.map((s) => {
+                                            const key = `${s.lat},${s.lon}`;
+                                            const active =
+                                                startupManualSelected != null &&
+                                                startupManualSelected.lat === s.lat &&
+                                                startupManualSelected.lon === s.lon;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setStartupManualSelected(s);
+                                                        setStartupManualQuery(s.label);
+                                                    }}
+                                                    className={
+                                                        "block w-full px-3 py-2 text-[12px] transition " +
+                                                        (active
+                                                            ? "bg-blue-50 text-blue-900"
+                                                            : "hover:bg-gray-50 text-gray-900")
+                                                    }
+                                                >
+                                                    <span className="line-clamp-2">{s.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
                                 {startupManualError ? (
                                     <div className="mt-2 text-[11px] font-semibold text-red-700">
                                         {startupManualError}
