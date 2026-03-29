@@ -10,6 +10,7 @@ type Props = {
     setEndText: (value: string) => void;
     onSearch: (type: "start" | "end") => void;
     onSuggestionPick: (type: "start" | "end", point: Point) => void;
+    onClear: (type: "start" | "end") => void;
     onPickStart: () => void;
     onPickEnd: () => void;
     onUseMyLocationAsStart: () => void;
@@ -27,6 +28,7 @@ export default function RouteSection({
                                          setEndText,
                                          onSearch,
                                          onSuggestionPick,
+                                         onClear,
                                          onPickStart,
                                          onPickEnd,
                                          onUseMyLocationAsStart,
@@ -48,6 +50,7 @@ export default function RouteSection({
                 onChange={setStartText}
                 onSearch={() => onSearch("start")}
                 onSuggestionPick={(p) => onSuggestionPick("start", p)}
+                onClear={() => onClear("start")}
                 onPickOnMap={onPickStart}
                 onUseMyLocation={onUseMyLocationAsStart}
                 loading={searchLoading === "start"}
@@ -92,6 +95,7 @@ export default function RouteSection({
                 onChange={setEndText}
                 onSearch={() => onSearch("end")}
                 onSuggestionPick={(p) => onSuggestionPick("end", p)}
+                onClear={() => onClear("end")}
                 onPickOnMap={onPickEnd}
                 onUseMyLocation={onUseMyLocationAsDestination}
                 loading={searchLoading === "end"}

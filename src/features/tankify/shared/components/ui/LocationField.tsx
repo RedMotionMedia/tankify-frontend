@@ -8,6 +8,7 @@ type Props = {
     onChange: (value: string) => void;
     onSearch: () => void;
     onSuggestionPick?: (point: Point) => void;
+    onClear?: () => void;
     onPickOnMap: () => void;
     onUseMyLocation?: () => void;
     loading: boolean;
@@ -23,6 +24,7 @@ export default function LocationField({
                                           onChange,
                                           onSearch,
                                           onSuggestionPick,
+                                          onClear,
                                           onPickOnMap,
                                           onUseMyLocation,
                                           loading,
@@ -32,7 +34,14 @@ export default function LocationField({
                                           myLocationLabel,
                                       }: Props) {
     const hasMyLocation = Boolean(onUseMyLocation && myLocationLabel);
-    const inputRightPadding = hasMyLocation ? "pr-32" : "pr-24";
+    const showClear = value.trim().length > 0;
+    const inputRightPadding = hasMyLocation
+        ? showClear
+            ? "pr-44"
+            : "pr-32"
+        : showClear
+            ? "pr-32"
+            : "pr-24";
 
     const rootRef = useRef<HTMLDivElement | null>(null);
     const abortRef = useRef<AbortController | null>(null);
@@ -91,6 +100,12 @@ export default function LocationField({
         onChange(p.label);
         if (onSuggestionPick) onSuggestionPick(p);
         else onSearch();
+        close();
+    }
+
+    function clearValue() {
+        if (onClear) onClear();
+        else onChange("");
         close();
     }
 
@@ -185,6 +200,31 @@ export default function LocationField({
                 ) : null}
 
                 <div className="absolute inset-y-0 right-2 flex items-center gap-2">
+                    {showClear ? (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={clearValue}
+                            title="Clear"
+                            aria-label="Clear"
+                            className="grid h-9 w-9 place-items-center rounded-full bg-gray-100 text-gray-700 shadow-sm transition hover:bg-gray-200 active:scale-95"
+                        >
+                            <svg
+                                viewBox="0 0 20 20"
+                                className="h-4 w-4"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path
+                                    d="M5 5l10 10M15 5L5 15"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                        </button>
+                    ) : null}
                     {hasMyLocation ? (
                         <button
                             type="button"

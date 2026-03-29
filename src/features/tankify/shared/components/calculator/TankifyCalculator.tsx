@@ -428,6 +428,27 @@ export default function TankifyCalculator() {
         setMapPickMode(null);
     }
 
+    function handleClearLocation(type: "start" | "end") {
+        setError("");
+        setMapPickMode(null);
+
+        // Clearing a point invalidates the current calculation/route.
+        setRouteRequestId(0);
+        setCalcStartPoint(null);
+        setCalcEndPoint(null);
+        setSelectedStationId(null);
+        setVisibleStations([]);
+        setStationsQueried(false);
+
+        if (type === "start") {
+            setStartText("");
+            setDraftStartPoint(null);
+        } else {
+            setEndText("");
+            setDraftEndPoint(null);
+        }
+    }
+
     function getCurrentPosition(): Promise<{ lat: number; lon: number }> {
         if (typeof window === "undefined") return Promise.reject(new Error("NO_WINDOW"));
         if (!window.isSecureContext) return Promise.reject(new Error("NOT_SECURE_CONTEXT"));
@@ -747,6 +768,7 @@ export default function TankifyCalculator() {
                 setEndText={setEndText}
                 onSearch={handleSearch}
                 onSuggestionPick={handleSuggestionPick}
+                onClear={handleClearLocation}
                 onPickStart={() => {
                     setMapPickMode((prev) => (prev === "start" ? null : "start"));
                     minimizeBottomSheet();
