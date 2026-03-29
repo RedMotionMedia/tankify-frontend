@@ -652,6 +652,8 @@ export default function TankifyCalculator() {
                 setError(t.errors.noStartFound);
                 return;
             }
+            // Desktop: hide "Search here" after the user explicitly sets destination (auto-calc route).
+            if (isDesktop) setHideSearchOverlayReqId((v) => v + 1);
             commitRoute(draftStartPoint, point);
 
             // Explicit user action: request a map recenter (desktop + mobile).
@@ -740,7 +742,8 @@ export default function TankifyCalculator() {
             return;
         }
 
-        setHideSearchOverlayReqId((v) => v + 1);
+        // Desktop: hide "Search here" after the user explicitly calculates a route.
+        if (isDesktop) setHideSearchOverlayReqId((v) => v + 1);
         commitRoute(draftStartPoint, draftEndPoint);
 
         // Explicit user action: request a map recenter (desktop + mobile).
