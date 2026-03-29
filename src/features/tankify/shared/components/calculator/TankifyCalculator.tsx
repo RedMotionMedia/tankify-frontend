@@ -436,42 +436,10 @@ export default function TankifyCalculator() {
         );
     }
 
-    function tryReadLastLocation(): { lat: number; lon: number } | null {
-        try {
-            const raw = window.localStorage.getItem("tankify-last-location");
-            if (!raw) return null;
-            const parsed = JSON.parse(raw) as Partial<{ lat: unknown; lon: unknown }>;
-            const lat = typeof parsed.lat === "number" ? parsed.lat : Number.NaN;
-            const lon = typeof parsed.lon === "number" ? parsed.lon : Number.NaN;
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-            return { lat, lon };
-        } catch {
-            return null;
-        }
-    }
-
-    function writeLastLocation(loc: { lat: number; lon: number }) {
-        try {
-            window.localStorage.setItem(
-                "tankify-last-location",
-                JSON.stringify({ lat: loc.lat, lon: loc.lon, ts: Date.now() })
-            );
-        } catch {}
-    }
-
     async function handleUseMyLocationAsStart() {
         const reqId = ++myLocationReqIdRef.current;
         try {
             setError("");
-
-            // Instant feedback: use the last known location (if available) right away.
-            const cached = tryReadLastLocation();
-            if (cached) {
-                const label = t.route.currentLocation;
-                setDraftStartPoint({ lat: cached.lat, lon: cached.lon, label });
-                setStartText(label);
-                setMapPickMode(null);
-            }
 
             const { lat, lon } = await getCurrentPosition();
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
@@ -481,11 +449,8 @@ export default function TankifyCalculator() {
             setDraftStartPoint({ lat, lon, label });
             setStartText(label);
             setMapPickMode(null);
-            writeLastLocation({ lat, lon });
         } catch {
-            // If we already applied a cached location, don't block the user with an error.
             if (reqId !== myLocationReqIdRef.current) return;
-            if (tryReadLastLocation()) return;
             setError(t.errors.locationFailed);
         }
     }
@@ -495,14 +460,6 @@ export default function TankifyCalculator() {
         try {
             setError("");
 
-            const cached = tryReadLastLocation();
-            if (cached) {
-                const label = t.route.currentLocation;
-                setDraftEndPoint({ lat: cached.lat, lon: cached.lon, label });
-                setEndText(label);
-                setMapPickMode(null);
-            }
-
             const { lat, lon } = await getCurrentPosition();
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
             if (reqId !== myLocationReqIdRef.current) return;
@@ -511,10 +468,8 @@ export default function TankifyCalculator() {
             setDraftEndPoint({ lat, lon, label });
             setEndText(label);
             setMapPickMode(null);
-            writeLastLocation({ lat, lon });
         } catch {
             if (reqId !== myLocationReqIdRef.current) return;
-            if (tryReadLastLocation()) return;
             setError(t.errors.locationFailed);
         }
     }
@@ -964,23 +919,22 @@ export default function TankifyCalculator() {
                             }
                         >
                             <div className="h-full overflow-hidden rounded-3xl">
-                                <MapPicker
-                                    start={draftStartPoint}
-                                    end={draftEndPoint}
-                                    routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
-                                    pickMode={mapPickMode}
-                                    fuelType={fuelType}
-                                    measurementSystem={measurementSystem}
-                                    currencySystem={currencySystem}
-                                    eurToCurrencyRate={eurToCurrencyRate}
-                                    debugMode={debugMode}
-                                    t={t}
-                                    defaultLocationEnabled
-                                    recenterRequestId={mobileRecenterReqId}
-                                    hideSearchOverlayRequestId={hideSearchOverlayReqId}
-                                    onStationsChange={handleStationsChange}
-                                    selectedStationId={selectedStationId}
-                                    stationFocusRequestId={stationFocusRequestId}
+                                 <MapPicker
+                                     start={draftStartPoint}
+                                     end={draftEndPoint}
+                                     routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                                     pickMode={mapPickMode}
+                                     fuelType={fuelType}
+                                     measurementSystem={measurementSystem}
+                                     currencySystem={currencySystem}
+                                     eurToCurrencyRate={eurToCurrencyRate}
+                                     debugMode={debugMode}
+                                     t={t}
+                                     recenterRequestId={mobileRecenterReqId}
+                                     hideSearchOverlayRequestId={hideSearchOverlayReqId}
+                                     onStationsChange={handleStationsChange}
+                                     selectedStationId={selectedStationId}
+                                     stationFocusRequestId={stationFocusRequestId}
                                     onStationSelect={(station) => {
                                         setSelectedStationId(station.id);
                                         setStationFocusRequestId((v) => v + 1);
@@ -1149,7 +1103,6 @@ export default function TankifyCalculator() {
                             debugMode={debugMode}
                             t={t}
                             hideSearchOverlayRequestId={hideSearchOverlayReqId}
-                            defaultLocationEnabled
                             recenterRequestId={mobileRecenterReqId}
                             onSearchHereStart={() => {
                                 setMobileSheetPage(1);
