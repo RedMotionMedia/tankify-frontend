@@ -371,6 +371,15 @@ export default function MapPicker({
         userLocationRef.current = userLocation;
     }, [userLocation]);
 
+    const startRef = useRef<Point | null>(start);
+    const endRef = useRef<Point | null>(end);
+    const routeGeometryRef = useRef<[number, number][]>(routeGeometry);
+    useEffect(() => {
+        startRef.current = start;
+        endRef.current = end;
+        routeGeometryRef.current = routeGeometry;
+    }, [start, end, routeGeometry]);
+
     useEffect(() => {
         onStationSelectRef.current = onStationSelect;
     }, [onStationSelect]);
@@ -699,9 +708,10 @@ export default function MapPicker({
                 };
                 const onMoveStartAny = (e: unknown) => {
                     onMoveStart();
+                    // Any manual pan/zoom should stop "auto-fit" snap-backs until an explicit recenter happens.
+                    suppressAutoFitRef.current = true;
                     const isUserInitiated = Boolean((e as { originalEvent?: unknown } | null)?.originalEvent);
                     if (isUserInitiated) {
-                        suppressAutoFitRef.current = true;
                         setHideSearchOverlay(false);
                     }
                 };
@@ -916,7 +926,6 @@ export default function MapPicker({
         // Only auto-fit when we have a calculated route geometry.
         // Start/end selection alone should not force recentering.
         if (validRoute.length === 0) return;
-        if (suppressAutoFitRef.current) return;
         const points = validRoute;
         const signature = (() => {
             const first = validRoute[0];
@@ -927,6 +936,9 @@ export default function MapPicker({
         // Prevent auto-recentering on unrelated re-renders (e.g. "Hier suchen" updates stations state).
         if (lastAutoFitSignatureRef.current === signature) return;
         lastAutoFitSignatureRef.current = signature;
+        // A new calculated route is an explicit user action ("Calculate"/auto-calc), so allow auto-fit
+        // even if the user previously panned/zoomed the map.
+        suppressAutoFitRef.current = false;
 
         if (points.length === 0) return;
 
@@ -998,6 +1010,10 @@ export default function MapPicker({
     ]);
 
     // Highlight and center the selected station (no popups; selection is shown in the UI list).
+    const lastStationRecenterRef = useRef<{ id: string | null; focus: number }>({
+        id: null,
+        focus: -1,
+    });
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
@@ -1019,9 +1035,15 @@ export default function MapPicker({
         if (!selectedStationId) return;
         const station = stations.find((s) => s.id === selectedStationId);
         if (!station) return;
+        const focus = typeof stationFocusRequestId === "number" ? stationFocusRequestId : 0;
+        const last = lastStationRecenterRef.current;
+        // Don't recenter repeatedly just because the stations array identity/order changes.
+        if (last.id === selectedStationId && last.focus === focus) return;
+
         const points: Array<[number, number]> = [[station.lat, station.lon]];
         try {
             suppressAutoFitRef.current = false;
+            lastStationRecenterRef.current = { id: selectedStationId, focus };
             // When side panels open/close, ResizeObserver may call map.stop() and cancel animations.
             // Keep a pending recenter so we re-apply after the resize settles.
             setPendingRecenter(points);
@@ -1282,15 +1304,19 @@ export default function MapPicker({
         if (!map) return;
         suppressAutoFitRef.current = false;
 
-        const validRoute = routeGeometry.filter(
+        const geom = routeGeometryRef.current;
+        const s = startRef.current;
+        const e = endRef.current;
+
+        const validRoute = geom.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
         );
         const points =
             validRoute.length > 0
                 ? validRoute
                 : [
-                    ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
-                    ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
+                    ...(s ? [sanitizeLatLng([s.lat, s.lon])] : []),
+                    ...(e ? [sanitizeLatLng([e.lat, e.lon])] : []),
                 ];
         if (points.length === 0) return;
         try {
@@ -1309,10 +1335,10 @@ export default function MapPicker({
                 } catch {}
             });
         } catch {}
-    }, [start, end, routeGeometry]);
+    }, []);
 
     useEffect(() => {
-        if (recenterRequestId == null) return;
+        if (typeof recenterRequestId !== "number" || recenterRequestId <= 0) return;
         handleRecenter();
     }, [recenterRequestId, handleRecenter]);
 

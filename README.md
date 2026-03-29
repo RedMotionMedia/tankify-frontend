@@ -2,9 +2,7 @@
 
 A modern Next.js app that helps you decide whether it’s worth driving to a cheaper fuel station.
 
-<img alt="img.png" src="resources/doc/img.png"/>
-<br>
-<img alt="img.png" src="resources/doc/img_1.png"/>
+<img alt="img.png" src="doc/img.png"/>
 
 It calculates:
 
