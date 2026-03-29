@@ -148,7 +148,7 @@ export default function SettingsModal({
 
     return (
         <div
-            className={`fixed inset-0 z-[3300] flex items-center justify-center p-4 transition duration-200 ${
+            className={`fixed inset-0 z-3300 flex items-center justify-center p-4 transition duration-200 ${
                 open ? "pointer-events-auto" : "pointer-events-none"
             }`}
             aria-hidden={!open}
@@ -168,7 +168,7 @@ export default function SettingsModal({
                 aria-modal="true"
                 aria-label={t.settings.title}
                 onClick={(e) => e.stopPropagation()}
-                className={`relative z-[3301] max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl transition duration-200 sm:p-8 ${
+                className={`relative z-3301 max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl transition duration-200 sm:p-8 ${
                     open ? "scale-100 opacity-100" : "scale-95 opacity-0"
                 }`}
             >
@@ -313,8 +313,8 @@ export default function SettingsModal({
 
                         <SliderNumberField
                             label={t.vehicle.consumption}
-                            min={measurementSystem === "metric" ? 3 : 5}
-                            max={measurementSystem === "metric" ? 25 : 80}
+                            min={measurementSystem === "metric" ? 1.5 : 5}
+                            max={measurementSystem === "metric" ? 40 : 150}
                             step={0.1}
                             value={consumption}
                             onChange={setConsumption}
@@ -327,8 +327,8 @@ export default function SettingsModal({
 
                         <SliderNumberField
                             label={t.vehicle.tankSize}
-                            min={measurementSystem === "metric" ? 20 : 5}
-                            max={measurementSystem === "metric" ? 120 : 35}
+                            min={measurementSystem === "metric" ? 5 : 1.5}
+                            max={measurementSystem === "metric" ? 800 : 210}
                             step={1}
                             value={tankSize}
                             onChange={setTankSize}
@@ -341,8 +341,8 @@ export default function SettingsModal({
 
                         <SliderNumberField
                             label={t.vehicle.avgSpeed}
-                            min={measurementSystem === "metric" ? 30 : 20}
-                            max={measurementSystem === "metric" ? 130 : 80}
+                            min={measurementSystem === "metric" ? 10 : 6}
+                            max={measurementSystem === "metric" ? 180 : 110}
                             step={1}
                             value={avgSpeed}
                             onChange={setAvgSpeed}

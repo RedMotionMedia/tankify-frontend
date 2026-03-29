@@ -25,8 +25,8 @@ export default function PriceSection({
     measurementSystem,
 }: Props) {
     const unit = measurementSystem === "metric" ? `${currencySystem}/L` : `${currencySystem}/gal`;
-    const min = eurToQuote(1, eurToCurrencyRate);
-    const max = eurToQuote(5, eurToCurrencyRate);
+    const min = eurToQuote(0.2, eurToCurrencyRate);
+    const max = eurToQuote(5.0, eurToCurrencyRate);
 
     return (
         <section className="space-y-4">
