@@ -1320,8 +1320,6 @@ export default function MapPicker({
                 ];
         if (points.length === 0) return;
         try {
-            setHideSearchOverlay(true);
-
             // If a layout transition resizes the map right after recentering,
             // the resulting view can look "off". Keep one pending recenter to re-apply after resize.
             setPendingRecenter(points);
