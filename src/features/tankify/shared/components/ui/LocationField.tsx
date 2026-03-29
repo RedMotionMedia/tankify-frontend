@@ -9,6 +9,8 @@ type Props = {
     onSearch: () => void;
     onSuggestionPick?: (point: Point) => void;
     onClear?: () => void;
+    clearLabel: string;
+    suggestionsLoadingLabel: string;
     onPickOnMap: () => void;
     onUseMyLocation?: () => void;
     loading: boolean;
@@ -25,6 +27,8 @@ export default function LocationField({
                                           onSearch,
                                           onSuggestionPick,
                                           onClear,
+                                          clearLabel,
+                                          suggestionsLoadingLabel,
                                           onPickOnMap,
                                           onUseMyLocation,
                                           loading,
@@ -175,7 +179,7 @@ export default function LocationField({
                         <div className="absolute left-0 right-0 top-full z-[60] mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
                             {suggestLoading ? (
                                 <div className="px-3 py-2 text-xs font-medium text-gray-600">
-                                    Vorschlaege werden geladen...
+                                    {suggestionsLoadingLabel}
                                 </div>
                             ) : null}
 
@@ -208,8 +212,8 @@ export default function LocationField({
                                 type="button"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={clearValue}
-                                title="Clear"
-                                aria-label="Clear"
+                                title={clearLabel}
+                                aria-label={clearLabel}
                                 className="grid h-9 w-9 place-items-center rounded-full bg-gray-100 text-gray-700 shadow-sm transition hover:bg-gray-200 active:scale-95"
                             >
                                 <svg

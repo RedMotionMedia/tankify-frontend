@@ -155,7 +155,7 @@ export default function SettingsModal({
         >
             <button
                 type="button"
-                aria-label="Close settings overlay"
+                aria-label={t.actions.close}
                 className={`absolute inset-0 transition duration-200 ${
                     open ? "bg-black/25 backdrop-blur-sm" : "bg-black/0 backdrop-blur-none"
                 }`}
@@ -184,7 +184,7 @@ export default function SettingsModal({
                         type="button"
                         onClick={onClose}
                         className="rounded-full px-3 py-2 text-sm font-medium text-gray-500 transition hover:bg-gray-100"
-                        aria-label="Close settings"
+                        aria-label={t.actions.close}
                     >
                         ✕
                     </button>

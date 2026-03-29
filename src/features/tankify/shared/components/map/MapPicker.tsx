@@ -128,22 +128,12 @@ function formatBadgePrice(
 const stationMarkerTemplateCache = new Map<string, HTMLElement>();
 
 function getTapSearchHereHint(t: TranslationSchema, label: string): string {
-    if (label.includes("Tankstellen")) {
-        return `Tippe auf "${label}", um Tankstellen im Kartenausschnitt zu laden.`;
-    }
-    if (label.toLowerCase().includes("gas station")) {
-        return `Tap "${label}" to load stations in this area.`;
-    }
+    void label;
     return t.route.tapSearchHere;
 }
 
 function getAreaChangedHint(t: TranslationSchema, label: string): string {
-    if (label.includes("Tankstellen")) {
-        return `Kartenausschnitt geaendert. Tippe auf "${label}".`;
-    }
-    if (label.toLowerCase().includes("gas station")) {
-        return `Map area changed. Tap "${label}".`;
-    }
+    void label;
     return t.route.areaChanged;
 }
 
@@ -325,6 +315,10 @@ export default function MapPicker({
     const [needsSearchHere, setNeedsSearchHere] = useState(true);
     const [hideSearchOverlay, setHideSearchOverlay] = useState(false);
     const lastHideReqIdRef = useRef<number | null>(null);
+    const tRef = useRef(t);
+    useEffect(() => {
+        tRef.current = t;
+    }, [t]);
 
     const [locationEnabled, setLocationEnabled] = useState(
         Boolean(defaultLocationEnabled)
@@ -435,7 +429,7 @@ export default function MapPicker({
                     // the geolocation API itself. (Avoid false negatives on Safari iOS.)
                     if (state === "denied" && geoDeniedConfirmedRef.current) {
                         setLocationEnabled(false);
-                        setLocationError("Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren.");
+                        setLocationError(tRef.current.errors.locationDisabled);
                     }
                 };
 
@@ -742,7 +736,7 @@ export default function MapPicker({
                 return;
             }
 
-            setStartupCenterError("Standort konnte nicht bestimmt werden.");
+            setStartupCenterError(tRef.current.errors.locationFailed);
         })();
     }, [startupCenter, startupAttempt, fetchIpLocation, suspendStartup]);
 
@@ -756,7 +750,7 @@ export default function MapPicker({
             startupReqIdRef.current += 1;
             const point = startupManualSelected ?? (await geocode(q));
             if (!point) {
-                setStartupManualError("Ort nicht gefunden.");
+                setStartupManualError(tRef.current.errors.placeNotFound);
                 return;
             }
 
@@ -764,9 +758,9 @@ export default function MapPicker({
             setStartupCenter({ lat: point.lat, lon: point.lon, source: "manual" });
         } catch (e) {
             if (e instanceof Error && e.message === "GEOCODE_FAILED") {
-                setStartupManualError("Suche fehlgeschlagen. Bitte erneut versuchen.");
+                setStartupManualError(tRef.current.errors.placeSearchFailed);
             } else {
-                setStartupManualError("Suche fehlgeschlagen. Bitte erneut versuchen.");
+                setStartupManualError(tRef.current.errors.placeSearchFailed);
             }
         } finally {
             setStartupManualLoading(false);
@@ -1372,11 +1366,11 @@ export default function MapPicker({
 
         if (typeof window === "undefined") return;
         if (!window.isSecureContext) {
-            setLocationError("Geolocation requires HTTPS (or localhost).");
+            setLocationError(tRef.current.errors.geoRequiresHttps);
             return;
         }
         if (!navigator.geolocation) {
-            setLocationError("Geolocation not available.");
+            setLocationError(tRef.current.errors.geoNotAvailable);
             return;
         }
 
@@ -1432,7 +1426,7 @@ export default function MapPicker({
                         setGeoPermission("prompt");
                         setLocationEnabled(false);
                         setLocationError(
-                            'Standort konnte nicht automatisch aktiviert werden. Bitte tippen Sie auf "Standort einschalten" und erlauben Sie den Zugriff in Safari.'
+                            tRef.current.errors.locationAutoEnableFailed
                         );
                         return;
                     }
@@ -1442,12 +1436,12 @@ export default function MapPicker({
                     setGeoPermission("denied");
                     setLocationEnabled(false);
                     setLocationError(
-                        "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
+                        tRef.current.errors.locationDisabled
                     );
                     return;
                 }
 
-                setLocationError(err.message || "Location error");
+                setLocationError(err.message || tRef.current.errors.locationErrorGeneric);
                 if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
                 if (code !== 1) {
                     retryTimerRef.current = setTimeout(() => {
@@ -1523,7 +1517,12 @@ export default function MapPicker({
             onStationsChange?.(result.stations as Station[]);
 
             if (result.error) {
-                setSearchHint(result.error);
+                // Don't show provider/internal server messages to users. Only show details in debug mode.
+                setSearchHint(
+                    debugMode && result.error.detail
+                        ? result.error.detail
+                        : t.route.stationsLoadFailed
+                );
             } else {
                 setSearchHint(
                     result.stations.length > 0
@@ -1602,10 +1601,10 @@ export default function MapPicker({
                 <div className="absolute inset-0 z-2000 grid place-items-center bg-white">
                     <div className="mx-6 max-w-sm rounded-3xl border border-gray-200 bg-white p-4 text-center shadow-sm">
                         <div className="text-sm font-semibold text-gray-900">
-                            Standort wird ermittelt...
+                            {t.route.locationResolvingTitle}
                         </div>
                         <div className="mt-1 text-xs text-gray-600">
-                            Bitte Standortzugriff erlauben.
+                            {t.route.locationResolvingHint}
                         </div>
                         {startupCenterError ? (
                             <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-900">
@@ -1614,7 +1613,7 @@ export default function MapPicker({
                         ) : null}
                         {startupCenterError ? (
                             <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-900">
-                                Entweder aktivieren sie ihren standort oder geben sie einen standort ein
+                                {t.route.locationManualPrompt}
                                 <form
                                     className="mt-2 flex gap-2"
                                     onSubmit={(e) => {
@@ -1625,7 +1624,7 @@ export default function MapPicker({
                                     <input
                                         value={startupManualQuery}
                                         onChange={(e) => setStartupManualQuery(e.target.value)}
-                                        placeholder="Ort eingeben (z.B. Wien)"
+                                        placeholder={t.route.locationManualPlaceholder}
                                         className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
                                         autoCapitalize="sentences"
                                         autoCorrect="on"
@@ -1641,12 +1640,12 @@ export default function MapPicker({
                                                 : "bg-blue-600 text-white hover:bg-blue-700")
                                         }
                                     >
-                                        {startupManualLoading ? "Suchen..." : "Suchen"}
+                                        {startupManualLoading ? t.actions.searching : t.actions.search}
                                     </button>
                                 </form>
                                 {startupManualSuggestionsLoading ? (
                                     <div className="mt-2 text-[11px] font-medium text-gray-600">
-                                        Vorschlaege werden geladen...
+                                        {t.route.suggestionsLoading}
                                     </div>
                                 ) : null}
                                 {startupManualSuggestions.length > 0 ? (
@@ -1696,7 +1695,7 @@ export default function MapPicker({
                                 }}
                                 className="mt-3 w-full rounded-2xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"
                             >
-                                Erneut versuchen
+                                {t.actions.retry}
                             </button>
                         ) : null}
                     </div>
@@ -1742,8 +1741,8 @@ export default function MapPicker({
                         if (!canUseGeolocation()) {
                             setLocationError(
                                 typeof window !== "undefined" && !window.isSecureContext
-                                    ? "Geolocation requires HTTPS (or localhost)."
-                                    : "Geolocation not available."
+                                    ? t.errors.geoRequiresHttps
+                                    : t.errors.geoNotAvailable
                             );
                             return;
                         }
@@ -1756,7 +1755,7 @@ export default function MapPicker({
                             geoDeniedConfirmedRef.current
                         ) {
                             setLocationError(
-                                "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
+                                t.errors.locationDisabled
                             );
                             return;
                         }
@@ -1768,12 +1767,12 @@ export default function MapPicker({
                     }}
                     title={
                         !canUseGeolocation()
-                            ? "Geolocation not available"
+                            ? t.errors.geoNotAvailable
                             : locationError
                                 ? locationError
                                 : locationEnabled
-                                    ? "Standort ausschalten"
-                                    : "Standort einschalten"
+                                    ? t.route.locationToggleOffTitle
+                                    : t.route.locationToggleOnTitle
                     }
                     aria-pressed={locationEnabled}
                     aria-disabled={!canUseGeolocation()}

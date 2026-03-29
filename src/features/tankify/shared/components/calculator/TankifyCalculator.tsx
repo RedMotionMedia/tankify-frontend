@@ -900,7 +900,7 @@ export default function TankifyCalculator() {
                                         type="button"
                                         onClick={() => setSettingsOpen(true)}
                                         className="h-11 w-11 place-items-center rounded-full border border-gray-200 shadow-sm transition hover:bg-gray-50 active:scale-95 text-[0px]"
-                                        aria-label="Open settings"
+                                        aria-label={t.actions.openSettings}
                                     >
                                         <svg
                                             viewBox="0 0 64 64"
@@ -1052,8 +1052,8 @@ export default function TankifyCalculator() {
                                 type="button"
                                 onClick={() => setDesktopResultsOpen(true)}
                                 className="absolute bottom-0 right-5 z-50 rounded-t-full border border-gray-200 bg-white text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 grid h-12 w-12 place-items-center"
-                                aria-label="Expand results"
-                                title="Expand results"
+                                aria-label={t.actions.expandResults}
+                                title={t.actions.expandResults}
                             >
                                 <span className="inline-flex items-center gap-2">
                                     <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
@@ -1105,8 +1105,8 @@ export default function TankifyCalculator() {
                                     type="button"
                                     onClick={() => setDesktopStationsOpen(true)}
                                     className="fixed right-0 top-15 z-50 -translate-y-1/2 rounded-l-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 h-12 w-12 place-items-center"
-                                    aria-label="Expand stations"
-                                    title="Expand stations"
+                                    aria-label={t.actions.expandStations}
+                                    title={t.actions.expandStations}
                                 >
                                     <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
                                         <path
@@ -1185,7 +1185,7 @@ export default function TankifyCalculator() {
                             type="button"
                             onClick={() => setSettingsOpen(true)}
                             className="grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow-md backdrop-blur transition hover:bg-white active:scale-95 text-[0px]"
-                            aria-label="Open settings"
+                            aria-label={t.actions.openSettings}
                         >
                             <svg
                                 viewBox="0 0 64 64"

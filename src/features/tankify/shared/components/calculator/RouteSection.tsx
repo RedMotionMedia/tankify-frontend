@@ -51,6 +51,8 @@ export default function RouteSection({
                 onSearch={() => onSearch("start")}
                 onSuggestionPick={(p) => onSuggestionPick("start", p)}
                 onClear={() => onClear("start")}
+                clearLabel={t.actions.clear}
+                suggestionsLoadingLabel={t.route.suggestionsLoading}
                 onPickOnMap={onPickStart}
                 onUseMyLocation={onUseMyLocationAsStart}
                 loading={searchLoading === "start"}
@@ -96,6 +98,8 @@ export default function RouteSection({
                 onSearch={() => onSearch("end")}
                 onSuggestionPick={(p) => onSuggestionPick("end", p)}
                 onClear={() => onClear("end")}
+                clearLabel={t.actions.clear}
+                suggestionsLoadingLabel={t.route.suggestionsLoading}
                 onPickOnMap={onPickEnd}
                 onUseMyLocation={onUseMyLocationAsDestination}
                 loading={searchLoading === "end"}

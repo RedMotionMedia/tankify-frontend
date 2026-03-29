@@ -292,7 +292,7 @@ export default function MobileStationsSidebar({
                             ? "border-green-200 bg-green-50 text-green-500"
                             : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50")
                     }
-                    title="Geoeffnet zuerst"
+                    title={t.actions.sortOpenFirst}
                     aria-pressed={openFirst}
                 >
                     {t.station.open}
@@ -302,11 +302,11 @@ export default function MobileStationsSidebar({
                     type="button"
                     onClick={() => setPriceSort((v) => cycleSort(v))}
                     className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-95"
-                    title="Preis sortieren"
-                    aria-label="Preis sortieren"
+                    title={t.actions.sortPrice}
+                    aria-label={t.actions.sortPrice}
                 >
                     <SortIcon dir={priceSort} />
-                    Preis
+                    {t.pricing.sourcePrice}
                 </button>
 
                 {hasDistanceData ? (
@@ -337,8 +337,8 @@ export default function MobileStationsSidebar({
                             });
                         }}
                         className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 active:scale-95"
-                        title="Distanz sortieren"
-                        aria-label="Distanz sortieren"
+                        title={t.actions.sortDistance}
+                        aria-label={t.actions.sortDistance}
                     >
                         <SortIcon dir={distanceSort} />
                         {t.station.distance}
@@ -408,7 +408,7 @@ export default function MobileStationsSidebar({
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                             }}
-                                            aria-label="Navigation oeffnen"
+                                            aria-label={t.actions.openNavigation}
                                             href={navUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"

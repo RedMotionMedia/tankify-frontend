@@ -30,6 +30,9 @@ export type TranslationSchema = {
         mobileTitle: string;
         mobileSubtitle: string;
         adjustCalculator: string;
+        calculatorTab: string;
+        stationsTab: string;
+        placeholderDash: string;
     };
     route: {
         title: string;
@@ -57,6 +60,13 @@ export type TranslationSchema = {
         stationsLoaded: string;
         noStationsFound: string;
         stationsLoadFailed: string;
+        locationResolvingTitle: string;
+        locationResolvingHint: string;
+        locationManualPrompt: string;
+        locationManualPlaceholder: string;
+        suggestionsLoading: string;
+        locationToggleOnTitle: string;
+        locationToggleOffTitle: string;
     };
     pricing: {
         title: string;
@@ -131,6 +141,16 @@ export type TranslationSchema = {
     };
         actions: {
             search: string;
+            searching: string;
+            clear: string;
+            retry: string;
+            openSettings: string;
+            expandResults: string;
+            expandStations: string;
+            openNavigation: string;
+            sortOpenFirst: string;
+            sortPrice: string;
+            sortDistance: string;
             map: string;
             swap: string;
             calculate: string;
@@ -161,6 +181,13 @@ export type TranslationSchema = {
         routeLoadFailed: string;
         geocodeFailed: string;
         locationFailed: string;
+        placeNotFound: string;
+        placeSearchFailed: string;
+        geoRequiresHttps: string;
+        geoNotAvailable: string;
+        locationDisabled: string;
+        locationAutoEnableFailed: string;
+        locationErrorGeneric: string;
     };
 };
 
@@ -197,6 +224,9 @@ export const translations: Record<Language, TranslationSchema> = {
             mobileSubtitle:
                 "Prüfe, ob sich die Fahrt zum günstigeren Tanken wirklich auszahlt.",
             adjustCalculator: "Rechner anpassen",
+            calculatorTab: "Rechner",
+            stationsTab: "Tankstellen",
+            placeholderDash: "-",
         },
         route: {
             title: "Route",
@@ -225,6 +255,13 @@ export const translations: Record<Language, TranslationSchema> = {
             stationsLoaded: "Tankstellen geladen.",
             noStationsFound: "Keine Tankstellen gefunden.",
             stationsLoadFailed: "Tankstellen konnten nicht geladen werden.",
+            locationResolvingTitle: "Standort wird ermittelt...",
+            locationResolvingHint: "Bitte Standortzugriff erlauben.",
+            locationManualPrompt: "Entweder aktivieren sie ihren standort oder geben sie einen standort ein",
+            locationManualPlaceholder: "Ort eingeben (z.B. Wien)",
+            suggestionsLoading: "Vorschlaege werden geladen...",
+            locationToggleOnTitle: "Standort einschalten",
+            locationToggleOffTitle: "Standort ausschalten",
         },
         pricing: {
             title: "Preise",
@@ -301,6 +338,16 @@ export const translations: Record<Language, TranslationSchema> = {
         },
         actions: {
             search: "Suchen",
+            searching: "Suchen...",
+            clear: "Leeren",
+            retry: "Erneut versuchen",
+            openSettings: "Einstellungen öffnen",
+            expandResults: "Ergebnisse anzeigen",
+            expandStations: "Tankstellen anzeigen",
+            openNavigation: "Navigation öffnen",
+            sortOpenFirst: "Geöffnet zuerst",
+            sortPrice: "Preis sortieren",
+            sortDistance: "Distanz sortieren",
             map: "Karte",
             swap: "Tauschen",
             calculate: "Berechnen",
@@ -331,6 +378,14 @@ export const translations: Record<Language, TranslationSchema> = {
             routeLoadFailed: "Route konnte nicht geladen werden.",
             geocodeFailed: "Adresssuche fehlgeschlagen.",
             locationFailed: "Standort konnte nicht ermittelt werden.",
+            placeNotFound: "Ort nicht gefunden.",
+            placeSearchFailed: "Suche fehlgeschlagen. Bitte erneut versuchen.",
+            geoRequiresHttps: "Standort erfordert HTTPS (oder localhost).",
+            geoNotAvailable: "Standort ist nicht verfuegbar.",
+            locationDisabled: "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren.",
+            locationAutoEnableFailed:
+                'Standort konnte nicht automatisch aktiviert werden. Bitte tippen Sie auf "Standort einschalten" und erlauben Sie den Zugriff im Browser.',
+            locationErrorGeneric: "Standort-Fehler.",
         },
     },
     en: {
@@ -365,6 +420,9 @@ export const translations: Record<Language, TranslationSchema> = {
             mobileSubtitle:
                 "Check whether the trip for cheaper refueling is actually worth it.",
             adjustCalculator: "Adjust calculator",
+            calculatorTab: "Calculator",
+            stationsTab: "Stations",
+            placeholderDash: "-",
         },
         route: {
             title: "Route",
@@ -393,6 +451,13 @@ export const translations: Record<Language, TranslationSchema> = {
             stationsLoaded: "gas stations loaded.",
             noStationsFound: "No gas stations found.",
             stationsLoadFailed: "Could not load gas stations.",
+            locationResolvingTitle: "Determining location...",
+            locationResolvingHint: "Please allow location access.",
+            locationManualPrompt: "Either enable your location or enter a place",
+            locationManualPlaceholder: "Enter a place (e.g. Vienna)",
+            suggestionsLoading: "Loading suggestions...",
+            locationToggleOnTitle: "Enable location",
+            locationToggleOffTitle: "Disable location",
         },
         pricing: {
             title: "Prices",
@@ -468,6 +533,16 @@ export const translations: Record<Language, TranslationSchema> = {
         },
         actions: {
             search: "Search",
+            searching: "Searching...",
+            clear: "Clear",
+            retry: "Try again",
+            openSettings: "Open settings",
+            expandResults: "Expand results",
+            expandStations: "Expand stations",
+            openNavigation: "Open navigation",
+            sortOpenFirst: "Open first",
+            sortPrice: "Sort by price",
+            sortDistance: "Sort by distance",
             map: "Map",
             swap: "Swap",
             calculate: "Calculate",
@@ -498,6 +573,14 @@ export const translations: Record<Language, TranslationSchema> = {
             routeLoadFailed: "Route could not be loaded.",
             geocodeFailed: "Address search failed.",
             locationFailed: "Could not determine location.",
+            placeNotFound: "Place not found.",
+            placeSearchFailed: "Search failed. Please try again.",
+            geoRequiresHttps: "Location requires HTTPS (or localhost).",
+            geoNotAvailable: "Location is not available.",
+            locationDisabled: "Location is disabled. Please enable it in browser settings.",
+            locationAutoEnableFailed:
+                'Location could not be enabled automatically. Please press "Enable location" and allow access in your browser.',
+            locationErrorGeneric: "Location error.",
         },
     },
 };
