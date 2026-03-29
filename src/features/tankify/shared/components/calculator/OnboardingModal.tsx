@@ -108,7 +108,7 @@ export default function OnboardingModal({
     const currencyOptions = fxCurrencies ?? { EUR: "Euro", USD: "US Dollar" };
 
     return (
-        <div className="fixed inset-0 z-[2000] grid place-items-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[3200] grid place-items-center bg-black/40 p-4">
             <div
                 role="dialog"
                 aria-modal="true"

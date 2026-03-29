@@ -218,7 +218,16 @@ export default function StationPopupContent({
                             aria-hidden="true"
                             className="text-gray-500 transition-transform group-open:rotate-90"
                         >
-                            ▶
+                            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden="true" focusable="false">
+                                <path
+                                    d="M7 5l6 5-6 5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
                         </span>
                         <span className="flex-auto">{t.station.openingHours}</span>
                         <span className="text-[11px] font-medium inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 ring-1 ring-green-200 text-green-500">
@@ -263,7 +272,7 @@ export default function StationPopupContent({
                             })}
                         </div>
                     ) : (
-                        <div className="mt-2 text-xs text-gray-500">—</div>
+                        <div className="mt-2 text-xs text-gray-500">{t.app.placeholderDash}</div>
                     )}
                 </details>
 
@@ -273,7 +282,16 @@ export default function StationPopupContent({
                             aria-hidden="true"
                             className="text-gray-500 transition-transform group-open:rotate-90"
                         >
-                            ▶
+                            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden="true" focusable="false">
+                                <path
+                                    d="M7 5l6 5-6 5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
                         </span>
                         <span className="flex-auto">{t.station.payment}</span>
                     </summary>
@@ -290,7 +308,7 @@ export default function StationPopupContent({
                             ))}
                         </div>
                     ) : (
-                        <div className="mt-2 text-xs text-gray-500">â€”</div>
+                        <div className="mt-2 text-xs text-gray-500">{t.app.placeholderDash}</div>
                     )}
                 </details>
 
@@ -300,7 +318,16 @@ export default function StationPopupContent({
                             aria-hidden="true"
                             className="text-gray-500 transition-transform group-open:rotate-90"
                         >
-                            ▶
+                            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden="true" focusable="false">
+                                <path
+                                    d="M7 5l6 5-6 5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
                         </span>
                         <span className="flex-auto">{t.station.contact}</span>
                     </summary>
@@ -344,7 +371,7 @@ export default function StationPopupContent({
                             ) : null}
                         </div>
                     ) : (
-                        <div className="mt-2 text-xs text-gray-500">—</div>
+                        <div className="mt-2 text-xs text-gray-500">{t.app.placeholderDash}</div>
                     )}
                 </details>
 
@@ -355,7 +382,16 @@ export default function StationPopupContent({
                                 aria-hidden="true"
                                 className="text-gray-500 transition-transform group-open:rotate-90"
                             >
-                                ▶
+                                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden="true" focusable="false">
+                                    <path
+                                        d="M7 5l6 5-6 5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </svg>
                             </span>
                             <span className="flex-auto">{t.station.otherOffers}</span>
                         </summary>
@@ -372,7 +408,16 @@ export default function StationPopupContent({
                                 aria-hidden="true"
                                 className="text-gray-500 transition-transform group-open:rotate-90"
                             >
-                                ▶
+                                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden="true" focusable="false">
+                                    <path
+                                        d="M7 5l6 5-6 5"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </svg>
                             </span>
                             <span className="flex-auto">{t.station.rawData}</span>
                         </summary>

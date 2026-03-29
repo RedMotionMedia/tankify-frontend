@@ -30,7 +30,7 @@ export async function fetchStationsForVisibleMap(bounds: {
     east: number;
     centerLat: number;
     centerLon: number;
-}, options?: { includeClosed?: boolean; debug?: boolean }): Promise<{stations: Station[]; error?: string | null}> {
+}, options?: { includeClosed?: boolean; debug?: boolean }): Promise<{stations: Station[]; error?: { code: "LOAD_FAILED"; detail?: string } | null}> {
     const params = new URLSearchParams({
         south: String(bounds.south),
         west: String(bounds.west),
@@ -46,14 +46,14 @@ export async function fetchStationsForVisibleMap(bounds: {
     const res = await fetch(`/api/stations?${params.toString()}`);
 
     if (!res.ok) {
-        let message = "Tankstellen konnten nicht geladen werden.";
+        let detail: string | undefined = undefined;
 
         try {
             const data = await res.json();
-            if (data?.error) message = data.error;
+            if (typeof data?.error === "string" && data.error.trim()) detail = data.error.trim();
         } catch {}
 
-        return { stations: [], error: message };
+        return { stations: [], error: { code: "LOAD_FAILED", detail } };
     }
 
     const data = await res.json();

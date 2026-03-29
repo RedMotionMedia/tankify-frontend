@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { TranslationSchema } from "@/features/tankify/shared/config/i18n";
 import {
     CurrencySystem,
@@ -10,7 +10,7 @@ import {
     Point,
     Station,
 } from "@/features/tankify/shared/types/tankify";
-import { reverseGeocode } from "@/features/tankify/shared/lib/geocode";
+import { geocode, geocodeSuggestions, reverseGeocode } from "@/features/tankify/shared/lib/geocode";
 import { fetchStationsForVisibleMap } from "@/features/tankify/shared/lib/route";
 import { pricePerLiterToPerGallon } from "@/features/tankify/shared/lib/units";
 import { eurToQuote } from "@/features/tankify/shared/lib/fx";
@@ -44,6 +44,7 @@ type Props = {
     hideSearchOverlayRequestId?: number;
     onSearchHereStart?: () => void;
     recenterRequestId?: number;
+    suspendStartup?: boolean;
 };
 
 type UserLocation = { lat: number; lon: number };
@@ -51,17 +52,14 @@ type GeoPermissionState = PermissionState | "unsupported" | "unavailable";
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM = 12;
-// Default view when we don't yet have a user location or any route points.
-// Keep this reasonably wide; when geolocation is enabled we pan to the user location,
-// but we avoid starting overly zoomed-in.
-const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 12 };
+const DEFAULT_ZOOM = 12;
 
 function isFiniteNumber(v: unknown): v is number {
     return typeof v === "number" && Number.isFinite(v);
 }
 
-function sanitizeLatLng(center: [number, number]): [number, number] {
-    return isFiniteNumber(center[0]) && isFiniteNumber(center[1]) ? center : FALLBACK_VIEW.center;
+function sanitizeLatLng(center: [number, number]): [number, number] | null {
+    return isFiniteNumber(center[0]) && isFiniteNumber(center[1]) ? center : null;
 }
 
 function haversineKm(a: UserLocation, b: { lat: number; lon: number }): number {
@@ -130,22 +128,12 @@ function formatBadgePrice(
 const stationMarkerTemplateCache = new Map<string, HTMLElement>();
 
 function getTapSearchHereHint(t: TranslationSchema, label: string): string {
-    if (label.includes("Tankstellen")) {
-        return `Tippe auf "${label}", um Tankstellen im Kartenausschnitt zu laden.`;
-    }
-    if (label.toLowerCase().includes("gas station")) {
-        return `Tap "${label}" to load stations in this area.`;
-    }
+    void label;
     return t.route.tapSearchHere;
 }
 
 function getAreaChangedHint(t: TranslationSchema, label: string): string {
-    if (label.includes("Tankstellen")) {
-        return `Kartenausschnitt geaendert. Tippe auf "${label}".`;
-    }
-    if (label.toLowerCase().includes("gas station")) {
-        return `Map area changed. Tap "${label}".`;
-    }
+    void label;
     return t.route.areaChanged;
 }
 
@@ -309,6 +297,7 @@ export default function MapPicker({
     hideSearchOverlayRequestId,
     onSearchHereStart,
     recenterRequestId,
+    suspendStartup = false,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -326,6 +315,10 @@ export default function MapPicker({
     const [needsSearchHere, setNeedsSearchHere] = useState(true);
     const [hideSearchOverlay, setHideSearchOverlay] = useState(false);
     const lastHideReqIdRef = useRef<number | null>(null);
+    const tRef = useRef(t);
+    useEffect(() => {
+        tRef.current = t;
+    }, [t]);
 
     const [locationEnabled, setLocationEnabled] = useState(
         Boolean(defaultLocationEnabled)
@@ -335,12 +328,7 @@ export default function MapPicker({
     const didAutoEnableLocationRef = useRef(Boolean(defaultLocationEnabled));
     const [locationError, setLocationError] = useState<string | null>(null);
     const [locationAttempt, setLocationAttempt] = useState(0);
-    const [geoPermission, setGeoPermission] = useState<GeoPermissionState>(() => {
-        if (typeof window === "undefined") return "unsupported";
-        if (!window.isSecureContext) return "unavailable";
-        if (!navigator.geolocation) return "unavailable";
-        return "unsupported";
-    });
+    const [geoPermission, setGeoPermission] = useState<GeoPermissionState>("unsupported");
     // Safari (especially iOS) can report incorrect geolocation permission state via the Permissions API.
     // We only "trust" denied once we observed a real GeolocationPositionError(code=1) at runtime.
     const geoDeniedConfirmedRef = useRef(false);
@@ -370,6 +358,17 @@ export default function MapPicker({
     useEffect(() => {
         userLocationRef.current = userLocation;
     }, [userLocation]);
+
+    // Avoid hydration mismatches: server render cannot know whether geolocation is available.
+    // Keep initial render stable and only compute capabilities after mount.
+    const [geoAvailable, setGeoAvailable] = useState(false);
+    useEffect(() => {
+        try {
+            setGeoAvailable(Boolean(window.isSecureContext && navigator.geolocation));
+        } catch {
+            setGeoAvailable(false);
+        }
+    }, []);
 
     const startRef = useRef<Point | null>(start);
     const endRef = useRef<Point | null>(end);
@@ -430,7 +429,7 @@ export default function MapPicker({
                     // the geolocation API itself. (Avoid false negatives on Safari iOS.)
                     if (state === "denied" && geoDeniedConfirmedRef.current) {
                         setLocationEnabled(false);
-                        setLocationError("Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren.");
+                        setLocationError(tRef.current.errors.locationDisabled);
                     }
                 };
 
@@ -561,6 +560,253 @@ export default function MapPicker({
         stations: MapLibreMarker[];
     }>({ start: null, end: null, user: null, stations: [] });
 
+    const [startupCenter, setStartupCenter] = useState<{
+        lat: number;
+        lon: number;
+        source: "gps" | "ip" | "manual";
+    } | null>(null);
+    const [startupCenterError, setStartupCenterError] = useState<string | null>(null);
+    const [startupManualQuery, setStartupManualQuery] = useState("");
+    const [startupManualLoading, setStartupManualLoading] = useState(false);
+    const [startupManualError, setStartupManualError] = useState<string | null>(null);
+    const [startupManualSuggestions, setStartupManualSuggestions] = useState<Point[]>([]);
+    const [startupManualSuggestionsLoading, setStartupManualSuggestionsLoading] = useState(false);
+    const [startupManualSelected, setStartupManualSelected] = useState<Point | null>(null);
+    const startupSuggestAbortRef = useRef<AbortController | null>(null);
+    const [startupAttempt, setStartupAttempt] = useState(0);
+    const startupReqIdRef = useRef(0);
+    const ipAbortRef = useRef<AbortController | null>(null);
+    const startupLastStartedAttemptRef = useRef<number | null>(null);
+
+    const fetchIpLocation = useCallback(async (): Promise<{ lat: number; lon: number } | null> => {
+        try {
+            ipAbortRef.current?.abort();
+            const outer = new AbortController();
+            ipAbortRef.current = outer;
+
+            const fetchWithTimeout = async (url: string, timeoutMs: number): Promise<Response> => {
+                const c = new AbortController();
+                const abort = () => c.abort();
+                let timer: number | null = null;
+                try {
+                    if (outer.signal.aborted) c.abort();
+                    else outer.signal.addEventListener("abort", abort, { once: true });
+                    timer = window.setTimeout(() => c.abort(), timeoutMs);
+                    return await fetch(url, {
+                        signal: c.signal,
+                        headers: { Accept: "application/json" },
+                        cache: "no-store",
+                    });
+                } finally {
+                    if (timer != null) window.clearTimeout(timer);
+                    try {
+                        outer.signal.removeEventListener("abort", abort);
+                    } catch {}
+                }
+            };
+
+            const parseIpify = (txt: string): string | null => {
+                try {
+                    const parsed = JSON.parse(txt) as Partial<{ ip: string }>;
+                    const v = typeof parsed.ip === "string" ? parsed.ip.trim() : "";
+                    return v ? v : null;
+                } catch {
+                    return null;
+                }
+            };
+
+            const tryFetchPublicIp = async (): Promise<string | null> => {
+                // On iOS Safari (especially Private Browsing) first-time DNS/TLS can be slow.
+                // Use dedicated timeouts and multiple endpoints for resilience.
+                const endpoints = [
+                    "https://api.ipify.org?format=json",
+                    "https://api64.ipify.org?format=json",
+                ];
+                for (const url of endpoints) {
+                    try {
+                        const res = await fetchWithTimeout(url, 8000);
+                        if (!res.ok) continue;
+                        const txt = await res.text();
+                        const ip = parseIpify(txt);
+                        if (ip) return ip;
+                    } catch {}
+                }
+                return null;
+            };
+
+            // Prefer the client public IP if possible (works in local dev and doesn't rely on forwarded headers).
+            const ip = await tryFetchPublicIp();
+
+            const url = ip ? `/api/ip-location?ip=${encodeURIComponent(ip)}` : "/api/ip-location";
+            const res = await fetchWithTimeout(url, 12000);
+            const text = await res.text();
+            if (!text.trim()) return null;
+
+            const parsed = JSON.parse(text) as Partial<
+                | { ok: true; lat: number; lon: number; provider?: string; ipUsed?: string | null }
+                | {
+                    ok: false;
+                    ipUsed?: string | null;
+                    error?: { type?: string; message?: string; statusHint?: number };
+                    tried?: Array<{ provider?: string; status?: number; message?: string; error?: string; url?: string }>;
+                }
+            >;
+
+            if (parsed && (parsed as { ok?: unknown }).ok === true) {
+                const lat = typeof (parsed as { lat?: unknown }).lat === "number" ? (parsed as { lat: number }).lat : Number.NaN;
+                const lon = typeof (parsed as { lon?: unknown }).lon === "number" ? (parsed as { lon: number }).lon : Number.NaN;
+                if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+                return null;
+            }
+
+            return null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    // Resolve initial map center once. Prefer GPS (will trigger the permission prompt),
+    // and fall back to IP location if GPS is unavailable or fails.
+    useEffect(() => {
+        if (startupCenter) return;
+        if (typeof window === "undefined") return;
+        if (suspendStartup) return;
+        // Prevent double invocation in dev StrictMode from triggering multiple prompts.
+        if (startupLastStartedAttemptRef.current === startupAttempt) return;
+        startupLastStartedAttemptRef.current = startupAttempt;
+
+        const reqId = ++startupReqIdRef.current;
+        setStartupCenterError(null);
+        setStartupManualError(null);
+
+        void (async () => {
+            const tryGeolocation = async (): Promise<{ lat: number; lon: number } | null> => {
+                try {
+                    if (!window.isSecureContext || !navigator.geolocation) return null;
+
+                    const tryOnce = (opts: PositionOptions) =>
+                        new Promise<GeolocationPosition>((resolve, reject) => {
+                            navigator.geolocation.getCurrentPosition(resolve, reject, opts);
+                        });
+
+                    // High accuracy can be flaky/time out; fall back to a more permissive request.
+                    const pos = await tryOnce({
+                        enableHighAccuracy: true,
+                        timeout: 20_000,
+                        maximumAge: 0,
+                    }).catch(() =>
+                        tryOnce({
+                            enableHighAccuracy: false,
+                            timeout: 25_000,
+                            maximumAge: 10_000,
+                        })
+                    );
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+                    return { lat, lon };
+                } catch {
+                    return null;
+                }
+            };
+
+            const geo = await tryGeolocation();
+            if (startupReqIdRef.current !== reqId) return;
+            if (geo) {
+                userLocationRef.current = { lat: geo.lat, lon: geo.lon };
+                setUserLocation({ lat: geo.lat, lon: geo.lon });
+                geoEverGrantedRef.current = true;
+                setGeoPermission("granted");
+                didCenterOnEnableRef.current = true;
+                try {
+                    window.dispatchEvent(
+                        new CustomEvent("tankify:user-location", {
+                            detail: { lat: geo.lat, lon: geo.lon },
+                        })
+                    );
+                } catch {}
+                setStartupCenter({ lat: geo.lat, lon: geo.lon, source: "gps" });
+                return;
+            }
+
+            const ip = await fetchIpLocation();
+            if (startupReqIdRef.current !== reqId) return;
+            if (ip) {
+                setStartupCenter({ lat: ip.lat, lon: ip.lon, source: "ip" });
+                return;
+            }
+
+            setStartupCenterError(tRef.current.errors.locationFailed);
+        })();
+    }, [startupCenter, startupAttempt, fetchIpLocation, suspendStartup]);
+
+    const handleStartupManualSearch = useCallback(async () => {
+        const q = startupManualQuery.trim();
+        if (!q) return;
+        setStartupManualLoading(true);
+        setStartupManualError(null);
+        try {
+            // Cancel any in-flight startup attempt (GPS/IP).
+            startupReqIdRef.current += 1;
+            const point = startupManualSelected ?? (await geocode(q));
+            if (!point) {
+                setStartupManualError(tRef.current.errors.placeNotFound);
+                return;
+            }
+
+            setStartupCenterError(null);
+            setStartupCenter({ lat: point.lat, lon: point.lon, source: "manual" });
+        } catch (e) {
+            if (e instanceof Error && e.message === "GEOCODE_FAILED") {
+                setStartupManualError(tRef.current.errors.placeSearchFailed);
+            } else {
+                setStartupManualError(tRef.current.errors.placeSearchFailed);
+            }
+        } finally {
+            setStartupManualLoading(false);
+        }
+    }, [startupManualQuery, startupManualSelected]);
+
+    useEffect(() => {
+        // Only fetch suggestions when the manual entry UI is visible.
+        if (!startupCenterError) return;
+
+        const q = startupManualQuery.trim();
+        setStartupManualSelected(null);
+        if (q.length < 3) {
+            startupSuggestAbortRef.current?.abort();
+            setStartupManualSuggestions([]);
+            setStartupManualSuggestionsLoading(false);
+            return;
+        }
+
+        startupSuggestAbortRef.current?.abort();
+        const controller = new AbortController();
+        startupSuggestAbortRef.current = controller;
+
+        setStartupManualSuggestionsLoading(true);
+        const t = window.setTimeout(() => {
+            void (async () => {
+                try {
+                    const results = await geocodeSuggestions(q, 5);
+                    if (controller.signal.aborted) return;
+                    setStartupManualSuggestions(results);
+                } catch {
+                    if (controller.signal.aborted) return;
+                    setStartupManualSuggestions([]);
+                } finally {
+                    if (controller.signal.aborted) return;
+                    setStartupManualSuggestionsLoading(false);
+                }
+            })();
+        }, 250);
+
+        return () => {
+            window.clearTimeout(t);
+            controller.abort();
+        };
+    }, [startupCenterError, startupManualQuery]);
+
     function upsertUserLocationMarker(map: MapLibreMap, loc: { lat: number; lon: number }) {
         const bucket = markerBucketRef.current;
         try {
@@ -628,15 +874,6 @@ export default function MapPicker({
         }
     }, [start, end, stations, selectedStationId, applyStationMarkerVisibility]);
 
-    const safeCenter = useMemo<[number, number]>(() => {
-        if (start && end) {
-            return sanitizeLatLng([(start.lat + end.lat) / 2, (start.lon + end.lon) / 2]);
-        }
-        if (start) return sanitizeLatLng([start.lat, start.lon]);
-        if (end) return sanitizeLatLng([end.lat, end.lon]);
-        return FALLBACK_VIEW.center;
-    }, [start, end]);
-
     const hideStartMarker =
         !start ||
         (userLocation != null && isNearKm(userLocation, start, 0.03)) ||
@@ -661,6 +898,7 @@ export default function MapPicker({
 
     // Create/destroy map.
     useEffect(() => {
+        if (!startupCenter) return;
         let cancelled = false;
 
         (async () => {
@@ -676,8 +914,8 @@ export default function MapPicker({
                 const map = new maplibre.Map({
                     container,
                     style: OPENFREE_MAP_STYLE_URL,
-                    center: [safeCenter[1], safeCenter[0]],
-                    zoom: FALLBACK_VIEW.zoom,
+                    center: [startupCenter.lon, startupCenter.lat],
+                    zoom: DEFAULT_ZOOM,
                     attributionControl: false,
                     // Reduce console noise from strict style validation on remote styles.
                     // Also avoid internal resize tracking; we manage resize via a debounced ResizeObserver.
@@ -886,7 +1124,7 @@ export default function MapPicker({
             mapRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [startupCenter]);
 
     // Update route source.
     useEffect(() => {
@@ -1109,6 +1347,9 @@ export default function MapPicker({
     useEffect(() => {
         const map = mapRef.current;
 
+        // Avoid triggering a second geolocation prompt during initial startup center resolution.
+        if (!startupCenter) return;
+
         if (!locationEnabled) {
             if (retryTimerRef.current) {
                 clearTimeout(retryTimerRef.current);
@@ -1125,11 +1366,11 @@ export default function MapPicker({
 
         if (typeof window === "undefined") return;
         if (!window.isSecureContext) {
-            setLocationError("Geolocation requires HTTPS (or localhost).");
+            setLocationError(tRef.current.errors.geoRequiresHttps);
             return;
         }
         if (!navigator.geolocation) {
-            setLocationError("Geolocation not available.");
+            setLocationError(tRef.current.errors.geoNotAvailable);
             return;
         }
 
@@ -1164,12 +1405,6 @@ export default function MapPicker({
                         new CustomEvent("tankify:user-location", { detail: { lat, lon } })
                     );
                 } catch {}
-                try {
-                    window.localStorage.setItem(
-                        "tankify-last-location",
-                        JSON.stringify({ lat, lon, ts: Date.now() })
-                    );
-                } catch {}
 
                 if (!didCenterOnEnableRef.current && map) {
                     didCenterOnEnableRef.current = true;
@@ -1191,7 +1426,7 @@ export default function MapPicker({
                         setGeoPermission("prompt");
                         setLocationEnabled(false);
                         setLocationError(
-                            'Standort konnte nicht automatisch aktiviert werden. Bitte tippen Sie auf "Standort einschalten" und erlauben Sie den Zugriff in Safari.'
+                            tRef.current.errors.locationAutoEnableFailed
                         );
                         return;
                     }
@@ -1201,12 +1436,12 @@ export default function MapPicker({
                     setGeoPermission("denied");
                     setLocationEnabled(false);
                     setLocationError(
-                        "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
+                        tRef.current.errors.locationDisabled
                     );
                     return;
                 }
 
-                setLocationError(err.message || "Location error");
+                setLocationError(err.message || tRef.current.errors.locationErrorGeneric);
                 if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
                 if (code !== 1) {
                     retryTimerRef.current = setTimeout(() => {
@@ -1231,7 +1466,7 @@ export default function MapPicker({
             }
             watchIdRef.current = null;
         };
-    }, [locationEnabled, locationAttempt]);
+    }, [startupCenter, locationEnabled, locationAttempt]);
 
     async function handleSearchHere() {
         const map = mapRef.current;
@@ -1282,7 +1517,12 @@ export default function MapPicker({
             onStationsChange?.(result.stations as Station[]);
 
             if (result.error) {
-                setSearchHint(result.error);
+                // Don't show provider/internal server messages to users. Only show details in debug mode.
+                setSearchHint(
+                    debugMode && result.error.detail
+                        ? result.error.detail
+                        : t.route.stationsLoadFailed
+                );
             } else {
                 setSearchHint(
                     result.stations.length > 0
@@ -1311,13 +1551,14 @@ export default function MapPicker({
         const validRoute = geom.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
         );
-        const points =
+        const rawPoints =
             validRoute.length > 0
                 ? validRoute
                 : [
-                    ...(s ? [sanitizeLatLng([s.lat, s.lon])] : []),
-                    ...(e ? [sanitizeLatLng([e.lat, e.lon])] : []),
-                ];
+                      ...(s ? [sanitizeLatLng([s.lat, s.lon])] : []),
+                      ...(e ? [sanitizeLatLng([e.lat, e.lon])] : []),
+                  ];
+        const points = rawPoints.filter((p): p is [number, number] => p !== null);
         if (points.length === 0) return;
         try {
             // If a layout transition resizes the map right after recentering,
@@ -1341,9 +1582,7 @@ export default function MapPicker({
     }, [recenterRequestId, handleRecenter]);
 
     function canUseGeolocation(): boolean {
-        if (typeof window === "undefined") return false;
-        if (!window.isSecureContext) return false;
-        return typeof navigator !== "undefined" && !!navigator.geolocation;
+        return geoAvailable;
     }
 
     useEffect(() => {
@@ -1357,6 +1596,111 @@ export default function MapPicker({
     return (
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full" />
+
+            {!startupCenter && !suspendStartup ? (
+                <div className="absolute inset-0 z-2000 grid place-items-center bg-white">
+                    <div className="mx-6 max-w-sm rounded-3xl border border-gray-200 bg-white p-4 text-center shadow-sm">
+                        <div className="text-sm font-semibold text-gray-900">
+                            {t.route.locationResolvingTitle}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600">
+                            {t.route.locationResolvingHint}
+                        </div>
+                        {startupCenterError ? (
+                            <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-900">
+                                {startupCenterError}
+                            </div>
+                        ) : null}
+                        {startupCenterError ? (
+                            <div className="mt-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-900">
+                                {t.route.locationManualPrompt}
+                                <form
+                                    className="mt-2 flex gap-2"
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        void handleStartupManualSearch();
+                                    }}
+                                >
+                                    <input
+                                        value={startupManualQuery}
+                                        onChange={(e) => setStartupManualQuery(e.target.value)}
+                                        placeholder={t.route.locationManualPlaceholder}
+                                        className="min-w-0 flex-1 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
+                                        autoCapitalize="sentences"
+                                        autoCorrect="on"
+                                        inputMode="search"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!startupManualQuery.trim() || startupManualLoading}
+                                        className={
+                                            "shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm active:scale-[0.99] " +
+                                            (!startupManualQuery.trim() || startupManualLoading
+                                                ? "bg-gray-200 text-gray-600"
+                                                : "bg-blue-600 text-white hover:bg-blue-700")
+                                        }
+                                    >
+                                        {startupManualLoading ? t.actions.searching : t.actions.search}
+                                    </button>
+                                </form>
+                                {startupManualSuggestionsLoading ? (
+                                    <div className="mt-2 text-[11px] font-medium text-gray-600">
+                                        {t.route.suggestionsLoading}
+                                    </div>
+                                ) : null}
+                                {startupManualSuggestions.length > 0 ? (
+                                    <div className="mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white text-left">
+                                        {startupManualSuggestions.map((s) => {
+                                            const key = `${s.lat},${s.lon}`;
+                                            const active =
+                                                startupManualSelected != null &&
+                                                startupManualSelected.lat === s.lat &&
+                                                startupManualSelected.lon === s.lon;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setStartupManualSelected(s);
+                                                        setStartupManualQuery(s.label);
+                                                    }}
+                                                    className={
+                                                        "block w-full px-3 py-2 text-[12px] transition " +
+                                                        (active
+                                                            ? "bg-blue-50 text-blue-900"
+                                                            : "hover:bg-gray-50 text-gray-900")
+                                                    }
+                                                >
+                                                    <span className="line-clamp-2">{s.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
+                                {startupManualError ? (
+                                    <div className="mt-2 text-[11px] font-semibold text-red-700">
+                                        {startupManualError}
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {startupCenterError ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setStartupCenterError(null);
+                                    setStartupManualError(null);
+                                    startupReqIdRef.current += 1;
+                                    setStartupAttempt((v) => v + 1);
+                                }}
+                                className="mt-3 w-full rounded-2xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"
+                            >
+                                {t.actions.retry}
+                            </button>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
 
             <div className="pointer-events-none absolute left-3 top-3 z-1000 flex flex-col gap-2">
                 <button
@@ -1397,8 +1741,8 @@ export default function MapPicker({
                         if (!canUseGeolocation()) {
                             setLocationError(
                                 typeof window !== "undefined" && !window.isSecureContext
-                                    ? "Geolocation requires HTTPS (or localhost)."
-                                    : "Geolocation not available."
+                                    ? t.errors.geoRequiresHttps
+                                    : t.errors.geoNotAvailable
                             );
                             return;
                         }
@@ -1411,7 +1755,7 @@ export default function MapPicker({
                             geoDeniedConfirmedRef.current
                         ) {
                             setLocationError(
-                                "Standort ist deaktiviert. Bitte in den Browser-Einstellungen aktivieren."
+                                t.errors.locationDisabled
                             );
                             return;
                         }
@@ -1423,12 +1767,12 @@ export default function MapPicker({
                     }}
                     title={
                         !canUseGeolocation()
-                            ? "Geolocation not available"
+                            ? t.errors.geoNotAvailable
                             : locationError
                                 ? locationError
                                 : locationEnabled
-                                    ? "Standort ausschalten"
-                                    : "Standort einschalten"
+                                    ? t.route.locationToggleOffTitle
+                                    : t.route.locationToggleOnTitle
                     }
                     aria-pressed={locationEnabled}
                     aria-disabled={!canUseGeolocation()}

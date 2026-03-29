@@ -363,7 +363,7 @@ export default function MobileBottomSheet({
                                     (visualPage === 0 ? "bg-white shadow-sm text-gray-900" : "text-gray-600")
                                 }
                             >
-                                Rechner
+                                {t.app.calculatorTab}
                             </button>
                             <button
                                 type="button"
@@ -373,7 +373,7 @@ export default function MobileBottomSheet({
                                     (visualPage === 1 ? "bg-white shadow-sm text-gray-900" : "text-gray-600")
                                 }
                             >
-                                Tankstellen
+                                {t.app.stationsTab}
                             </button>
                         </div>
 

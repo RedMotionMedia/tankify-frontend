@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import {useEffect, useMemo, useRef, useState} from "react";
 import RouteSection from "./RouteSection";
@@ -36,18 +35,8 @@ import {
 } from "@/features/tankify/shared/types/tankify";
 import WorthPanel from "./WorthPanel";
 import StationsSidebar from "@/features/tankify/desktop/components/StationsSidebar";
+import MapPicker from "@/features/tankify/shared/components/map/MapPicker";
 
-const MapPicker = dynamic(
-    () => import("@/features/tankify/shared/components/map/MapPicker"),
-    {
-    ssr: false,
-        loading: () => (
-            <div className="h-full w-full bg-neutral-100">
-                <div className="h-full w-full animate-pulse bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-100" />
-            </div>
-        ),
-    }
-);
 
 export default function TankifyCalculator() {
     const PANEL_ANIM_MS = 300;
@@ -427,6 +416,39 @@ export default function TankifyCalculator() {
         }
     }
 
+    function handleSuggestionPick(type: "start" | "end", point: Point) {
+        setError("");
+        if (type === "start") {
+            setDraftStartPoint(point);
+            setStartText(point.label);
+        } else {
+            setDraftEndPoint(point);
+            setEndText(point.label);
+        }
+        setMapPickMode(null);
+    }
+
+    function handleClearLocation(type: "start" | "end") {
+        setError("");
+        setMapPickMode(null);
+
+        // Clearing a point invalidates the current calculation/route.
+        setRouteRequestId(0);
+        setCalcStartPoint(null);
+        setCalcEndPoint(null);
+        setSelectedStationId(null);
+        setVisibleStations([]);
+        setStationsQueried(false);
+
+        if (type === "start") {
+            setStartText("");
+            setDraftStartPoint(null);
+        } else {
+            setEndText("");
+            setDraftEndPoint(null);
+        }
+    }
+
     function getCurrentPosition(): Promise<{ lat: number; lon: number }> {
         if (typeof window === "undefined") return Promise.reject(new Error("NO_WINDOW"));
         if (!window.isSecureContext) return Promise.reject(new Error("NOT_SECURE_CONTEXT"));
@@ -447,42 +469,10 @@ export default function TankifyCalculator() {
         );
     }
 
-    function tryReadLastLocation(): { lat: number; lon: number } | null {
-        try {
-            const raw = window.localStorage.getItem("tankify-last-location");
-            if (!raw) return null;
-            const parsed = JSON.parse(raw) as Partial<{ lat: unknown; lon: unknown }>;
-            const lat = typeof parsed.lat === "number" ? parsed.lat : Number.NaN;
-            const lon = typeof parsed.lon === "number" ? parsed.lon : Number.NaN;
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-            return { lat, lon };
-        } catch {
-            return null;
-        }
-    }
-
-    function writeLastLocation(loc: { lat: number; lon: number }) {
-        try {
-            window.localStorage.setItem(
-                "tankify-last-location",
-                JSON.stringify({ lat: loc.lat, lon: loc.lon, ts: Date.now() })
-            );
-        } catch {}
-    }
-
     async function handleUseMyLocationAsStart() {
         const reqId = ++myLocationReqIdRef.current;
         try {
             setError("");
-
-            // Instant feedback: use the last known location (if available) right away.
-            const cached = tryReadLastLocation();
-            if (cached) {
-                const label = t.route.currentLocation;
-                setDraftStartPoint({ lat: cached.lat, lon: cached.lon, label });
-                setStartText(label);
-                setMapPickMode(null);
-            }
 
             const { lat, lon } = await getCurrentPosition();
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
@@ -492,11 +482,8 @@ export default function TankifyCalculator() {
             setDraftStartPoint({ lat, lon, label });
             setStartText(label);
             setMapPickMode(null);
-            writeLastLocation({ lat, lon });
         } catch {
-            // If we already applied a cached location, don't block the user with an error.
             if (reqId !== myLocationReqIdRef.current) return;
-            if (tryReadLastLocation()) return;
             setError(t.errors.locationFailed);
         }
     }
@@ -506,14 +493,6 @@ export default function TankifyCalculator() {
         try {
             setError("");
 
-            const cached = tryReadLastLocation();
-            if (cached) {
-                const label = t.route.currentLocation;
-                setDraftEndPoint({ lat: cached.lat, lon: cached.lon, label });
-                setEndText(label);
-                setMapPickMode(null);
-            }
-
             const { lat, lon } = await getCurrentPosition();
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
             if (reqId !== myLocationReqIdRef.current) return;
@@ -522,10 +501,8 @@ export default function TankifyCalculator() {
             setDraftEndPoint({ lat, lon, label });
             setEndText(label);
             setMapPickMode(null);
-            writeLastLocation({ lat, lon });
         } catch {
             if (reqId !== myLocationReqIdRef.current) return;
-            if (tryReadLastLocation()) return;
             setError(t.errors.locationFailed);
         }
     }
@@ -790,6 +767,8 @@ export default function TankifyCalculator() {
                 setStartText={setStartText}
                 setEndText={setEndText}
                 onSearch={handleSearch}
+                onSuggestionPick={handleSuggestionPick}
+                onClear={handleClearLocation}
                 onPickStart={() => {
                     setMapPickMode((prev) => (prev === "start" ? null : "start"));
                     minimizeBottomSheet();
@@ -921,7 +900,7 @@ export default function TankifyCalculator() {
                                         type="button"
                                         onClick={() => setSettingsOpen(true)}
                                         className="h-11 w-11 place-items-center rounded-full border border-gray-200 shadow-sm transition hover:bg-gray-50 active:scale-95 text-[0px]"
-                                        aria-label="Open settings"
+                                        aria-label={t.actions.openSettings}
                                     >
                                         <svg
                                             viewBox="0 0 64 64"
@@ -986,7 +965,7 @@ export default function TankifyCalculator() {
                                     eurToCurrencyRate={eurToCurrencyRate}
                                     debugMode={debugMode}
                                     t={t}
-                                    defaultLocationEnabled
+                                    suspendStartup={vehicleModalOpen}
                                     recenterRequestId={mobileRecenterReqId}
                                     hideSearchOverlayRequestId={hideSearchOverlayReqId}
                                     onStationsChange={handleStationsChange}
@@ -1073,8 +1052,8 @@ export default function TankifyCalculator() {
                                 type="button"
                                 onClick={() => setDesktopResultsOpen(true)}
                                 className="absolute bottom-0 right-5 z-50 rounded-t-full border border-gray-200 bg-white text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 grid h-12 w-12 place-items-center"
-                                aria-label="Expand results"
-                                title="Expand results"
+                                aria-label={t.actions.expandResults}
+                                title={t.actions.expandResults}
                             >
                                 <span className="inline-flex items-center gap-2">
                                     <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
@@ -1126,8 +1105,8 @@ export default function TankifyCalculator() {
                                     type="button"
                                     onClick={() => setDesktopStationsOpen(true)}
                                     className="fixed right-0 top-15 z-50 -translate-y-1/2 rounded-l-full border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-lg transition hover:bg-gray-50 active:scale-95 h-12 w-12 place-items-center"
-                                    aria-label="Expand stations"
-                                    title="Expand stations"
+                                    aria-label={t.actions.expandStations}
+                                    title={t.actions.expandStations}
                                 >
                                     <svg viewBox="0 0 20 20" className="h-6 w-6" aria-hidden="true">
                                         <path
@@ -1160,7 +1139,7 @@ export default function TankifyCalculator() {
                             debugMode={debugMode}
                             t={t}
                             hideSearchOverlayRequestId={hideSearchOverlayReqId}
-                            defaultLocationEnabled
+                            suspendStartup={vehicleModalOpen}
                             recenterRequestId={mobileRecenterReqId}
                             onSearchHereStart={() => {
                                 setMobileSheetPage(1);
@@ -1206,7 +1185,7 @@ export default function TankifyCalculator() {
                             type="button"
                             onClick={() => setSettingsOpen(true)}
                             className="grid h-11 w-11 place-items-center rounded-full bg-white/90 shadow-md backdrop-blur transition hover:bg-white active:scale-95 text-[0px]"
-                            aria-label="Open settings"
+                            aria-label={t.actions.openSettings}
                         >
                             <svg
                                 viewBox="0 0 64 64"
