@@ -50,6 +50,7 @@ export default function TankifyCalculator() {
         useState<MeasurementSystem>("metric");
     const [storageReady, setStorageReady] = useState(false);
     const [debugMode, setDebugMode] = useState(false);
+    const [darkMode, setDarkMode] = useState(false);
 
     const debugAllowed = process.env.NODE_ENV !== "production" ||
         (process.env.NEXT_PUBLIC_ENABLE_DEBUG_MODE ?? "").trim() === "1";
@@ -190,6 +191,7 @@ export default function TankifyCalculator() {
         const savedMeasurement = window.localStorage.getItem("tankify-measurement");
         const savedFuelType = window.localStorage.getItem("tankify-fuelType");
         const savedDebugMode = window.localStorage.getItem("tankify-debug-mode");
+        const savedDarkMode = window.localStorage.getItem("tankify-dark-mode");
         const savedInputsRaw = window.localStorage.getItem("tankify-inputs-v1");
 
         if (savedLanguage === "de" || savedLanguage === "en") {
@@ -214,6 +216,10 @@ export default function TankifyCalculator() {
         if (savedDebugMode === "1" && debugAllowed) {
             setDebugMode(true);
         }
+
+        // Default is light mode. Only switch when the user explicitly enabled it before.
+        if (savedDarkMode === "1") setDarkMode(true);
+        else if (savedDarkMode === "0") setDarkMode(false);
 
         if (savedInputsRaw) {
             try {
@@ -295,6 +301,18 @@ export default function TankifyCalculator() {
         if (!storageReady) return;
         window.localStorage.setItem("tankify-debug-mode", debugMode ? "1" : "0");
     }, [debugMode, storageReady]);
+
+    useEffect(() => {
+        // Apply to the whole document; CSS uses [data-theme="dark"] to theme the UI.
+        try {
+            document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+        } catch {}
+    }, [darkMode]);
+
+    useEffect(() => {
+        if (!storageReady) return;
+        window.localStorage.setItem("tankify-dark-mode", darkMode ? "1" : "0");
+    }, [darkMode, storageReady]);
 
     useEffect(() => {
         if (!storageReady) return;
@@ -857,6 +875,8 @@ export default function TankifyCalculator() {
                 t={t}
                 language={language}
                 setLanguage={setLanguage}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
                 debugAllowed={debugAllowed}
                 debugMode={debugMode}
                 setDebugMode={setDebugMode}
@@ -959,6 +979,7 @@ export default function TankifyCalculator() {
                                     end={draftEndPoint}
                                     routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
                                     pickMode={mapPickMode}
+                                    theme={darkMode ? "dark" : "light"}
                                     fuelType={fuelType}
                                     measurementSystem={measurementSystem}
                                     currencySystem={currencySystem}
@@ -1132,6 +1153,7 @@ export default function TankifyCalculator() {
                             routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
                             viewportBottomInsetPx={mobileMapBottomInsetPx}
                             pickMode={mapPickMode}
+                            theme={darkMode ? "dark" : "light"}
                             fuelType={fuelType}
                             measurementSystem={measurementSystem}
                             currencySystem={currencySystem}

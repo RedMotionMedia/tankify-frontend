@@ -9,9 +9,11 @@ export type MapLibreSource = { setData?: (data: unknown) => void };
 export type MapLibreMap = {
     on: (type: string, listener: (ev: unknown) => void) => void;
     off: (type: string, listener: (ev: unknown) => void) => void;
+    once?: (type: string, listener: (ev: unknown) => void) => void;
     remove: () => void;
     resize: () => void;
     stop?: () => void;
+    setStyle?: (style: unknown, options?: unknown) => void;
     addControl?: (control: unknown, position?: string) => void;
     getZoom: () => number;
     getBearing?: () => number;

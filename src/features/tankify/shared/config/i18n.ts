@@ -17,6 +17,7 @@ export type TranslationSchema = {
         metric: string;
         imperial: string;
         version: string;
+        darkMode: string;
         logoCache: string;
         clearLogoCache: string;
         clearing: string;
@@ -210,6 +211,7 @@ export const translations: Record<Language, TranslationSchema> = {
             metric: "Metrisch",
             imperial: "Imperial",
             version: "Version",
+            darkMode: "Dunkelmodus",
             logoCache: "Logo-Cache",
             clearLogoCache: "Logo-Cache leeren",
             clearing: "Leere ...",
@@ -407,6 +409,7 @@ export const translations: Record<Language, TranslationSchema> = {
             metric: "Metric",
             imperial: "Imperial",
             version: "Version",
+            darkMode: "Dark mode",
             logoCache: "Logo cache",
             clearLogoCache: "Clear logo cache",
             clearing: "Clearing ...",

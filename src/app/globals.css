@@ -1,6 +1,98 @@
 @import "tailwindcss";
 
 /* =========================
+   Theme (Light/Dark)
+   - Toggle is controlled by setting: document.documentElement.dataset.theme = "dark" | "light"
+   - Dark mode aims to work without rewriting all Tailwind utility classes by overriding common ones.
+========================= */
+
+:root {
+  --app-bg: #f5f5f5;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f3f4f6;
+  --app-text: #111827;
+  --app-muted: #6b7280;
+  --app-border: #e5e7eb;
+  --app-blue: #2563eb;
+}
+
+html[data-theme="dark"] {
+  --app-bg: #070b10;
+  --app-surface: #0f172a;
+  --app-surface-muted: #0b1220;
+  --app-text: #e5e7eb;
+  --app-muted: #9ca3af;
+  --app-border: rgba(255, 255, 255, 0.12);
+  --app-blue: #60a5fa;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .bg-white {
+  background-color: var(--app-surface) !important;
+}
+
+html[data-theme="dark"] .bg-white\/90 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+html[data-theme="dark"] .bg-gray-50 {
+  background-color: var(--app-surface-muted) !important;
+}
+
+html[data-theme="dark"] .bg-gray-100 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-gray-800,
+html[data-theme="dark"] .text-gray-700 {
+  color: var(--app-text) !important;
+}
+
+html[data-theme="dark"] .text-gray-600,
+html[data-theme="dark"] .text-gray-500 {
+  color: var(--app-muted) !important;
+}
+
+html[data-theme="dark"] .border-gray-200,
+html[data-theme="dark"] .border-gray-300 {
+  border-color: var(--app-border) !important;
+}
+
+html[data-theme="dark"] .bg-blue-600 {
+  background-color: #2563eb !important;
+}
+
+html[data-theme="dark"] .bg-blue-700 {
+  background-color: #1d4ed8 !important;
+}
+
+html[data-theme="dark"] .ring-blue-200 {
+  --tw-ring-color: rgba(96, 165, 250, 0.28) !important;
+}
+
+html[data-theme="dark"] .bg-black\/25 {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+html[data-theme="dark"] .station-popup .maplibregl-popup-content {
+  background: var(--app-surface);
+  color: var(--app-text);
+  border: 1px solid var(--app-border);
+}
+
+html[data-theme="dark"] .station-popup .maplibregl-popup-close-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--app-text);
+  border-color: var(--app-border);
+}
+
+html[data-theme="dark"] .station-logo {
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+/* =========================
    Base Layout
 ========================= */
 
@@ -8,8 +100,8 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: #f5f5f5;
-  color: #111827;
+  background: var(--app-bg);
+  color: var(--app-text);
   font-family: Arial, Helvetica, sans-serif;
   height: 100%;
   overflow: hidden;
