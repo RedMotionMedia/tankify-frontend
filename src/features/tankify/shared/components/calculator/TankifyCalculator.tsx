@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import {useEffect, useMemo, useRef, useState} from "react";
 import RouteSection from "./RouteSection";
@@ -36,18 +35,8 @@ import {
 } from "@/features/tankify/shared/types/tankify";
 import WorthPanel from "./WorthPanel";
 import StationsSidebar from "@/features/tankify/desktop/components/StationsSidebar";
+import MapPicker from "@/features/tankify/shared/components/map/MapPicker";
 
-const MapPicker = dynamic(
-    () => import("@/features/tankify/shared/components/map/MapPicker"),
-    {
-    ssr: false,
-        loading: () => (
-            <div className="h-full w-full bg-neutral-100">
-                <div className="h-full w-full animate-pulse bg-gradient-to-br from-neutral-100 via-neutral-200 to-neutral-100" />
-            </div>
-        ),
-    }
-);
 
 export default function TankifyCalculator() {
     const PANEL_ANIM_MS = 300;

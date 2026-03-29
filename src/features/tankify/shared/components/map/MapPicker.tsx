@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { TranslationSchema } from "@/features/tankify/shared/config/i18n";
 import {
     CurrencySystem,
@@ -51,17 +51,14 @@ type GeoPermissionState = PermissionState | "unsupported" | "unavailable";
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 const HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM = 12;
-// Default view when we don't yet have a user location or any route points.
-// Keep this reasonably wide; when geolocation is enabled we pan to the user location,
-// but we avoid starting overly zoomed-in.
-const FALLBACK_VIEW = { center: [48.3069, 14.2858] as [number, number], zoom: 12 };
+const DEFAULT_ZOOM = 12;
 
 function isFiniteNumber(v: unknown): v is number {
     return typeof v === "number" && Number.isFinite(v);
 }
 
-function sanitizeLatLng(center: [number, number]): [number, number] {
-    return isFiniteNumber(center[0]) && isFiniteNumber(center[1]) ? center : FALLBACK_VIEW.center;
+function sanitizeLatLng(center: [number, number]): [number, number] | null {
+    return isFiniteNumber(center[0]) && isFiniteNumber(center[1]) ? center : null;
 }
 
 function haversineKm(a: UserLocation, b: { lat: number; lon: number }): number {
@@ -371,6 +368,17 @@ export default function MapPicker({
         userLocationRef.current = userLocation;
     }, [userLocation]);
 
+    // Avoid hydration mismatches: server render cannot know whether geolocation is available.
+    // Keep initial render stable and only compute capabilities after mount.
+    const [geoAvailable, setGeoAvailable] = useState(false);
+    useEffect(() => {
+        try {
+            setGeoAvailable(Boolean(window.isSecureContext && navigator.geolocation));
+        } catch {
+            setGeoAvailable(false);
+        }
+    }, []);
+
     const startRef = useRef<Point | null>(start);
     const endRef = useRef<Point | null>(end);
     const routeGeometryRef = useRef<[number, number][]>(routeGeometry);
@@ -561,6 +569,106 @@ export default function MapPicker({
         stations: MapLibreMarker[];
     }>({ start: null, end: null, user: null, stations: [] });
 
+    const [startupCenter, setStartupCenter] = useState<{
+        lat: number;
+        lon: number;
+        source: "gps" | "ip";
+    } | null>(null);
+    const [startupCenterError, setStartupCenterError] = useState<string | null>(null);
+    const [startupAttempt, setStartupAttempt] = useState(0);
+    const startupForceIpRef = useRef(false);
+    const startupReqIdRef = useRef(0);
+    const ipAbortRef = useRef<AbortController | null>(null);
+
+    const fetchIpLocation = useCallback(async (): Promise<{ lat: number; lon: number } | null> => {
+        try {
+            ipAbortRef.current?.abort();
+            const controller = new AbortController();
+            ipAbortRef.current = controller;
+            const t = window.setTimeout(() => controller.abort(), 6500);
+            const res = await fetch("/api/ip-location", {
+                signal: controller.signal,
+                headers: { Accept: "application/json" },
+                cache: "no-store",
+            });
+            window.clearTimeout(t);
+            if (res.status === 204) return null;
+            if (!res.ok) return null;
+            const text = await res.text();
+            if (!text.trim()) return null;
+            const data = JSON.parse(text) as Partial<{ lat: number; lon: number }>;
+            const lat = typeof data.lat === "number" ? data.lat : Number.NaN;
+            const lon = typeof data.lon === "number" ? data.lon : Number.NaN;
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return { lat, lon };
+        } catch {
+            return null;
+        }
+    }, []);
+
+    // Resolve initial map center once. Prefer GPS (will trigger the permission prompt),
+    // and fall back to IP location if GPS is unavailable or fails.
+    useEffect(() => {
+        if (startupCenter) return;
+        if (typeof window === "undefined") return;
+
+        const reqId = ++startupReqIdRef.current;
+        setStartupCenterError(null);
+
+        void (async () => {
+            const tryGeolocation = async (): Promise<{ lat: number; lon: number } | null> => {
+                try {
+                    if (!window.isSecureContext || !navigator.geolocation) return null;
+                    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(
+                            resolve,
+                            reject,
+                            { enableHighAccuracy: true, timeout: 60_000, maximumAge: 0 }
+                        );
+                    });
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+                    return { lat, lon };
+                } catch {
+                    return null;
+                }
+            };
+
+            if (startupForceIpRef.current) {
+                startupForceIpRef.current = false;
+                const ip = await fetchIpLocation();
+                if (startupReqIdRef.current !== reqId) return;
+                if (ip) {
+                    setStartupCenter({ lat: ip.lat, lon: ip.lon, source: "ip" });
+                    return;
+                }
+                setStartupCenterError("IP-Standort konnte nicht geladen werden.");
+                return;
+            }
+
+            const geo = await tryGeolocation();
+            if (startupReqIdRef.current !== reqId) return;
+            if (geo) {
+                userLocationRef.current = { lat: geo.lat, lon: geo.lon };
+                setUserLocation({ lat: geo.lat, lon: geo.lon });
+                setGeoPermission("granted");
+                didCenterOnEnableRef.current = true;
+                setStartupCenter({ lat: geo.lat, lon: geo.lon, source: "gps" });
+                return;
+            }
+
+            const ip = await fetchIpLocation();
+            if (startupReqIdRef.current !== reqId) return;
+            if (ip) {
+                setStartupCenter({ lat: ip.lat, lon: ip.lon, source: "ip" });
+                return;
+            }
+
+            setStartupCenterError("Standort konnte nicht bestimmt werden.");
+        })();
+    }, [startupCenter, startupAttempt, fetchIpLocation]);
+
     function upsertUserLocationMarker(map: MapLibreMap, loc: { lat: number; lon: number }) {
         const bucket = markerBucketRef.current;
         try {
@@ -628,15 +736,6 @@ export default function MapPicker({
         }
     }, [start, end, stations, selectedStationId, applyStationMarkerVisibility]);
 
-    const safeCenter = useMemo<[number, number]>(() => {
-        if (start && end) {
-            return sanitizeLatLng([(start.lat + end.lat) / 2, (start.lon + end.lon) / 2]);
-        }
-        if (start) return sanitizeLatLng([start.lat, start.lon]);
-        if (end) return sanitizeLatLng([end.lat, end.lon]);
-        return FALLBACK_VIEW.center;
-    }, [start, end]);
-
     const hideStartMarker =
         !start ||
         (userLocation != null && isNearKm(userLocation, start, 0.03)) ||
@@ -661,6 +760,7 @@ export default function MapPicker({
 
     // Create/destroy map.
     useEffect(() => {
+        if (!startupCenter) return;
         let cancelled = false;
 
         (async () => {
@@ -676,8 +776,8 @@ export default function MapPicker({
                 const map = new maplibre.Map({
                     container,
                     style: OPENFREE_MAP_STYLE_URL,
-                    center: [safeCenter[1], safeCenter[0]],
-                    zoom: FALLBACK_VIEW.zoom,
+                    center: [startupCenter.lon, startupCenter.lat],
+                    zoom: DEFAULT_ZOOM,
                     attributionControl: false,
                     // Reduce console noise from strict style validation on remote styles.
                     // Also avoid internal resize tracking; we manage resize via a debounced ResizeObserver.
@@ -886,7 +986,7 @@ export default function MapPicker({
             mapRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [startupCenter]);
 
     // Update route source.
     useEffect(() => {
@@ -1109,6 +1209,9 @@ export default function MapPicker({
     useEffect(() => {
         const map = mapRef.current;
 
+        // Avoid triggering a second geolocation prompt during initial startup center resolution.
+        if (!startupCenter) return;
+
         if (!locationEnabled) {
             if (retryTimerRef.current) {
                 clearTimeout(retryTimerRef.current);
@@ -1162,12 +1265,6 @@ export default function MapPicker({
                 try {
                     window.dispatchEvent(
                         new CustomEvent("tankify:user-location", { detail: { lat, lon } })
-                    );
-                } catch {}
-                try {
-                    window.localStorage.setItem(
-                        "tankify-last-location",
-                        JSON.stringify({ lat, lon, ts: Date.now() })
                     );
                 } catch {}
 
@@ -1231,7 +1328,7 @@ export default function MapPicker({
             }
             watchIdRef.current = null;
         };
-    }, [locationEnabled, locationAttempt]);
+    }, [startupCenter, locationEnabled, locationAttempt]);
 
     async function handleSearchHere() {
         const map = mapRef.current;
@@ -1311,13 +1408,14 @@ export default function MapPicker({
         const validRoute = geom.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
         );
-        const points =
+        const rawPoints =
             validRoute.length > 0
                 ? validRoute
                 : [
-                    ...(s ? [sanitizeLatLng([s.lat, s.lon])] : []),
-                    ...(e ? [sanitizeLatLng([e.lat, e.lon])] : []),
-                ];
+                      ...(s ? [sanitizeLatLng([s.lat, s.lon])] : []),
+                      ...(e ? [sanitizeLatLng([e.lat, e.lon])] : []),
+                  ];
+        const points = rawPoints.filter((p): p is [number, number] => p !== null);
         if (points.length === 0) return;
         try {
             // If a layout transition resizes the map right after recentering,
@@ -1341,9 +1439,7 @@ export default function MapPicker({
     }, [recenterRequestId, handleRecenter]);
 
     function canUseGeolocation(): boolean {
-        if (typeof window === "undefined") return false;
-        if (!window.isSecureContext) return false;
-        return typeof navigator !== "undefined" && !!navigator.geolocation;
+        return geoAvailable;
     }
 
     useEffect(() => {
@@ -1357,6 +1453,50 @@ export default function MapPicker({
     return (
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full" />
+
+            {!startupCenter ? (
+                <div className="absolute inset-0 z-2000 grid place-items-center bg-white">
+                    <div className="mx-6 max-w-sm rounded-3xl border border-gray-200 bg-white p-4 text-center shadow-sm">
+                        <div className="text-sm font-semibold text-gray-900">
+                            Standort wird ermittelt...
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600">
+                            Bitte Standortzugriff erlauben. Falls das nicht geht, wird eine IP-Naeherung verwendet.
+                        </div>
+                        {startupCenterError ? (
+                            <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-900">
+                                {startupCenterError}
+                            </div>
+                        ) : null}
+                        {startupCenterError ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setStartupCenterError(null);
+                                    startupReqIdRef.current += 1;
+                                    setStartupAttempt((v) => v + 1);
+                                }}
+                                className="mt-3 w-full rounded-2xl bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm active:scale-[0.99]"
+                            >
+                                Erneut versuchen
+                            </button>
+                        ) : null}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                startupForceIpRef.current = true;
+                                setStartupCenterError(null);
+                                // Override any in-flight attempt (e.g. waiting for the GPS prompt).
+                                startupReqIdRef.current += 1;
+                                setStartupAttempt((v) => v + 1);
+                            }}
+                            className="mt-2 w-full rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm active:scale-[0.99]"
+                        >
+                            IP-Standort verwenden
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             <div className="pointer-events-none absolute left-3 top-3 z-1000 flex flex-col gap-2">
                 <button
