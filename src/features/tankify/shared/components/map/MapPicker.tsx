@@ -45,14 +45,61 @@ type Props = {
     onSearchHereStart?: () => void;
     recenterRequestId?: number;
     suspendStartup?: boolean;
+    theme?: "light" | "dark";
 };
 
 type UserLocation = { lat: number; lon: number };
 type GeoPermissionState = PermissionState | "unsupported" | "unavailable";
 
 const OPENFREE_MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+const OPENFREE_TILEJSON_URL = "https://tiles.openfreemap.org/planet";
+const OPENFREE_GLYPHS_URL = "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf";
+const DARK_MATTER_STYLE_URL =
+    "https://raw.githubusercontent.com/openmaptiles/dark-matter-gl-style/master/style.json";
 const HIDE_NON_ESSENTIAL_MARKERS_BELOW_ZOOM = 12;
 const DEFAULT_ZOOM = 12;
+
+let darkMatterStylePromise: Promise<unknown> | null = null;
+
+async function loadDarkMatterStyle(): Promise<unknown> {
+    if (darkMatterStylePromise) return darkMatterStylePromise;
+
+    darkMatterStylePromise = (async () => {
+        const res = await fetch(DARK_MATTER_STYLE_URL, { cache: "force-cache" });
+        if (!res.ok) throw new Error(`DARK_STYLE_${res.status}`);
+        const json = (await res.json()) as unknown;
+        const style = (json && typeof json === "object" ? (json as Record<string, unknown>) : {}) as Record<
+            string,
+            unknown
+        >;
+
+        // Patch MapTiler-keyed defaults to use OpenFreeMap instead.
+        const sources = (style.sources && typeof style.sources === "object"
+            ? (style.sources as Record<string, unknown>)
+            : {}) as Record<string, unknown>;
+
+        const openmaptiles =
+            (sources.openmaptiles && typeof sources.openmaptiles === "object"
+                ? (sources.openmaptiles as Record<string, unknown>)
+                : {}) as Record<string, unknown>;
+
+        openmaptiles.type = "vector";
+        openmaptiles.url = OPENFREE_TILEJSON_URL;
+        delete openmaptiles.tiles; // prefer TileJSON URL
+
+        sources.openmaptiles = openmaptiles;
+        style.sources = sources;
+
+        style.glyphs = OPENFREE_GLYPHS_URL;
+        if (typeof style.sprite !== "string" || !style.sprite) {
+            style.sprite = "https://openmaptiles.github.io/dark-matter-gl-style/sprite";
+        }
+
+        return style;
+    })();
+
+    return darkMatterStylePromise;
+}
 
 function isFiniteNumber(v: unknown): v is number {
     return typeof v === "number" && Number.isFinite(v);
@@ -60,6 +107,30 @@ function isFiniteNumber(v: unknown): v is number {
 
 function sanitizeLatLng(center: [number, number]): [number, number] | null {
     return isFiniteNumber(center[0]) && isFiniteNumber(center[1]) ? center : null;
+}
+
+function ensureRouteLayer(map: MapLibreMap) {
+    try {
+        // After setStyle(), custom sources/layers are removed. Recreate them if missing.
+        if (!map.getSource("route")) {
+            map.addSource("route", {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+            });
+        }
+
+        if (!map.getLayer("route-line")) {
+            map.addLayer({
+                id: "route-line",
+                type: "line",
+                source: "route",
+                layout: { "line-join": "round", "line-cap": "round" },
+                paint: { "line-color": "#2563eb", "line-width": 5 },
+            });
+        }
+    } catch {
+        // ignore
+    }
 }
 
 function haversineKm(a: UserLocation, b: { lat: number; lon: number }): number {
@@ -298,6 +369,7 @@ export default function MapPicker({
     onSearchHereStart,
     recenterRequestId,
     suspendStartup = false,
+    theme = "light",
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -911,9 +983,12 @@ export default function MapPicker({
                 if (!container) return;
                 if (mapRef.current) return;
 
+                const initialStyle =
+                    theme === "dark" ? await loadDarkMatterStyle() : OPENFREE_MAP_STYLE_URL;
+
                 const map = new maplibre.Map({
                     container,
-                    style: OPENFREE_MAP_STYLE_URL,
+                    style: initialStyle,
                     center: [startupCenter.lon, startupCenter.lat],
                     zoom: DEFAULT_ZOOM,
                     attributionControl: false,
@@ -977,21 +1052,7 @@ export default function MapPicker({
 
                 map.on("load", () => {
                     mapLoadedRef.current = true;
-                    try {
-                        map.addSource("route", {
-                            type: "geojson",
-                            data: { type: "FeatureCollection", features: [] },
-                        });
-                        map.addLayer({
-                            id: "route-line",
-                            type: "line",
-                            source: "route",
-                            layout: { "line-join": "round", "line-cap": "round" },
-                            paint: { "line-color": "#2563eb", "line-width": 5 },
-                        });
-                    } catch {
-                        // ignore
-                    }
+                    ensureRouteLayer(map);
 
                     // If geolocation resolves before the map is ready, the "user marker" effect can miss.
                     // Ensure the marker is created once the map finishes loading.
@@ -1126,10 +1187,36 @@ export default function MapPicker({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [startupCenter]);
 
+    // Switch map style on theme changes.
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const nextStyle = theme === "dark" ? await loadDarkMatterStyle() : OPENFREE_MAP_STYLE_URL;
+                if (cancelled) return;
+                map.setStyle?.(nextStyle, { diff: false });
+                try {
+                    if (map.once) map.once("style.load", () => ensureRouteLayer(map));
+                    else map.on("style.load", () => ensureRouteLayer(map));
+                } catch {}
+            } catch {
+                // ignore (keep current style)
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [theme]);
+
     // Update route source.
     useEffect(() => {
         const map = mapRef.current;
         if (!map || !mapLoadedRef.current) return;
+        ensureRouteLayer(map);
 
         const valid = routeGeometry.filter((p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1]));
         const coords = valid.map(([lat, lon]) => [lon, lat]);
@@ -1151,7 +1238,7 @@ export default function MapPicker({
             const src = map.getSource("route");
             if (src?.setData) src.setData(data);
         } catch {}
-    }, [routeGeometry]);
+    }, [routeGeometry, theme]);
 
     // Fit bounds when inputs change.
     useEffect(() => {

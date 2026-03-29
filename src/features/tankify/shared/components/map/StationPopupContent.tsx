@@ -196,14 +196,14 @@ export default function StationPopupContent({
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
+                <div className="tankify-fuel-card rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
                     <div className="text-[11px] font-semibold text-gray-600">{t.pricing.diesel}</div>
                     <div className="mt-0.5 text-sm font-extrabold text-gray-900">
                         {formatDisplayPrice(station.diesel, measurementSystem, currencySystem, eurToCurrencyRate)}
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
+                <div className="tankify-fuel-card rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50 to-white p-3">
                     <div className="text-[11px] font-semibold text-gray-600">{t.pricing.super95}</div>
                     <div className="mt-0.5 text-sm font-extrabold text-gray-900">
                         {formatDisplayPrice(station.super95, measurementSystem, currencySystem, eurToCurrencyRate)}

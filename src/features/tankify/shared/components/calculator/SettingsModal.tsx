@@ -16,6 +16,8 @@ type Props = {
     t: TranslationSchema;
     language: Language;
     setLanguage: (language: Language) => void;
+    darkMode: boolean;
+    setDarkMode: (value: boolean) => void;
     debugAllowed: boolean;
     debugMode: boolean;
     setDebugMode: (value: boolean) => void;
@@ -39,6 +41,8 @@ export default function SettingsModal({
                                           t,
                                           language,
                                           setLanguage,
+                                          darkMode,
+                                          setDarkMode,
                                           debugAllowed,
                                           debugMode,
                                           setDebugMode,
@@ -210,6 +214,18 @@ export default function SettingsModal({
                                 <option value="en">{t.settings.english}</option>
                             </select>
                         </div>
+
+                        <label className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                            <span className="text-sm font-semibold text-gray-900">
+                                {t.settings.darkMode}
+                            </span>
+                            <input
+                                type="checkbox"
+                                checked={darkMode}
+                                onChange={(e) => setDarkMode(e.target.checked)}
+                                className="h-5 w-5 accent-gray-900"
+                            />
+                        </label>
 
                         <div className="flex flex-row gap-3">
                             <label className="block py-3 text-sm font-medium">
