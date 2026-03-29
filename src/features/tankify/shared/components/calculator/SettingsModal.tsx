@@ -59,6 +59,7 @@ export default function SettingsModal({
     const [cacheStatus, setCacheStatus] = useState<"ok" | "error" | null>(null);
     const [fxCurrencies, setFxCurrencies] = useState<Record<string, string> | null>(null);
     const showDebugControls = debugAllowed;
+    const appVersion = (process.env.NEXT_PUBLIC_APP_VERSION ?? "").trim() || "dev";
 
     useEffect(() => {
         let cancelled = false;
@@ -258,6 +259,15 @@ export default function SettingsModal({
                                 <option value="diesel">{t.pricing.diesel}</option>
                                 <option value="super95">{t.pricing.super95}</option>
                             </select>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900">
+                                {t.settings.version}
+                            </div>
+                            <div className="font-mono text-xs text-gray-700">
+                                {appVersion}
+                            </div>
                         </div>
 
                         {showDebugControls ? (

@@ -16,6 +16,7 @@ export type TranslationSchema = {
         measurement: string;
         metric: string;
         imperial: string;
+        version: string;
         logoCache: string;
         clearLogoCache: string;
         clearing: string;
@@ -208,6 +209,7 @@ export const translations: Record<Language, TranslationSchema> = {
             measurement: "Einheitensystem",
             metric: "Metrisch",
             imperial: "Imperial",
+            version: "Version",
             logoCache: "Logo-Cache",
             clearLogoCache: "Logo-Cache leeren",
             clearing: "Leere ...",
@@ -404,6 +406,7 @@ export const translations: Record<Language, TranslationSchema> = {
             measurement: "Measurement system",
             metric: "Metric",
             imperial: "Imperial",
+            version: "Version",
             logoCache: "Logo cache",
             clearLogoCache: "Clear logo cache",
             clearing: "Clearing ...",

@@ -41,8 +41,10 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             VERSION_TAG="${GITHUB_REF#refs/tags/}"
             echo "version_tag=$VERSION_TAG" >> "$GITHUB_OUTPUT"
+            echo "app_version=$VERSION_TAG" >> "$GITHUB_OUTPUT"
           else
             echo "version_tag=" >> "$GITHUB_OUTPUT"
+            echo "app_version=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Login to GHCR
@@ -66,6 +68,7 @@ jobs:
             LOGO_DEV_TOKEN=${{ secrets.LOGO_DEV_TOKEN }}
             ENABLE_DEBUG_MODE=${{ vars.ENABLE_DEBUG_MODE }}
             NEXT_PUBLIC_ENABLE_DEBUG_MODE=${{ vars.ENABLE_DEBUG_MODE }}
+            NEXT_PUBLIC_APP_VERSION=${{ steps.meta.outputs.app_version }}
 
       - name: Tag sha image as version tag (only for v* tags)
         if: startsWith(github.ref, 'refs/tags/')
