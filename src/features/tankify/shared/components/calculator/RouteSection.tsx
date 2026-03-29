@@ -1,5 +1,5 @@
 import { TranslationSchema } from "@/features/tankify/shared/config/i18n";
-import { MapPickMode } from "@/features/tankify/shared/types/tankify";
+import { MapPickMode, Point } from "@/features/tankify/shared/types/tankify";
 import LocationField from "../ui/LocationField";
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
     setStartText: (value: string) => void;
     setEndText: (value: string) => void;
     onSearch: (type: "start" | "end") => void;
+    onSuggestionPick: (type: "start" | "end", point: Point) => void;
     onPickStart: () => void;
     onPickEnd: () => void;
     onUseMyLocationAsStart: () => void;
@@ -25,6 +26,7 @@ export default function RouteSection({
                                          setStartText,
                                          setEndText,
                                          onSearch,
+                                         onSuggestionPick,
                                          onPickStart,
                                          onPickEnd,
                                          onUseMyLocationAsStart,
@@ -45,6 +47,7 @@ export default function RouteSection({
                 value={startText}
                 onChange={setStartText}
                 onSearch={() => onSearch("start")}
+                onSuggestionPick={(p) => onSuggestionPick("start", p)}
                 onPickOnMap={onPickStart}
                 onUseMyLocation={onUseMyLocationAsStart}
                 loading={searchLoading === "start"}
@@ -88,6 +91,7 @@ export default function RouteSection({
                 value={endText}
                 onChange={setEndText}
                 onSearch={() => onSearch("end")}
+                onSuggestionPick={(p) => onSuggestionPick("end", p)}
                 onPickOnMap={onPickEnd}
                 onUseMyLocation={onUseMyLocationAsDestination}
                 loading={searchLoading === "end"}

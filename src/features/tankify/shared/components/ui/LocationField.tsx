@@ -1,8 +1,13 @@
+import { useEffect, useRef, useState } from "react";
+import { geocodeSuggestions } from "@/features/tankify/shared/lib/geocode";
+import type { Point } from "@/features/tankify/shared/types/tankify";
+
 type Props = {
     label: string;
     value: string;
     onChange: (value: string) => void;
     onSearch: () => void;
+    onSuggestionPick?: (point: Point) => void;
     onPickOnMap: () => void;
     onUseMyLocation?: () => void;
     loading: boolean;
@@ -17,6 +22,7 @@ export default function LocationField({
                                           value,
                                           onChange,
                                           onSearch,
+                                          onSuggestionPick,
                                           onPickOnMap,
                                           onUseMyLocation,
                                           loading,
@@ -28,18 +34,118 @@ export default function LocationField({
     const hasMyLocation = Boolean(onUseMyLocation && myLocationLabel);
     const inputRightPadding = hasMyLocation ? "pr-32" : "pr-24";
 
+    const rootRef = useRef<HTMLDivElement | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
+    const [open, setOpen] = useState(false);
+    const [suggestions, setSuggestions] = useState<Point[]>([]);
+    const [suggestLoading, setSuggestLoading] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const q = value.trim();
+        if (q.length < 3) {
+            abortRef.current?.abort();
+            setSuggestions([]);
+            setSuggestLoading(false);
+            setActiveIndex(-1);
+            return;
+        }
+
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        setSuggestLoading(true);
+        const t = window.setTimeout(() => {
+            void (async () => {
+                try {
+                    const results = await geocodeSuggestions(q, 6);
+                    if (controller.signal.aborted) return;
+                    setSuggestions(results);
+                    setActiveIndex(results.length > 0 ? 0 : -1);
+                } catch {
+                    if (controller.signal.aborted) return;
+                    setSuggestions([]);
+                    setActiveIndex(-1);
+                } finally {
+                    if (controller.signal.aborted) return;
+                    setSuggestLoading(false);
+                }
+            })();
+        }, 250);
+
+        return () => {
+            window.clearTimeout(t);
+            controller.abort();
+        };
+    }, [open, value]);
+
+    function close() {
+        setOpen(false);
+        setActiveIndex(-1);
+    }
+
+    function applySuggestion(p: Point) {
+        onChange(p.label);
+        if (onSuggestionPick) onSuggestionPick(p);
+        else onSearch();
+        close();
+    }
+
     return (
         <div className="space-y-2">
             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600">
                 {label}
             </label>
 
-            <div className="relative">
+            <div
+                ref={rootRef}
+                className="relative"
+                onFocus={() => setOpen(true)}
+                onBlur={() => {
+                    // Close only when focus fully leaves this field (input + dropdown).
+                    window.requestAnimationFrame(() => {
+                        const root = rootRef.current;
+                        const active = document.activeElement;
+                        if (!root || !active) return close();
+                        if (!root.contains(active)) close();
+                    });
+                }}
+            >
                 <input
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === "Enter") onSearch();
+                        if (e.key === "ArrowDown") {
+                            if (!open) setOpen(true);
+                            e.preventDefault();
+                            setActiveIndex((i) => {
+                                const next = i + 1;
+                                return next >= suggestions.length ? i : next;
+                            });
+                            return;
+                        }
+                        if (e.key === "ArrowUp") {
+                            if (!open) setOpen(true);
+                            e.preventDefault();
+                            setActiveIndex((i) => Math.max(0, i - 1));
+                            return;
+                        }
+                        if (e.key === "Escape") {
+                            e.preventDefault();
+                            close();
+                            return;
+                        }
+                        if (e.key === "Enter") {
+                            if (open && activeIndex >= 0 && activeIndex < suggestions.length) {
+                                e.preventDefault();
+                                applySuggestion(suggestions[activeIndex]);
+                                return;
+                            }
+                            onSearch();
+                        }
                     }}
                     placeholder={label}
                     className={
@@ -48,6 +154,35 @@ export default function LocationField({
                         inputRightPadding
                     }
                 />
+
+                {open && (suggestLoading || suggestions.length > 0) ? (
+                    <div className="absolute left-0 right-0 top-full z-[60] mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
+                        {suggestLoading ? (
+                            <div className="px-3 py-2 text-xs font-medium text-gray-600">
+                                Vorschlaege werden geladen...
+                            </div>
+                        ) : null}
+
+                        {suggestions.map((s, idx) => {
+                            const key = `${s.lat},${s.lon}`;
+                            const active = idx === activeIndex;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()} // keep input focus
+                                    onClick={() => applySuggestion(s)}
+                                    className={
+                                        "block w-full px-3 py-2 text-left text-[12px] transition " +
+                                        (active ? "bg-blue-50 text-blue-900" : "text-gray-900 hover:bg-gray-50")
+                                    }
+                                >
+                                    <span className="line-clamp-2">{s.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : null}
 
                 <div className="absolute inset-y-0 right-2 flex items-center gap-2">
                     {hasMyLocation ? (
