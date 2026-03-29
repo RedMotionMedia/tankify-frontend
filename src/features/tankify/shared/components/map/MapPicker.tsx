@@ -44,6 +44,7 @@ type Props = {
     hideSearchOverlayRequestId?: number;
     onSearchHereStart?: () => void;
     recenterRequestId?: number;
+    suspendStartup?: boolean;
 };
 
 type UserLocation = { lat: number; lon: number };
@@ -306,6 +307,7 @@ export default function MapPicker({
     hideSearchOverlayRequestId,
     onSearchHereStart,
     recenterRequestId,
+    suspendStartup = false,
 }: Props) {
     const [stations, setStations] = useState<Station[]>([]);
     const [logoCacheBust, setLogoCacheBust] = useState(0);
@@ -670,6 +672,7 @@ export default function MapPicker({
     useEffect(() => {
         if (startupCenter) return;
         if (typeof window === "undefined") return;
+        if (suspendStartup) return;
         // Prevent double invocation in dev StrictMode from triggering multiple prompts.
         if (startupLastStartedAttemptRef.current === startupAttempt) return;
         startupLastStartedAttemptRef.current = startupAttempt;
@@ -737,7 +740,7 @@ export default function MapPicker({
 
             setStartupCenterError("Standort konnte nicht bestimmt werden.");
         })();
-    }, [startupCenter, startupAttempt, fetchIpLocation]);
+    }, [startupCenter, startupAttempt, fetchIpLocation, suspendStartup]);
 
     const handleStartupManualSearch = useCallback(async () => {
         const q = startupManualQuery.trim();
@@ -1551,7 +1554,7 @@ export default function MapPicker({
         <div className="relative h-full w-full">
             <div ref={containerRef} className="h-full w-full" />
 
-            {!startupCenter ? (
+            {!startupCenter && !suspendStartup ? (
                 <div className="absolute inset-0 z-2000 grid place-items-center bg-white">
                     <div className="mx-6 max-w-sm rounded-3xl border border-gray-200 bg-white p-4 text-center shadow-sm">
                         <div className="text-sm font-semibold text-gray-900">

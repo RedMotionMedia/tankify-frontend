@@ -919,22 +919,23 @@ export default function TankifyCalculator() {
                             }
                         >
                             <div className="h-full overflow-hidden rounded-3xl">
-                                 <MapPicker
-                                     start={draftStartPoint}
-                                     end={draftEndPoint}
-                                     routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
-                                     pickMode={mapPickMode}
-                                     fuelType={fuelType}
-                                     measurementSystem={measurementSystem}
-                                     currencySystem={currencySystem}
-                                     eurToCurrencyRate={eurToCurrencyRate}
-                                     debugMode={debugMode}
-                                     t={t}
-                                     recenterRequestId={mobileRecenterReqId}
-                                     hideSearchOverlayRequestId={hideSearchOverlayReqId}
-                                     onStationsChange={handleStationsChange}
-                                     selectedStationId={selectedStationId}
-                                     stationFocusRequestId={stationFocusRequestId}
+                                <MapPicker
+                                    start={draftStartPoint}
+                                    end={draftEndPoint}
+                                    routeGeometry={hasCommittedRoute ? routeData?.geometry ?? [] : []}
+                                    pickMode={mapPickMode}
+                                    fuelType={fuelType}
+                                    measurementSystem={measurementSystem}
+                                    currencySystem={currencySystem}
+                                    eurToCurrencyRate={eurToCurrencyRate}
+                                    debugMode={debugMode}
+                                    t={t}
+                                    suspendStartup={vehicleModalOpen}
+                                    recenterRequestId={mobileRecenterReqId}
+                                    hideSearchOverlayRequestId={hideSearchOverlayReqId}
+                                    onStationsChange={handleStationsChange}
+                                    selectedStationId={selectedStationId}
+                                    stationFocusRequestId={stationFocusRequestId}
                                     onStationSelect={(station) => {
                                         setSelectedStationId(station.id);
                                         setStationFocusRequestId((v) => v + 1);
@@ -1103,6 +1104,7 @@ export default function TankifyCalculator() {
                             debugMode={debugMode}
                             t={t}
                             hideSearchOverlayRequestId={hideSearchOverlayReqId}
+                            suspendStartup={vehicleModalOpen}
                             recenterRequestId={mobileRecenterReqId}
                             onSearchHereStart={() => {
                                 setMobileSheetPage(1);

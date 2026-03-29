@@ -148,7 +148,7 @@ export default function SettingsModal({
 
     return (
         <div
-            className={`fixed inset-0 z-2000 flex items-center justify-center p-4 transition duration-200 ${
+            className={`fixed inset-0 z-[3300] flex items-center justify-center p-4 transition duration-200 ${
                 open ? "pointer-events-auto" : "pointer-events-none"
             }`}
             aria-hidden={!open}
@@ -168,7 +168,7 @@ export default function SettingsModal({
                 aria-modal="true"
                 aria-label={t.settings.title}
                 onClick={(e) => e.stopPropagation()}
-                className={`relative z-2001 max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl transition duration-200 sm:p-8 ${
+                className={`relative z-[3301] max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl transition duration-200 sm:p-8 ${
                     open ? "scale-100 opacity-100" : "scale-95 opacity-0"
                 }`}
             >
