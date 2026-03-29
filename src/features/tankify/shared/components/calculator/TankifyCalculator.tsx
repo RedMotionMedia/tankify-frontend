@@ -654,11 +654,13 @@ export default function TankifyCalculator() {
             }
             commitRoute(draftStartPoint, point);
 
+            // Explicit user action: request a map recenter (desktop + mobile).
+            setMobileRecenterReqId((v) => v + 1);
+
             if (!isDesktop) {
                 setMobileSheetPage(0);
                 setBottomSheet(window.innerHeight * snapWorthMultiplicator);
                 setMobileCalcScrollToTopReqId((v) => v + 1);
-                setMobileRecenterReqId((v) => v + 1);
             }
         }
     }
@@ -741,12 +743,14 @@ export default function TankifyCalculator() {
         setHideSearchOverlayReqId((v) => v + 1);
         commitRoute(draftStartPoint, draftEndPoint);
 
+        // Explicit user action: request a map recenter (desktop + mobile).
+        setMobileRecenterReqId((v) => v + 1);
+
         if (!isDesktop) {
             setMobileSheetPage(0);
             const h = window.visualViewport?.height ?? window.innerHeight;
             setBottomSheet(h * snapWorthMultiplicator);
             setMobileCalcScrollToTopReqId((v) => v + 1);
-            setMobileRecenterReqId((v) => v + 1);
         }
     }
 
@@ -980,6 +984,7 @@ export default function TankifyCalculator() {
                                     debugMode={debugMode}
                                     t={t}
                                     defaultLocationEnabled
+                                    recenterRequestId={mobileRecenterReqId}
                                     hideSearchOverlayRequestId={hideSearchOverlayReqId}
                                     onStationsChange={handleStationsChange}
                                     selectedStationId={selectedStationId}

@@ -350,6 +350,8 @@ export default function MapPicker({
     const mapLoadedRef = useRef(false);
     const mapCleanupRef = useRef<(() => void) | null>(null);
     const lastAutoFitSignatureRef = useRef<string>("");
+    // Once the user pans/zooms manually, stop auto-fitting until an explicit recenter action happens.
+    const suppressAutoFitRef = useRef(false);
     const pendingRecenterPointsRef = useRef<Array<[number, number]> | null>(null);
     const pendingRecenterIdRef = useRef(0);
     const pendingRecenterClearTimerRef = useRef<number | null>(null);
@@ -368,6 +370,15 @@ export default function MapPicker({
     useEffect(() => {
         userLocationRef.current = userLocation;
     }, [userLocation]);
+
+    const startRef = useRef<Point | null>(start);
+    const endRef = useRef<Point | null>(end);
+    const routeGeometryRef = useRef<[number, number][]>(routeGeometry);
+    useEffect(() => {
+        startRef.current = start;
+        endRef.current = end;
+        routeGeometryRef.current = routeGeometry;
+    }, [start, end, routeGeometry]);
 
     useEffect(() => {
         onStationSelectRef.current = onStationSelect;
@@ -697,6 +708,8 @@ export default function MapPicker({
                 };
                 const onMoveStartAny = (e: unknown) => {
                     onMoveStart();
+                    // Any manual pan/zoom should stop "auto-fit" snap-backs until an explicit recenter happens.
+                    suppressAutoFitRef.current = true;
                     const isUserInitiated = Boolean((e as { originalEvent?: unknown } | null)?.originalEvent);
                     if (isUserInitiated) {
                         setHideSearchOverlay(false);
@@ -910,36 +923,29 @@ export default function MapPicker({
         const validRoute = routeGeometry.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
         );
-        const points =
-            validRoute.length > 0
-                ? validRoute
-                : [
-                    ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
-                    ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
-                ];
+        // Only auto-fit when we have a calculated route geometry.
+        // Start/end selection alone should not force recentering.
+        if (validRoute.length === 0) return;
+        const points = validRoute;
         const signature = (() => {
-            if (validRoute.length > 0) {
-                const first = validRoute[0];
-                const last = validRoute[validRoute.length - 1];
-                return `r:${validRoute.length}:${first[0]},${first[1]}:${last[0]},${last[1]}`;
-            }
-            const s = start ? `${start.lat},${start.lon}` : "-";
-            const e = end ? `${end.lat},${end.lon}` : "-";
-            return `p:${s}:${e}`;
+            const first = validRoute[0];
+            const last = validRoute[validRoute.length - 1];
+            return `r:${validRoute.length}:${first[0]},${first[1]}:${last[0]},${last[1]}`;
         })();
 
         // Prevent auto-recentering on unrelated re-renders (e.g. "Hier suchen" updates stations state).
         if (lastAutoFitSignatureRef.current === signature) return;
         lastAutoFitSignatureRef.current = signature;
+        // A new calculated route is an explicit user action ("Calculate"/auto-calc), so allow auto-fit
+        // even if the user previously panned/zoomed the map.
+        suppressAutoFitRef.current = false;
 
         if (points.length === 0) return;
 
         try {
-            if (validRoute.length > 0 || (start && end)) {
-                // When we auto-recenter for a calculated route (geometry may arrive slightly later),
-                // hide the overlay until the user moves the map or the map resizes.
-                setHideSearchOverlay(true);
-            }
+            // When we auto-recenter for a calculated route (geometry may arrive slightly later),
+            // hide the overlay until the user moves the map or the map resizes.
+            setHideSearchOverlay(true);
 
             // Apply immediately, but also re-apply once after any layout-driven resize settles.
             setPendingRecenter(points);
@@ -952,7 +958,7 @@ export default function MapPicker({
                 } catch {}
             });
         } catch {}
-    }, [start, end, routeGeometry]);
+    }, [routeGeometry]);
 
     // Rebuild markers when stations or marker-visual inputs change.
     useEffect(() => {
@@ -1004,6 +1010,10 @@ export default function MapPicker({
     ]);
 
     // Highlight and center the selected station (no popups; selection is shown in the UI list).
+    const lastStationRecenterRef = useRef<{ id: string | null; focus: number }>({
+        id: null,
+        focus: -1,
+    });
     useEffect(() => {
         const map = mapRef.current;
         if (!map) return;
@@ -1025,8 +1035,15 @@ export default function MapPicker({
         if (!selectedStationId) return;
         const station = stations.find((s) => s.id === selectedStationId);
         if (!station) return;
+        const focus = typeof stationFocusRequestId === "number" ? stationFocusRequestId : 0;
+        const last = lastStationRecenterRef.current;
+        // Don't recenter repeatedly just because the stations array identity/order changes.
+        if (last.id === selectedStationId && last.focus === focus) return;
+
         const points: Array<[number, number]> = [[station.lat, station.lon]];
         try {
+            suppressAutoFitRef.current = false;
+            lastStationRecenterRef.current = { id: selectedStationId, focus };
             // When side panels open/close, ResizeObserver may call map.stop() and cancel animations.
             // Keep a pending recenter so we re-apply after the resize settles.
             setPendingRecenter(points);
@@ -1285,16 +1302,21 @@ export default function MapPicker({
     const handleRecenter = useCallback(() => {
         const map = mapRef.current;
         if (!map) return;
+        suppressAutoFitRef.current = false;
 
-        const validRoute = routeGeometry.filter(
+        const geom = routeGeometryRef.current;
+        const s = startRef.current;
+        const e = endRef.current;
+
+        const validRoute = geom.filter(
             (p) => isFiniteNumber(p[0]) && isFiniteNumber(p[1])
         );
         const points =
             validRoute.length > 0
                 ? validRoute
                 : [
-                    ...(start ? [sanitizeLatLng([start.lat, start.lon])] : []),
-                    ...(end ? [sanitizeLatLng([end.lat, end.lon])] : []),
+                    ...(s ? [sanitizeLatLng([s.lat, s.lon])] : []),
+                    ...(e ? [sanitizeLatLng([e.lat, e.lon])] : []),
                 ];
         if (points.length === 0) return;
         try {
@@ -1313,10 +1335,10 @@ export default function MapPicker({
                 } catch {}
             });
         } catch {}
-    }, [start, end, routeGeometry]);
+    }, []);
 
     useEffect(() => {
-        if (recenterRequestId == null) return;
+        if (typeof recenterRequestId !== "number" || recenterRequestId <= 0) return;
         handleRecenter();
     }, [recenterRequestId, handleRecenter]);
 
