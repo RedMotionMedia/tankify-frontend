@@ -1,185 +1,45 @@
-# 🚗 Tankify Frontend
+# Tankify Frontend
 
-A modern Next.js app that helps you decide whether it’s worth driving to a cheaper fuel station.
+A Next.js app that helps you decide whether it is worth driving to a cheaper gas station.
 
-<img alt="img.png" src="doc/img.png"/>
+<img alt="Tankify screenshot" src="doc/img.png" />
 
-It calculates:
+## Documentation
 
-* ⛽ Fuel cost for the trip
-* 💸 Savings compared to local fuel price
-* 📍 Real driving distance (via routing)
-* ⏱ Estimated travel time
-* 📊 Profitability (visual indicator)
+The full documentation lives under [`doc/`](./doc/README.md):
 
----
+- Product overview, user flows, and what you can change
+- Running your own Docker image
+- Development guide (local setup, code pointers, internal APIs)
+- Configuration, deployment, and troubleshooting
 
-## ✨ Features
+## Quickstart (Development)
 
-* 🗺 Interactive OpenStreetMap with Leaflet
-* 📍 Select start & destination via:
-
-    * Address search
-    * Map click mode
-* 🛣 Real road routing (OSRM)
-* 📈 Profit indicator (red → yellow → green)
-* 🎚 Sliders + manual input for:
-
-    * Fuel prices
-    * Consumption
-    * Tank size
-    * Average speed
-* 🎯 Calculates:
-
-    * Distance
-    * Duration
-    * Trip cost
-    * Net savings
-    * Break-even price difference
-    * Max consumption
-
----
-
-## 🛠 Tech Stack
-
-* **Next.js (App Router) 16.2.1**
-* **Node 10.9.3**
-* **React 19.2.4**
-* **TypeScript**
-* **Tailwind CSS**
-* **React Leaflet** (OpenStreetMap)
-* **OSRM API** (routing)
-* **Nominatim API** (geocoding)
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone the repo
+Requirements: Node.js 20+ and npm.
 
 ```bash
-git clone https://github.com/RedMotionMedia/tankify-frontend.git
-cd tankify-frontend
-```
-
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
-### 3. Run development server
-
-```bash
+npm ci
 npm run dev
 ```
 
-Open:
+Open `http://localhost:3000`.
+
+## Quickstart (Docker)
 
 ```bash
-http://localhost:3000
+docker build -t tankify-frontend:local \
+  --build-arg NEXT_PUBLIC_APP_VERSION=dev \
+  --build-arg NEXT_PUBLIC_ENABLE_DEBUG_MODE=0 \
+  .
+
+docker run --rm -p 3000:3000 tankify-frontend:local
 ```
 
----
+## Notes
 
-## ⚙️ How It Works
+- Map: MapLibre with an OpenFreeMap style.
+- Routing: OSRM public endpoints.
+- Search and suggestions: Nominatim.
+- Gas station data: Austrian E-Control API via `/api/stations`.
+- The Settings panel shows the build version (`NEXT_PUBLIC_APP_VERSION`), injected at build time by the CI pipeline (Git tag `v*` or short SHA).
 
-### 1. Routing (distance + time)
-
-Uses OSRM:
-
-```
-https://router.project-osrm.org
-```
-
-Returns:
-
-* Distance (meters)
-* Duration (seconds)
-* Route geometry
-
----
-
-### 2. Calculations
-
-#### Trip fuel usage
-
-```
-tripLiters = (distance_roundtrip / 100) * consumption
-```
-
-#### Trip cost
-
-```
-tripCost = tripLiters * destinationPrice
-```
-
-#### Savings
-
-```
-grossSaving = tankSize * (localPrice - destinationPrice)
-netSaving = grossSaving - tripCost
-```
-
-#### Break-even
-
-```
-breakEven = tripCost / tankSize
-```
-
----
-
-## 🎨 UI Logic
-
-### Profit Indicator
-
-| Range | Meaning            |
-| ----- | ------------------ |
-| < 0€  | Not worth it 🔴    |
-| 0–5€  | Barely worth it 🟡 |
-| 5–15€ | Worth it 🟢        |
-| >15€  | Very worth it 🟢🔥 |
-
----
-
-## ⚠️ Limitations
-
-* Uses public APIs (rate limited)
-* Routing is approximate (no live traffic)
-* Fuel prices must be entered manually
-
----
-
-## 🔮 Possible Improvements
-
-* 🔌 Live fuel price integration
-* 📍 Nearby fuel station suggestions
-* 💾 Save favorite routes
-* 🌙 Dark mode
-* 📱 Mobile PWA version
-
----
-
-## 📄 License
-
-MIT License
-
----
-
-## 🙌 Credits
-
-* OpenStreetMap
-* OSRM
-* React Leaflet
-* Overpass-API
-* E-Control API
-
----
-
-## 💡 Idea
-
-Built to answer one simple question:
-
-> “Is it actually worth driving for cheaper fuel?”
-
-Now you know 😄
