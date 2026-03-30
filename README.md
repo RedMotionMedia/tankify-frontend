@@ -2,16 +2,11 @@
 
 A Next.js app that helps you decide whether it is worth driving to a cheaper gas station.
 
-<img alt="Tankify screenshot" src="doc/img.png" />
+<img alt="Tankify screenshot" src="public/tankify-screenshot.png" />
 
 ## Documentation
 
-The full documentation lives under [`doc/`](./doc/README.md):
-
-- Product overview, user flows, and what you can change
-- Running your own Docker image
-- Development guide (local setup, code pointers, internal APIs)
-- Configuration, deployment, and troubleshooting
+Documentation homepage: [GitHub Wiki](https://github.com/RedMotionMedia/tankify-frontend/wiki).
 
 ## Quickstart (Development)
 
