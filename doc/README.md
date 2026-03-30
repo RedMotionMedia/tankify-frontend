@@ -10,7 +10,7 @@ Runtime vs build-time configuration:
 ## Contents
 
 - [Product Overview](./product.md)
-- [Run Your Own Image (Docker)](./running-docker.md)
+- [Run Or Deploy With Docker](./running-docker.md)
 - [Development Guide](./development.md)
 - [Configuration Reference](./configuration.md)
 - [Deployment and CI/CD (GitHub Actions)](./deployment.md)
