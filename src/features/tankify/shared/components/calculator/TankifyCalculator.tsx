@@ -128,6 +128,24 @@ export default function TankifyCalculator() {
     );
     const t = getTranslations(language);
     const myLocationReqIdRef = useRef(0);
+    // If the user explicitly clears the start field we must not auto-restore "My Location"
+    // from background geolocation updates. This is reset when the user clicks "My Location".
+    const suppressAutoStartFromUserLocationRef = useRef(false);
+    const draftStartPointRef = useRef<Point | null>(null);
+    const startTextRef = useRef("");
+    const tRef = useRef(t);
+
+    useEffect(() => {
+        draftStartPointRef.current = draftStartPoint;
+    }, [draftStartPoint]);
+
+    useEffect(() => {
+        startTextRef.current = startText;
+    }, [startText]);
+
+    useEffect(() => {
+        tRef.current = t;
+    }, [t]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -459,6 +477,7 @@ export default function TankifyCalculator() {
         setStationsQueried(false);
 
         if (type === "start") {
+            suppressAutoStartFromUserLocationRef.current = true;
             setStartText("");
             setDraftStartPoint(null);
         } else {
@@ -491,6 +510,7 @@ export default function TankifyCalculator() {
         const reqId = ++myLocationReqIdRef.current;
         try {
             setError("");
+            suppressAutoStartFromUserLocationRef.current = false;
 
             const { lat, lon } = await getCurrentPosition();
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("INVALID_COORDS");
@@ -533,9 +553,12 @@ export default function TankifyCalculator() {
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
             setUserLocation({ lat, lon });
-            if (draftStartPoint) return;
+            if (suppressAutoStartFromUserLocationRef.current) return;
+            if (draftStartPointRef.current) return;
+            // Never overwrite what the user is currently typing.
+            if (startTextRef.current.trim().length > 0) return;
 
-            const label = t.route.currentLocation;
+            const label = tRef.current.route.currentLocation;
             setDraftStartPoint({ lat, lon, label });
             setStartText(label);
         }
@@ -551,7 +574,7 @@ export default function TankifyCalculator() {
             window.removeEventListener("tankify:user-location", handleUserLocation);
             window.removeEventListener("tankify:user-location-disabled", handleUserLocationDisabled);
         };
-    }, [draftStartPoint, t]);
+    }, []);
 
     function handleSwapStartEnd() {
         setError("");
