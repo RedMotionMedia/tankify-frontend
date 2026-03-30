@@ -2,8 +2,10 @@
 
 ## Requirements
 
-- Node.js 20 (recommended, matches the Docker image)
+- Node.js 22 (recommended, matches the Docker image and CI)
 - npm (package-lock is committed)
+
+This repo includes `.nvmrc` and sets `engines.node` in `package.json` to keep versions consistent.
 
 If you are on Windows PowerShell and `npm` scripts are blocked due to ExecutionPolicy, run npm via a different shell (cmd.exe / Git Bash) or adjust your policy for your environment.
 

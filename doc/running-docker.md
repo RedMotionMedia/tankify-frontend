@@ -6,6 +6,8 @@ This project ships as a standard Next.js production server inside a Docker image
 
 - Docker (or compatible container runtime)
 
+Note: the Docker image uses Node.js 22 (Alpine) as its base.
+
 ## Run A Prebuilt Image
 
 If you have an image reference (for example from GHCR), run it like this:

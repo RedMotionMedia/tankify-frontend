@@ -15,7 +15,9 @@ The full documentation lives under [`doc/`](./doc/README.md):
 
 ## Quickstart (Development)
 
-Requirements: Node.js 20+ and npm.
+Requirements: Node.js 22+ and npm.
+
+Tip: this repo includes `.nvmrc` and sets `engines.node` in `package.json`.
 
 ```bash
 npm ci

@@ -10,6 +10,7 @@ File: `.github/workflows/build.yml`
 
 - Runs on every push (all branches) and pull requests.
 - Installs dependencies, lints, and runs a production build.
+- Uses Node.js 22 for the workflow runtime (to match local development and Docker).
 
 ### Release (Build And Push Image)
 
