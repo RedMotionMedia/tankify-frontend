@@ -26,6 +26,7 @@ The app uses internal API routes for:
 - IP-based location resolution with provider fallback.
 - FX rate and currency name fetching with caching.
 - Brand logo proxying/caching and local fallback.
+- Runtime configuration used by the client (for example debug UI enablement in production).
 
 ## External Dependencies (Network)
 

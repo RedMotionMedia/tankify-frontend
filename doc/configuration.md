@@ -8,44 +8,38 @@ File: `next.config.ts`
 
 - `NEXT_ALLOWED_DEV_ORIGINS` (CSV)
   - Used only in development mode to set `allowedDevOrigins`.
-  - Example:
-    - `NEXT_ALLOWED_DEV_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
+  - Example: `NEXT_ALLOWED_DEV_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
 
-## Build/Runtime Environment Variables
+## Environment Variables
 
-### Public (baked into the client)
-
-These are read as `process.env.NEXT_PUBLIC_*` in client code. In Next.js, they are embedded at build time.
+### Build-Time (baked into the client)
 
 - `NEXT_PUBLIC_APP_VERSION`
   - Displayed in Settings.
-  - Intended value: Git tag `vX.Y.Z` when available, otherwise short SHA.
+  - CI sets this to the Git tag `vX.Y.Z` when building from a tag, otherwise to the short SHA.
+  - Local builds can set it to `dev`.
+
+### Runtime (set when starting the container)
+
+These are read server-side and can be changed without rebuilding the Docker image.
+
 - `NEXT_PUBLIC_ENABLE_DEBUG_MODE`
-  - `1` enables debug UI features in production builds.
-
-### Server-side (not exposed to client)
-
+  - `1` enables debug UI controls even in production.
+  - Implemented as runtime config via `GET /api/runtime-config` (reload the page after changing).
 - `ENABLE_DEBUG_MODE`
-  - Enables server-side debug features when set to `1`.
+  - `1` enables server-side debug-only API features.
   - Example: allowing `POST /api/logo?action=clear`.
 - `LOGO_DEV_TOKEN`
-  - Token for logo.dev used by `/api/logo` when fetching logos.
+  - Token for logo.dev used by `GET /api/logo` when fetching logos.
 - `LOGO_MAX_BYTES`
-  - Max bytes for downloaded logos.
+  - Max bytes for downloaded logos (default 512 KiB; clamped to a sane max).
+
+Note: despite the `NEXT_PUBLIC_` prefix, `NEXT_PUBLIC_ENABLE_DEBUG_MODE` is intentionally treated as runtime config in this project (it is not embedded into the client bundle).
 
 ## Station Fetch Behavior
 
-`/api/stations` supports:
+`GET /api/stations` supports:
 
-- `includeClosed=1` to include closed stations (defaults to false)
-- `debug=1` to include raw upstream E-Control station payloads in the response.
+- `includeClosed=1` to include closed stations (defaults to false).
+- `debug=1` to include raw upstream E-Control payloads in the response.
   - Only honored when debug is allowed (`NODE_ENV != production` or `ENABLE_DEBUG_MODE=1`).
-
-## IP Location Behavior
-
-`/api/ip-location`:
-
-- Detects client IP primarily via forwarded headers (`x-forwarded-for`, `x-real-ip`, etc.).
-- Falls back to provider-side auto-detection when running locally (no public IP available).
-- Tries multiple providers (`ipwho.is`, then `ipapi.co`) and returns structured error JSON if both fail.
-
