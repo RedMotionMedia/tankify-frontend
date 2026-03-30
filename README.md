@@ -28,6 +28,19 @@ Open `http://localhost:3000`.
 
 ## Quickstart (Docker)
 
+Option 1: run the prebuilt image from GHCR:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e NEXT_PUBLIC_ENABLE_DEBUG_MODE=1 \
+  -e ENABLE_DEBUG_MODE=1 \
+  -e LOGO_DEV_TOKEN=... \
+  ghcr.io/redmotionmedia/tankify-frontend:latest
+```
+
+Option 2: build locally and run:
+
 ```bash
 docker build -t tankify-frontend:local \
   --build-arg NEXT_PUBLIC_APP_VERSION=dev \

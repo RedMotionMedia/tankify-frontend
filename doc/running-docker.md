@@ -8,17 +8,22 @@ This project ships as a standard Next.js production server inside a Docker image
 
 The image uses Node.js 22 (Alpine).
 
-## Run A Prebuilt Image
+## Option 1: Run The Prebuilt Image (GHCR)
+
+Use `latest` for quick testing. For production deployments, prefer a pinned version tag (for example `vX.Y.Z` or `sha-abcdef0`).
 
 ```bash
 docker run --rm -p 3000:3000 \
   -e NODE_ENV=production \
-  ghcr.io/redmotionmedia/tankify-frontend:<tag>
+  -e NEXT_PUBLIC_ENABLE_DEBUG_MODE=1 \
+  -e ENABLE_DEBUG_MODE=1 \
+  -e LOGO_DEV_TOKEN=... \
+  ghcr.io/redmotionmedia/tankify-frontend:latest
 ```
 
 Open `http://localhost:3000`.
 
-## Build Locally
+## Option 2: Build The Image Yourself
 
 ```bash
 docker build -t tankify-frontend:local \
@@ -57,7 +62,7 @@ docker run --rm -p 3000:3000 \
 ```yaml
 services:
   tankify:
-    image: ghcr.io/redmotionmedia/tankify-frontend:<tag>
+    image: ghcr.io/redmotionmedia/tankify-frontend:latest
     ports:
       - "3000:3000"
     environment:

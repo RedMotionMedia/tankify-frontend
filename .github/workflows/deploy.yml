@@ -115,6 +115,9 @@ jobs:
                 containers:
                   - name: tankify-frontend
                     image: ${IMAGE}:${TAG}
+                    envFrom:
+                      - secretRef:
+                          name: tankify-frontend-runtime
           EOF
 
           git -C gitops diff
