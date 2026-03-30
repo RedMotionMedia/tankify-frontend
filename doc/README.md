@@ -1,6 +1,11 @@
 # Tankify Frontend Documentation
 
-This folder contains the up-to-date documentation for the Tankify frontend.
+This folder contains the documentation for the Tankify frontend.
+
+Runtime vs build-time configuration:
+
+- Runtime env (set when starting the container): `LOGO_DEV_TOKEN`, `ENABLE_DEBUG_MODE`, `NEXT_PUBLIC_ENABLE_DEBUG_MODE`.
+- Build-time injection (baked into the client bundle): `NEXT_PUBLIC_APP_VERSION`.
 
 ## Contents
 

@@ -51,9 +51,9 @@ export default function TankifyCalculator() {
     const [storageReady, setStorageReady] = useState(false);
     const [debugMode, setDebugMode] = useState(false);
     const [darkMode, setDarkMode] = useState(false);
-
-    const debugAllowed = process.env.NODE_ENV !== "production" ||
-        (process.env.NEXT_PUBLIC_ENABLE_DEBUG_MODE ?? "").trim() === "1";
+    const [debugAllowed, setDebugAllowed] = useState(false);
+    const [debugAllowedReady, setDebugAllowedReady] = useState(false);
+    const savedDebugModeRef = useRef<string | null>(null);
 
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
@@ -202,8 +202,43 @@ export default function TankifyCalculator() {
     }, [currencySystem]);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        let cancelled = false;
+        const ac = new AbortController();
 
+        (async () => {
+            try {
+                const res = await fetch("/api/runtime-config", {
+                    signal: ac.signal,
+                    cache: "no-store",
+                });
+                if (!res.ok) throw new Error(`RUNTIME_CONFIG_HTTP_${res.status}`);
+                const json = (await res.json()) as { debugUiAllowed?: unknown };
+                const allowed =
+                    json.debugUiAllowed === true ||
+                    // Dev fallback if the endpoint fails for some reason.
+                    process.env.NODE_ENV !== "production";
+                if (cancelled) return;
+                setDebugAllowed(Boolean(allowed));
+            } catch {
+                if (cancelled) return;
+                // Keep dev experience nice even if the endpoint fails locally.
+                setDebugAllowed(process.env.NODE_ENV !== "production");
+            } finally {
+                if (cancelled) return;
+                setDebugAllowedReady(true);
+            }
+        })();
 
+        return () => {
+            cancelled = true;
+            try {
+                ac.abort();
+            } catch {}
+        };
+    }, []);
+
+    useEffect(() => {
         const savedLanguage = window.localStorage.getItem("tankify-language");
         const savedCurrency = window.localStorage.getItem("tankify-currency");
         const savedMeasurement = window.localStorage.getItem("tankify-measurement");
@@ -231,9 +266,7 @@ export default function TankifyCalculator() {
             setFuelType(savedFuelType);
         }
 
-        if (savedDebugMode === "1" && debugAllowed) {
-            setDebugMode(true);
-        }
+        savedDebugModeRef.current = savedDebugMode;
 
         // Default is light mode. Only switch when the user explicitly enabled it before.
         if (savedDarkMode === "1") setDarkMode(true);
@@ -270,7 +303,14 @@ export default function TankifyCalculator() {
         }
 
         setStorageReady(true);
-    }, [debugAllowed]);
+    }, []);
+
+    useEffect(() => {
+        if (!debugAllowedReady) return;
+        if (!debugAllowed) return;
+        if (savedDebugModeRef.current !== "1") return;
+        setDebugMode(true);
+    }, [debugAllowed, debugAllowedReady]);
 
     useEffect(() => {
         if (!storageReady) return;
@@ -288,12 +328,13 @@ export default function TankifyCalculator() {
     }, [storageReady]);
 
     useEffect(() => {
+        if (!debugAllowedReady) return;
         if (debugAllowed) return;
         setDebugMode(false);
         try {
             window.localStorage.removeItem("tankify-debug-mode");
         } catch {}
-    }, [debugAllowed]);
+    }, [debugAllowed, debugAllowedReady]);
 
     useEffect(() => {
         if (!storageReady) return;
@@ -334,8 +375,9 @@ export default function TankifyCalculator() {
 
     useEffect(() => {
         if (!storageReady) return;
+        if (!debugAllowedReady) return;
         if (!debugAllowed && debugMode) setDebugMode(false);
-    }, [debugAllowed, debugMode, storageReady]);
+    }, [debugAllowed, debugAllowedReady, debugMode, storageReady]);
 
     useEffect(() => {
         if (!storageReady) return;

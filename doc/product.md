@@ -25,7 +25,7 @@ It is a Next.js web app that lets a user pick a start and a destination, then ca
   - Currency (via FX rates)
   - Measurement system (metric/imperial)
   - Fuel type
-  - Optional debug tools (depending on environment flags)
+  - Optional debug tools (in development always visible; in production requires `NEXT_PUBLIC_ENABLE_DEBUG_MODE=1` at runtime)
   - Build version display (tag or SHA injected at build time)
 
 ## Gas Station Data

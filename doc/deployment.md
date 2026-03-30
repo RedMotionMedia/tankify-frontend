@@ -48,9 +48,14 @@ File: `.github/workflows/deploy.yml`
 
 The workflow uses:
 
-- `LOGO_DEV_TOKEN` (secret)
-- `ENABLE_DEBUG_MODE` (environment variable)
 - `GITOPS_REPO_TOKEN` (secret, for pushing to the GitOps repo)
+
+Runtime configuration (set in GitOps manifests / Helm values, not in the Docker build):
+
+- `NEXT_PUBLIC_ENABLE_DEBUG_MODE`
+- `ENABLE_DEBUG_MODE`
+- `LOGO_DEV_TOKEN`
+- `LOGO_MAX_BYTES` (optional)
 
 ## Tagging Recommendations
 

@@ -89,6 +89,8 @@ Components receive the translation object `t` and should not hardcode UI strings
   - Server-side IP geolocation, tries multiple providers and returns structured errors.
 - `GET /api/fx/currencies` and `GET /api/fx/rate`
   - Currency list and FX conversion rates (Frankfurter).
+- `GET /api/runtime-config`
+  - Exposes runtime config for the client (for example whether debug UI controls are allowed in production).
 - `GET /api/logo`
   - Proxies and caches brand logo requests, supports a local asset fallback.
   - `POST /api/logo?action=clear` clears cache when debug is enabled.

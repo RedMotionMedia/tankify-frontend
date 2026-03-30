@@ -31,10 +31,13 @@ Open `http://localhost:3000`.
 ```bash
 docker build -t tankify-frontend:local \
   --build-arg NEXT_PUBLIC_APP_VERSION=dev \
-  --build-arg NEXT_PUBLIC_ENABLE_DEBUG_MODE=0 \
   .
 
-docker run --rm -p 3000:3000 tankify-frontend:local
+docker run --rm -p 3000:3000 \
+  -e NEXT_PUBLIC_ENABLE_DEBUG_MODE=1 \
+  -e ENABLE_DEBUG_MODE=1 \
+  -e LOGO_DEV_TOKEN=... \
+  tankify-frontend:local
 ```
 
 ## Notes

@@ -1,4 +1,4 @@
-# Run Your Own Image (Docker)
+# Run With Docker
 
 This project ships as a standard Next.js production server inside a Docker image.
 
@@ -6,11 +6,9 @@ This project ships as a standard Next.js production server inside a Docker image
 
 - Docker (or compatible container runtime)
 
-Note: the Docker image uses Node.js 22 (Alpine) as its base.
+The image uses Node.js 22 (Alpine).
 
 ## Run A Prebuilt Image
-
-If you have an image reference (for example from GHCR), run it like this:
 
 ```bash
 docker run --rm -p 3000:3000 \
@@ -18,51 +16,58 @@ docker run --rm -p 3000:3000 \
   ghcr.io/redmotionmedia/tankify-frontend:<tag>
 ```
 
-Then open:
+Open `http://localhost:3000`.
 
-`http://localhost:3000`
-
-## Build Your Own Image Locally
-
-From the repository root:
+## Build Locally
 
 ```bash
 docker build -t tankify-frontend:local \
-  --build-arg NEXT_PUBLIC_ENABLE_DEBUG_MODE=0 \
   --build-arg NEXT_PUBLIC_APP_VERSION=dev \
   .
 ```
 
-Run it:
+## Runtime Environment Variables
+
+Set these when starting the container. They are not baked into the image.
+
+- `NEXT_PUBLIC_ENABLE_DEBUG_MODE`
+  - `1` shows debug UI controls even in production.
+  - Evaluated at runtime via `GET /api/runtime-config` (reload the page after changing).
+- `ENABLE_DEBUG_MODE`
+  - `1` enables server-side debug-only API features (for example `POST /api/logo?action=clear`).
+- `LOGO_DEV_TOKEN`
+  - Token for logo.dev used by `GET /api/logo` for higher-quality brand logos.
+  - If not set, `/api/logo` falls back to a favicon service.
+- `LOGO_MAX_BYTES`
+  - Upper bound for downloaded logos (default 512 KiB; clamped to a sane max).
+
+Example:
 
 ```bash
-docker run --rm -p 3000:3000 tankify-frontend:local
+docker run --rm -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e NEXT_PUBLIC_ENABLE_DEBUG_MODE=1 \
+  -e ENABLE_DEBUG_MODE=1 \
+  -e LOGO_DEV_TOKEN=... \
+  tankify-frontend:local
 ```
 
-## Environment Variables
+## Docker Compose Example
 
-This app uses a mix of server-side env vars and `NEXT_PUBLIC_*` build-time vars.
+```yaml
+services:
+  tankify:
+    image: ghcr.io/redmotionmedia/tankify-frontend:<tag>
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_ENABLE_DEBUG_MODE: "1"
+      ENABLE_DEBUG_MODE: "1"
+      LOGO_DEV_TOKEN: ${LOGO_DEV_TOKEN}
+```
 
-Common variables:
+## Ports
 
-- `NEXT_PUBLIC_APP_VERSION`
-  - Build-time value shown in Settings.
-  - GitHub Actions sets this to the Git tag (e.g. `v1.2.3`) when building from a tag, otherwise to the short SHA.
-  - Local builds can set it to `dev`.
-- `NEXT_PUBLIC_ENABLE_DEBUG_MODE`
-  - If set to `1`, allows the UI to show debug controls even in production builds.
-- `ENABLE_DEBUG_MODE`
-  - Server-side flag. When set to `1`, enables debug-only API features (for example clearing the logo cache).
-- `LOGO_DEV_TOKEN`
-  - Token used by the `/api/logo` proxy to fetch high quality brand logos from logo.dev.
-  - If not provided, the logo endpoint falls back to a favicon service.
-- `LOGO_MAX_BYTES`
-  - Upper bound for downloaded logos (defaults to 512 KiB, clamped to a sane max).
-
-In Docker builds, values are passed as build arguments and then baked into the image as env vars.
-
-## Health And Ports
-
-- The container listens on port `3000`.
-- Start command: `next start` (Node) in production mode.
-
+- Listens on port `3000`
+- Entrypoint: `next start`
