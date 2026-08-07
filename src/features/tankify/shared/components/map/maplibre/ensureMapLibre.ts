@@ -129,13 +129,15 @@ export function ensureMapLibreDeps(): Promise<void> {
         // CSS is usually injected in app/layout.tsx, but keep this as a safety net.
         ensureCssOnce(
             "tankify-maplibre-gl-css",
-            "https://unpkg.com/maplibre-gl/dist/maplibre-gl.css"
+            "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css"
         );
 
         // UMD bundle exposes `maplibregl` globally.
+        // Pinned to major v5: MapLibre GL v6 dropped the UMD/global bundle entirely
+        // (only ships ESM .mjs now), so an unversioned URL breaks this loader.
         await loadScriptOnce(
             "tankify-maplibre-gl",
-            "https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"
+            "https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"
         );
     })();
 
