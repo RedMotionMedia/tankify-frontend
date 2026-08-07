@@ -21,7 +21,7 @@ export default function RootLayout({
             <link rel="icon" href="/favicon.ico" sizes="any" />
             <link
                 rel="stylesheet"
-                href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css"
+                href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css"
             />
             <title>Tankify</title>
         </head>
